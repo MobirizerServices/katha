@@ -6,7 +6,10 @@ Persistence, JWT/App-Attest, rate limits and CDN signing are the next layers.
 """
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from katha_domain import catalog
 from .routers import auth as auth_router
@@ -20,6 +23,20 @@ app = FastAPI(
     version="0.1.0",
     description="Public mobile + web API. Money is an append-only ledger; the client "
                 "computes no prices or entitlements.",
+)
+
+# Allow the web app (and admin) origins to call the API from the browser.
+# Dev default is permissive; production pins to the real web origins.
+_origins = os.environ.get(
+    "KATHA_CORS_ORIGINS",
+    "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000",
+).split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(auth_router.router)

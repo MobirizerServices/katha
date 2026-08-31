@@ -29,6 +29,7 @@ PACKS = {
 CLOCK = "2026-09-14T14:03:22+05:30"
 CLOCK_DAY = CLOCK[:10]  # "2026-09-14" — used for idempotent daily check-ins.
 CHECKIN_COINS = 5
+WEB_BONUS_PCT = 10  # +10% web bonus on any web-store purchase (PDD §19 decision 11)
 
 
 @dataclass

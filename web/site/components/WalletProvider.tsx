@@ -1,12 +1,17 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { webBonusCoins } from "@/lib/catalog";
+import { api, getToken, clearToken } from "@/lib/api";
 
 /**
- * Client-side wallet + auth state for the web watch app.
- * Money rules mirror the ledger package: bonus coins are spent before bought
- * coins, coins never expire. Purchases here are demo-only (no real payment).
+ * Wallet + auth state for the web watch app, wired to the LIVE core-api.
+ * The backend append-only ledger is the source of truth: purchases and unlocks
+ * hit the API and the wallet is reconciled from the server response. UI updates
+ * are optimistic (PDD principle: never make a paying user wait), then corrected.
  */
+
+let _keySeq = 0;
+const nextKey = (p: string) => `${p}:${Date.now()}:${_keySeq++}`;
 
 interface Unlocked {
   [slug: string]: "all" | number[]; // "all" for a bundle, else list of episode numbers
@@ -62,15 +67,48 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const afterHref = useRef<string | undefined>(undefined);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // hydrate from localStorage
+  // hydrate local unlocked-cache + establish a live session (guest token) and
+  // fetch the authoritative wallet from core-api.
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let cached: Partial<WalletState> = {};
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) cached = JSON.parse(raw);
+      } catch { /* ignore */ }
+      try {
+        if (!getToken()) await api.guestLogin();
+        const w = await api.wallet();
+        if (!cancelled)
+          setState((s) => ({
+            ...s,
+            ...cached,
+            bought: w.balance_bought,
+            bonus: w.balance_bonus,
+            signed: !!cached.signed,
+            phone: cached.phone || "",
+            name: cached.name || "",
+          }));
+      } catch {
+        // API offline: fall back to the cached view so the UI still renders.
+        if (!cancelled) setState((s) => ({ ...s, ...cached }));
+      }
+      if (!cancelled) setReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // A ref that always holds the latest state, so money decisions can be made
+  // synchronously (React does not guarantee setState updaters run inline).
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const refreshWallet = useCallback(async () => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setState({ ...INITIAL, ...JSON.parse(raw) });
-    } catch {
-      /* ignore */
-    }
-    setReady(true);
+      const w = await api.wallet();
+      setState((s) => ({ ...s, bought: w.balance_bought, bonus: w.balance_bonus }));
+    } catch { /* keep optimistic view */ }
   }, []);
 
   // persist
@@ -91,25 +129,38 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(
     (phone: string) => {
-      setState((s) => ({ ...s, signed: true, phone, name: "Meera" }));
-      setSignInOpen(false);
-      toast("Signed in as " + phone);
-      if (afterHref.current) {
-        const href = afterHref.current;
-        afterHref.current = undefined;
-        // let the modal close first
-        setTimeout(() => {
-          window.location.href = href;
-        }, 60);
-      }
+      // Real OTP login against core-api — switches identity to this phone user,
+      // then loads that user's authoritative wallet.
+      (async () => {
+        try {
+          await api.otpLogin(phone, "1234");
+          const w = await api.wallet();
+          setState((s) => ({
+            ...s, signed: true, phone, name: "Meera",
+            bought: w.balance_bought, bonus: w.balance_bonus,
+          }));
+        } catch {
+          setState((s) => ({ ...s, signed: true, phone, name: "Meera" }));
+        }
+        setSignInOpen(false);
+        toast("Signed in as " + phone);
+        if (afterHref.current) {
+          const href = afterHref.current;
+          afterHref.current = undefined;
+          setTimeout(() => { window.location.href = href; }, 60);
+        }
+      })();
     },
     [toast]
   );
 
   const signOut = useCallback(() => {
-    setState((s) => ({ ...s, signed: false, phone: "", name: "" }));
+    clearToken();
+    setState((s) => ({ ...s, signed: false, phone: "", name: "", bought: 0, bonus: 0, unlocked: {} }));
     toast("Signed out");
-  }, [toast]);
+    // re-establish a guest session for continued browsing
+    api.guestLogin().then(() => refreshWallet()).catch(() => {});
+  }, [toast, refreshWallet]);
 
   const openSignIn = useCallback((href?: string) => {
     afterHref.current = href;
@@ -134,33 +185,41 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const unlockEpisode = useCallback(
     (slug: string, n: number, price: number): boolean => {
-      let ok = false;
+      // Decide affordability synchronously from the latest state.
+      const s0 = stateRef.current;
+      if (s0.bonus + s0.bought < price) return false;
+      // Optimistic UI update.
       setState((s) => {
-        const spent = spend(s, price);
-        if (!spent) return s;
-        ok = true;
+        const spent = spend(s, price)!;
         const prev = spent.unlocked[slug];
         const list = prev === "all" ? "all" : Array.isArray(prev) ? [...prev, n] : [n];
         return { ...spent, unlocked: { ...spent.unlocked, [slug]: list } };
       });
-      return ok;
+      // Fire the real ledger unlock and reconcile the wallet from the server.
+      api.unlockEpisode(slug, n, nextKey(`unlock:${slug}:${n}`))
+        .then((r) => setState((s) => ({ ...s, bought: r.wallet.balance_bought, bonus: r.wallet.balance_bonus })))
+        .catch(() => { refreshWallet(); toast("Couldn't confirm the unlock — balance restored"); });
+      return true;
     },
-    []
+    [refreshWallet, toast]
   );
 
   const unlockBundle = useCallback((slug: string, cost: number): boolean => {
-    let ok = false;
+    const s0 = stateRef.current;
+    if (s0.bonus + s0.bought < cost) return false;
     setState((s) => {
-      const spent = spend(s, cost);
-      if (!spent) return s;
-      ok = true;
+      const spent = spend(s, cost)!;
       return { ...spent, unlocked: { ...spent.unlocked, [slug]: "all" } };
     });
-    return ok;
-  }, []);
+    api.unlockAll(slug, nextKey(`bundle:${slug}`))
+      .then((r) => setState((s) => ({ ...s, bought: r.wallet.balance_bought, bonus: r.wallet.balance_bonus })))
+      .catch(() => { refreshWallet(); toast("Couldn't confirm the bundle — balance restored"); });
+    return true;
+  }, [refreshWallet, toast]);
 
   const purchase = useCallback(
     (base: number, priceInr: number, sku: string) => {
+      // Optimistic credit, then reconcile from the real web-order (ledger + web bonus).
       const bonus = webBonusCoins(base);
       setState((s) => ({
         ...s,
@@ -169,8 +228,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         firstPack: sku === "coins_starter_in" ? false : s.firstPack,
       }));
       toast((base + bonus).toLocaleString("en-IN") + " coins added · invoice emailed");
+      api.webOrder(sku)
+        .then((w) => setState((s) => ({ ...s, bought: w.balance_bought, bonus: w.balance_bonus })))
+        .catch(() => refreshWallet());
     },
-    [toast]
+    [toast, refreshWallet]
   );
 
   const value: WalletCtx = {

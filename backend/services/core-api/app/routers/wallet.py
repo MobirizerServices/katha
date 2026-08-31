@@ -14,7 +14,7 @@ from katha_domain.schemas import (
 )
 from katha_ledger import InsufficientCoins, TxType
 from ..deps import current_user
-from ..store import CLOCK, PACKS, store
+from ..store import CLOCK, PACKS, WEB_BONUS_PCT, store
 
 router = APIRouter(prefix="/v1", tags=["wallet"])
 
@@ -68,8 +68,11 @@ def web_order(req: WebOrderRequest, user: str = Depends(current_user)) -> Wallet
         raise HTTPException(status_code=400, detail="unknown sku")
     store.ledger.credit(user, TxType.PURCHASE, coins=pack["coins"], reference_type="web_order",
                         reference_id=req.sku, idempotency_key=f"web:{user}:{req.sku}", created_at=CLOCK)
-    if pack["bonus"]:
-        store.ledger.credit(user, TxType.BONUS, coins=pack["bonus"], reference_type="web_order",
+    # Every WEB purchase earns the +10% web bonus (PDD §19 decision 11), funded by the
+    # absent App Store commission. Any explicit pack bonus is honoured too, whichever is larger.
+    web_bonus = max(pack.get("bonus", 0), pack["coins"] * WEB_BONUS_PCT // 100)
+    if web_bonus:
+        store.ledger.credit(user, TxType.BONUS, coins=web_bonus, reference_type="web_order",
                             reference_id=req.sku, idempotency_key=f"webbonus:{user}:{req.sku}",
                             created_at=CLOCK)
     return _wallet_response(user)

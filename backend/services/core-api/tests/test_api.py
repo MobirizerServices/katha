@@ -98,6 +98,17 @@ def test_web_order_adds_ten_percent_bonus():
     assert body["total"] == 1430
 
 
+def test_any_pack_bought_on_web_earns_the_web_bonus():
+    # Regression (caught by browser e2e): the web store sends the standard IN SKU,
+    # so the +10% web bonus must apply to ANY pack bought via /web/orders, not just
+    # the one SKU that hard-coded a bonus.
+    r = client.post("/v1/web/orders", headers=AUTH, json={"sku": "coins_popular_in"})
+    body = r.json()
+    assert body["balance_bought"] == 1300
+    assert body["balance_bonus"] == 130       # 10% of 1300, applied because it's a web order
+    assert body["total"] == 1430
+
+
 def test_bundle_unlock_all_uses_discount_and_bonus_first():
     slug = "kaanch-ka-mahal"
     client.post("/v1/web/orders", headers=AUTH, json={"sku": "coins_web_popular_in"})  # 1300+130
