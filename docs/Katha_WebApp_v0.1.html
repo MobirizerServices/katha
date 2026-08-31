@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Katha — Watch</title>
+<meta name="robots" content="noindex">
+<meta name="apple-itunes-app" content="app-id=0000000000">
+<meta name="theme-color" content="#0B0B0F">
+<style>
+:root{
+  --bg:#0B0B0F; --surface:#16161D; --raised:#1F1F28; --line:#23232C;
+  --text:#F5F5F7; --text2:#A1A1AA; --text3:#6B6B75;
+  --accent:#FF5C3A; --accent-p:#E04A2B; --coin:#F5C042; --ok:#2FBF71; --danger:#FF4D4F; --info:#5CA8FF;
+  --nav-h:64px; --r:14px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scrollbar-color:#33333d var(--bg)}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+a{color:inherit;text-decoration:none}
+img{display:block}
+::-webkit-scrollbar{height:8px;width:10px}::-webkit-scrollbar-thumb{background:#2A2A33;border-radius:5px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+.sr{position:absolute;left:-9999px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic.s{width:18px;height:18px}.ic.xs{width:15px;height:15px}
+.ic.fill{fill:currentColor;stroke:none}
+
+/* ---------- app banner (mobile) ---------- */
+.appbanner{display:none;align-items:center;gap:10px;padding:8px 12px;background:#111118;border-bottom:1px solid var(--line);font-size:13px}
+.appbanner img,.appbanner svg{border-radius:8px}
+.appbanner b{display:block;font-size:13px}
+.appbanner span{color:var(--text2);font-size:11px}
+.appbanner .get{margin-left:auto;background:var(--accent);color:#fff;font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px}
+
+/* ---------- nav ---------- */
+header.nav{position:sticky;top:0;z-index:60;height:var(--nav-h);display:flex;align-items:center;gap:22px;padding:0 max(20px,4vw);background:linear-gradient(to bottom,rgba(11,11,15,.95),rgba(11,11,15,.75));backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.04)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:21px;letter-spacing:-.03em}
+.brand small{font-weight:500;color:var(--text2);font-size:14px}
+nav.links{display:flex;gap:20px;font-size:14.5px}
+nav.links a{color:var(--text2);padding:6px 2px;font-weight:500}
+nav.links a:hover{color:var(--text)}
+nav.links a[aria-current="page"]{color:var(--text);font-weight:600}
+.nsp{flex:1}
+.nbtn{width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--text2)}
+.nbtn:hover{background:var(--surface);color:var(--text)}
+.coinpill{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px 0 10px;border-radius:999px;background:var(--surface);font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
+.coinpill:hover{background:var(--raised)}
+.coin{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FFE9A3,#F5C042 58%,#B8861B);box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.18);flex:none}
+.coin.s{width:14px;height:14px}
+.coin.lg{width:26px;height:26px}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(140deg,#C2553D,#3B1F2B);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
+.signin{height:36px;padding:0 16px;border-radius:999px;background:var(--text);color:#0B0B0F;font-weight:700;font-size:14px}
+.searchbar{display:none;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:999px;height:40px;padding:0 16px;width:min(440px,42vw)}
+.searchbar input{flex:1;background:none;border:0;color:var(--text);font:inherit;outline:none;min-width:0}
+.searchbar.on{display:flex}
+main{min-height:calc(100vh - var(--nav-h))}
+.page{display:none;padding-bottom:72px}
+.page.on{display:block}
+.wrap{padding:0 max(20px,4vw)}
+
+/* ---------- billboard ---------- */
+.billboard{position:relative;min-height:min(72vh,640px);display:flex;align-items:flex-end;isolation:isolate;overflow:hidden}
+.billboard .art{position:absolute;inset:0;z-index:-2;background:linear-gradient(160deg,var(--c1),var(--c2))}
+.billboard .art img{width:100%;height:100%;object-fit:cover;filter:saturate(.8) brightness(.8)}
+.billboard .art::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,var(--c1),var(--c2));opacity:.4;mix-blend-mode:multiply}
+.billboard::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(to top,var(--bg) 4%,rgba(11,11,15,.55) 40%,rgba(11,11,15,.15) 70%,rgba(11,11,15,.35)),linear-gradient(to right,rgba(11,11,15,.82),transparent 62%)}
+.bb{padding:0 max(20px,4vw) 46px;max-width:640px}
+.bb .kicker{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.06em;color:var(--accent);margin-bottom:12px}
+.bb h1{font-size:clamp(34px,5vw,58px);line-height:1.0;letter-spacing:-.03em;margin:0 0 10px;font-weight:800;text-shadow:0 2px 12px rgba(0,0,0,.35)}
+.bb .meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--text2);font-size:14px;margin-bottom:12px}
+.bb .hook{font-size:17px;color:#E8E8EC;max-width:46ch;margin:0 0 22px;text-shadow:0 1px 8px rgba(0,0,0,.4)}
+.rating{border:1px solid rgba(255,255,255,.35);border-radius:5px;padding:1px 6px;font-size:11.5px;font-weight:700;color:#fff}
+.dotsep::before{content:"·";margin:0 2px;color:var(--text3)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;height:48px;padding:0 22px;border-radius:999px;font-weight:700;font-size:15.5px}
+.btn.p{background:var(--accent);color:#fff}.btn.p:hover{background:var(--accent-p)}
+.btn.s{background:rgba(255,255,255,.12);backdrop-filter:blur(8px)}.btn.s:hover{background:rgba(255,255,255,.2)}
+.btn.ghost{background:transparent;border:1.5px solid rgba(255,255,255,.25)}.btn.ghost:hover{border-color:#fff}
+.btn.sm{height:38px;padding:0 16px;font-size:14px}
+.btn.gold{background:var(--coin);color:#241B02}.btn.gold:hover{filter:brightness(1.06)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.bb .ctas{display:flex;gap:12px;align-items:center}
+.freebadge{position:absolute;top:calc(var(--nav-h) + 14px);right:max(20px,4vw);background:rgba(0,0,0,.5);backdrop-filter:blur(8px);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:600;display:flex;gap:8px;align-items:center}
+
+/* ---------- rows & cards ---------- */
+.row{margin-top:34px}
+.rowhead{display:flex;align-items:baseline;justify-content:space-between;padding:0 max(20px,4vw);margin-bottom:12px}
+.rowhead h2{font-size:19px;margin:0;letter-spacing:-.01em;font-weight:700}
+.rowhead a{font-size:13px;color:var(--text2)}
+.rowhead a:hover{color:var(--text)}
+.strip{position:relative}
+.scroller{display:flex;gap:12px;overflow-x:auto;padding:4px max(20px,4vw) 10px;scroll-snap-type:x mandatory;scrollbar-width:none}
+.scroller::-webkit-scrollbar{display:none}
+.card{width:152px;flex:none;scroll-snap-align:start;position:relative}
+.card .poster{aspect-ratio:2/3;border-radius:12px;position:relative;overflow:hidden;background:linear-gradient(160deg,var(--c1),var(--c2));isolation:isolate;transition:transform .18s ease,box-shadow .18s ease}
+.card .poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.75) contrast(1.05) brightness(.88)}
+.card .poster::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,var(--c1),var(--c2));opacity:.42;mix-blend-mode:multiply}
+.card .poster::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(to top,rgba(0,0,0,.7),transparent 55%)}
+.card:hover .poster{transform:translateY(-4px) scale(1.03);box-shadow:0 14px 34px rgba(0,0,0,.5)}
+.card .t{position:absolute;left:10px;right:10px;bottom:10px;z-index:2;font-weight:800;font-size:15px;line-height:1.1;letter-spacing:-.015em;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.card .badge{position:absolute;top:8px;left:8px;z-index:2;height:22px;padding:0 8px;border-radius:999px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px}
+.card .badge.new{background:var(--accent)}
+.card .badge.lang{left:auto;right:8px;background:rgba(0,0,0,.45)}
+.card .playov{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
+.card:hover .playov{opacity:1}
+.card .playov i{width:46px;height:46px;border-radius:50%;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center}
+.card .sub{margin-top:8px;font-size:12.5px;color:var(--text2);line-height:1.35}
+.card .prog{height:3px;background:rgba(255,255,255,.15);border-radius:2px;margin-top:8px;overflow:hidden}
+.card .prog i{display:block;height:100%;background:var(--accent)}
+.card.cont{width:210px}
+.card.cont .poster{aspect-ratio:16/10}
+.arrow{position:absolute;top:0;bottom:14px;width:52px;display:flex;align-items:center;justify-content:center;z-index:5;opacity:0;transition:opacity .15s;color:#fff}
+.arrow.l{left:0;background:linear-gradient(to right,rgba(11,11,15,.85),transparent)}
+.arrow.r{right:0;background:linear-gradient(to left,rgba(11,11,15,.85),transparent)}
+.strip:hover .arrow{opacity:1}
+.arrow svg{width:30px;height:30px;filter:drop-shadow(0 1px 4px rgba(0,0,0,.6))}
+.chips{display:flex;gap:8px;flex-wrap:wrap;padding:18px max(20px,4vw) 0}
+.chip{height:34px;padding:0 15px;border-radius:999px;background:var(--surface);color:var(--text2);font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:7px}
+.chip.on{background:rgba(255,92,58,.16);color:var(--text);box-shadow:inset 0 0 0 1px var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;padding:20px max(20px,4vw)}
+.grid .card{width:auto}
+
+/* ---------- series page ---------- */
+.shero{position:relative;min-height:400px;display:flex;align-items:flex-end;isolation:isolate;overflow:hidden}
+.shero .art{position:absolute;inset:0;z-index:-2;background:linear-gradient(160deg,var(--c1),var(--c2))}
+.shero .art img{width:100%;height:100%;object-fit:cover;filter:saturate(.8) brightness(.75)}
+.shero .art::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,var(--c1),var(--c2));opacity:.42;mix-blend-mode:multiply}
+.shero::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(to top,var(--bg) 2%,rgba(11,11,15,.5) 45%,rgba(11,11,15,.2)),linear-gradient(to right,rgba(11,11,15,.8),transparent 60%)}
+.sinfo{padding:90px max(20px,4vw) 34px;display:flex;gap:26px;align-items:flex-end;width:100%}
+.sinfo .poster{width:150px;aspect-ratio:2/3;border-radius:14px;overflow:hidden;position:relative;background:linear-gradient(160deg,var(--c1),var(--c2));box-shadow:0 18px 44px rgba(0,0,0,.5);flex:none;isolation:isolate}
+.sinfo .poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.75) brightness(.9)}
+.sinfo .poster::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,var(--c1),var(--c2));opacity:.4;mix-blend-mode:multiply}
+.sinfo h1{font-size:clamp(30px,4vw,46px);margin:0 0 8px;letter-spacing:-.03em;line-height:1.02;font-weight:800}
+.sinfo .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--text2);font-size:14px;margin-bottom:14px}
+.sinfo .ctas{display:flex;gap:10px;flex-wrap:wrap}
+.sbody{display:grid;grid-template-columns:1fr 380px;gap:36px;padding:26px max(20px,4vw) 0;align-items:start}
+.syn{color:#D6D6DC;max-width:70ch}
+.facts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.fact{background:var(--surface);border-radius:999px;padding:6px 12px;font-size:12.5px;color:var(--text2)}
+.bundle{background:linear-gradient(140deg,#241a10,#171310);border:1px solid #3a2c17;border-radius:var(--r);padding:18px;display:flex;gap:14px;align-items:center;margin-top:18px}
+.bundle .coin.lg{box-shadow:inset 0 0 0 2px rgba(0,0,0,.18),0 0 24px rgba(245,192,66,.35)}
+.bundle b{display:block;font-size:15px}
+.bundle span{font-size:13px;color:var(--text2)}
+.bundle .btn{margin-left:auto}
+.epspanel h3{font-size:17px;margin:0 0 4px;display:flex;align-items:baseline;justify-content:space-between}
+.epspanel h3 span{font-size:12.5px;color:var(--text2);font-weight:500}
+.eps{background:var(--surface);border-radius:var(--r);overflow:hidden;max-height:560px;overflow-y:auto}
+.ep{display:flex;gap:12px;align-items:center;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;position:relative}
+.ep:hover{background:var(--raised)}
+.ep:last-child{border-bottom:0}
+.ep .n{width:26px;font-size:13px;color:var(--text3);font-variant-numeric:tabular-nums;text-align:right}
+.ep .th{width:64px;aspect-ratio:9/13;border-radius:8px;background:linear-gradient(160deg,var(--c1),var(--c2));position:relative;overflow:hidden;flex:none;filter:saturate(.8)}
+.ep .th i{position:absolute;left:0;bottom:0;height:3px;background:var(--accent)}
+.ep .tt{flex:1;min-width:0}
+.ep .tt b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ep .tt span{font-size:12px;color:var(--text2)}
+.ep .right{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text2);flex:none}
+.ep .free{color:var(--ok);font-weight:700;font-size:12px;letter-spacing:.03em}
+.ep .price{display:flex;align-items:center;gap:5px;font-weight:700;color:var(--text)}
+.ep.now{background:rgba(255,92,58,.1)}
+.ep.now .tt b{color:var(--accent)}
+.ep .done{color:var(--ok)}
+.ep.locked .th::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.45)}
+.lockic{width:14px;height:14px}
+
+/* ---------- player ---------- */
+.playerpage{position:fixed;inset:0;z-index:80;background:#000;display:none}
+.playerpage.on{display:block}
+.stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.backfill{position:absolute;inset:0;overflow:hidden}
+.backfill img{width:100%;height:100%;object-fit:cover;filter:blur(60px) brightness(.35) saturate(.8);transform:scale(1.2)}
+.video{position:relative;height:100%;aspect-ratio:9/16;max-width:100vw;background:radial-gradient(75% 55% at 38% 34%,var(--v1) 0%,var(--v2) 42%,#0B0B0F 100%);overflow:hidden;isolation:isolate}
+.video img.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.72) contrast(1.06) brightness(.78)}
+.video .grain{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.4),transparent 22%,transparent 58%,rgba(0,0,0,.75))}
+.video .paused{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.25)}
+.video .paused i{width:76px;height:76px;border-radius:50%;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center}
+.subt{position:absolute;left:6%;right:6%;bottom:132px;text-align:center;font-size:clamp(15px,2.4vh,19px);line-height:1.4;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.85);z-index:3}
+.ptop{position:absolute;top:0;left:0;right:0;padding:16px 18px;display:flex;align-items:center;gap:8px;z-index:14;background:linear-gradient(to bottom,rgba(0,0,0,.55),transparent)}
+.ptop .name{font-size:13.5px;color:#E7E7EC;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.ptop .name b{display:block;font-size:15px}
+.pbtn{width:40px;height:40px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.35);backdrop-filter:blur(6px)}
+.pbtn:hover{background:rgba(0,0,0,.55)}
+.pbtn.on{color:var(--accent)}
+.pbottom{position:absolute;left:0;right:0;bottom:0;padding:0 18px calc(16px + env(safe-area-inset-bottom));z-index:6;background:linear-gradient(to top,rgba(0,0,0,.65),transparent)}
+.ptitle{font-size:14px;color:#E7E7EC;margin-bottom:10px;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.ptitle b{display:block;font-size:16px;letter-spacing:-.01em}
+.seek{position:relative;height:20px;display:flex;align-items:center;cursor:pointer}
+.seek .tr{position:absolute;left:0;right:0;height:3px;border-radius:2px;background:rgba(255,255,255,.28)}
+.seek .buf{position:absolute;left:0;height:3px;border-radius:2px;background:rgba(255,255,255,.45);width:0}
+.seek .pl{position:absolute;left:0;height:3px;border-radius:2px;background:var(--accent);width:0}
+.seek .hd{position:absolute;width:13px;height:13px;border-radius:50%;background:#fff;margin-left:-7px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.pctrl{display:flex;align-items:center;gap:6px;margin-top:6px}
+.ptime{font-size:12.5px;color:#CFCFD6;font-variant-numeric:tabular-nums;margin:0 6px}
+.prail{position:absolute;right:14px;bottom:170px;display:flex;flex-direction:column;gap:18px;align-items:center;z-index:5}
+.prail button{display:flex;flex-direction:column;gap:5px;align-items:center;color:#fff;font-size:11.5px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+.prail .ic{width:30px;height:30px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
+.prail .liked{color:var(--accent)}
+.overlay{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(10px)}
+.ocard{width:min(400px,88%);background:var(--surface);border-radius:20px;padding:26px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.ocard h3{margin:0 0 6px;font-size:20px;letter-spacing:-.02em}
+.ocard p{margin:0 0 18px;color:var(--text2);font-size:14px}
+.balance{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--raised);border-radius:12px;padding:12px;margin-bottom:16px;font-weight:700}
+.balance small{font-weight:500;color:var(--text2)}
+.ocard .btn{width:100%;margin-top:10px}
+.olink{display:inline-block;margin-top:16px;color:var(--text2);font-size:13.5px}
+.olink:hover{color:var(--text)}
+.countring{width:64px;height:64px;margin:0 auto 14px;position:relative}
+.countring svg{transform:rotate(-90deg)}
+.countring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px}
+.unlockflash{position:absolute;inset:0;z-index:11;display:flex;align-items:center;justify-content:center;background:rgba(11,11,15,.65);backdrop-filter:blur(6px)}
+.unlockflash .in{text-align:center}
+.unlockflash .ring{width:84px;height:84px;border-radius:50%;background:rgba(47,191,113,.15);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;color:var(--ok)}
+.epsheet{position:absolute;top:0;right:0;bottom:0;width:min(400px,92vw);background:rgba(17,17,24,.92);backdrop-filter:blur(20px);z-index:12;transform:translateX(105%);transition:transform .22s ease;display:flex;flex-direction:column}
+.epsheet.on{transform:none}
+.epsheet h3{margin:0;padding:18px;font-size:16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.06)}
+.epsheet .eps{background:transparent;border-radius:0;max-height:none;flex:1}
+
+/* ---------- coin store ---------- */
+.storehead{padding:44px max(20px,4vw) 8px;max-width:760px}
+.storehead h1{font-size:clamp(26px,3.6vw,38px);margin:0 0 8px;letter-spacing:-.025em}
+.storehead p{color:var(--text2);margin:0}
+.walletbar{margin:20px max(20px,4vw) 0;display:flex;align-items:center;gap:14px;background:var(--surface);border-radius:var(--r);padding:16px 18px;max-width:760px}
+.walletbar b{font-size:22px;font-variant-numeric:tabular-nums}
+.walletbar span{color:var(--text2);font-size:13px}
+.packs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;padding:22px max(20px,4vw);max-width:1200px}
+.pack{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;position:relative;text-align:left;transition:transform .15s,border-color .15s}
+.pack:hover{transform:translateY(-3px);border-color:#3a3a46}
+.pack.hi{border-color:var(--accent);background:linear-gradient(180deg,rgba(255,92,58,.09),var(--surface) 55%)}
+.pack .tagt{position:absolute;top:-11px;left:16px;background:var(--accent);color:#fff;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:.03em}
+.pack .tagt.gold{background:var(--coin);color:#241B02}
+.pack .coins{display:flex;align-items:center;gap:9px;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.pack .bonus{color:var(--coin);font-size:12.5px;font-weight:700;margin-top:3px;min-height:17px}
+.pack .price{margin-top:14px;font-size:17px;font-weight:700}
+.pack .per{color:var(--text3);font-size:12px;margin-top:2px}
+.storenote{padding:0 max(20px,4vw) 30px;color:var(--text3);font-size:12.5px;max-width:760px}
+
+/* ---------- profile / mylist ---------- */
+.phead{padding:44px max(20px,4vw) 10px;display:flex;gap:18px;align-items:center}
+.phead .avatar{width:64px;height:64px;font-size:24px}
+.phead h1{margin:0;font-size:26px;letter-spacing:-.02em}
+.phead p{margin:4px 0 0;color:var(--text2);font-size:14px}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:18px max(20px,4vw);max-width:1100px}
+.pcard{background:var(--surface);border-radius:var(--r);padding:20px}
+.pcard h3{margin:0 0 14px;font-size:15.5px}
+.setrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:14px}
+.setrow:last-child{border-bottom:0}
+.setrow .d{flex:1}
+.setrow .d span{display:block;font-size:12.5px;color:var(--text2)}
+.tog{width:44px;height:26px;border-radius:14px;background:#3A3A44;position:relative;flex:none;transition:background .15s}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}
+.tog[aria-checked="true"]{background:var(--ok)}
+.tog[aria-checked="true"]::after{left:21px}
+.ledger{font-size:13.5px}
+.ledger .lr{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.ledger .lr:last-child{border-bottom:0}
+.ledger .lr span{color:var(--text2)}
+.ledger .lr b{font-variant-numeric:tabular-nums}
+.langchips{display:flex;gap:8px;flex-wrap:wrap}
+.empty{padding:80px 20px;text-align:center;color:var(--text2)}
+.empty .ic{width:46px;height:46px;margin:0 auto 14px;color:var(--text3)}
+.empty h3{color:var(--text);margin:0 0 6px;font-size:18px}
+.empty p{margin:0 0 18px;font-size:14px}
+
+/* ---------- modal / toast ---------- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);z-index:90;display:none}
+.scrim.on{display:block}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100vw - 32px));background:var(--surface);border-radius:22px;z-index:95;display:none;box-shadow:0 40px 100px rgba(0,0,0,.7);max-height:90vh;overflow:auto}
+.modal.on{display:block}
+.modal .mh{padding:22px 24px 0;display:flex;justify-content:space-between;align-items:flex-start}
+.modal h2{margin:0;font-size:20px;letter-spacing:-.02em}
+.modal .mb{padding:14px 24px 24px}
+.modal p.d{color:var(--text2);font-size:14px;margin:6px 0 16px}
+.x{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text2)}
+.x:hover{background:var(--raised);color:var(--text)}
+.fld{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text2);margin-bottom:14px}
+.fld input{background:var(--raised);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:inherit;font-size:16px;color:var(--text);width:100%;letter-spacing:.02em}
+.fld input:focus{border-color:var(--accent);outline:none}
+.otp{display:flex;gap:10px;justify-content:center}
+.otp input{width:52px;text-align:center;font-size:22px;font-weight:700;padding:12px 0}
+.upi{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:center}
+.qr{background:#fff;border-radius:14px;padding:10px;aspect-ratio:1;display:flex;align-items:center;justify-content:center}
+.upiapps{display:grid;gap:8px}
+.upiapps button{display:flex;align-items:center;gap:10px;background:var(--raised);border-radius:12px;padding:12px 14px;font-weight:600;font-size:14px}
+.upiapps button:hover{background:#26262f}
+.upiapps .logo{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff}
+.paying{text-align:center;padding:16px 0}
+.spinner{width:44px;height:44px;border-radius:50%;border:3px solid var(--raised);border-top-color:var(--accent);margin:0 auto 14px;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.success .ring{width:74px;height:74px;border-radius:50%;background:rgba(47,191,113,.15);color:var(--ok);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.pinpad{display:flex;gap:10px;justify-content:center;margin:8px 0 4px}
+.pinpad input{width:48px;text-align:center;font-size:22px;font-weight:700;padding:11px 0}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#fff;color:#0B0B0F;padding:11px 18px;border-radius:999px;font-size:14px;font-weight:600;z-index:120;display:none;box-shadow:0 12px 34px rgba(0,0,0,.5);max-width:calc(100vw - 32px);text-align:center}
+.toast.on{display:block}
+footer.site{padding:44px max(20px,4vw) 40px;color:var(--text3);font-size:12.5px;border-top:1px solid rgba(255,255,255,.05);margin-top:60px}
+footer.site .links{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px}
+footer.site a{color:var(--text2)}
+footer.site a:hover{color:var(--text)}
+
+/* ---------- responsive ---------- */
+@media (max-width:900px){
+  .sbody{grid-template-columns:1fr}
+  .pgrid{grid-template-columns:1fr}
+  nav.links{display:none}
+  .searchbar{width:min(320px,60vw)}
+}
+@media (max-width:640px){
+  :root{--nav-h:56px}
+  .appbanner{display:flex}
+  .brand small{display:none}
+  .billboard{min-height:78vh}
+  .bb{padding-bottom:34px}
+  .sinfo{gap:16px;padding-top:70px}
+  .sinfo .poster{width:104px}
+  .card{width:128px}
+  .card.cont{width:180px}
+  .coinpill span.lbl{display:none}
+  .freebadge{display:none}
+  .prail{bottom:190px}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-app" viewBox="0 0 64 64"><defs><linearGradient id="appg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF7A5C"/><stop offset="1" stop-color="#E04A2B"/></linearGradient></defs><rect width="64" height="64" rx="14.5" fill="url(#appg)"/><path d="M18 14h28a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8H30l-9 8v-8h-3a8 8 0 0 1-8-8V22a8 8 0 0 1 8-8z" fill="#fff" fill-opacity=".96"/><path d="M28 22.5v15l12-7.5z" fill="#E04A2B"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M6 12v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-7"/></symbol>
+  <symbol id="i-eps" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="4" rx="1.5"/><rect x="4" y="11" width="16" height="4" rx="1.5"/><rect x="4" y="17" width="10" height="3" rx="1.5"/></symbol>
+  <symbol id="i-cc" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M10 10.5h-2.5a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H10M17 10.5h-2.5a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H17"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3V7l-4 3H5z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3V7l-4 3H5z"/><path d="m16 10 4 4M20 10l-4 4"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 5v14l9-7z"/><rect x="16.5" y="5" width="2.5" height="14" rx="1"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.5L6 20V5a1 1 0 0 1 1-1z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/></symbol>
+  <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M13 5l7 7-7 7M4 5l7 7-7 7"/></symbol>
+  <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="4" rx="1"/><path d="M5 13v7h14v-7M12 9v11"/><path d="M12 9C9 9 7 7.8 7 6a2 2 0 0 1 4-.5c.4 1 .9 2.3 1 3.5.1-1.2.6-2.5 1-3.5A2 2 0 0 1 17 6c0 1.8-2 3-5 3z"/></symbol>
+</svg>
+
+<div class="appbanner" id="appbanner"><svg width="34" height="34"><use href="#i-app"/></svg><div><b>Katha</b><span>Better in the app · offline & rewards</span></div><button class="get" data-act="toast" data-msg="Opens the App Store listing">GET</button></div>
+
+<header class="nav">
+  <a class="brand" href="#/"><svg width="28" height="28"><use href="#i-app"/></svg>Katha <small>कथा</small></a>
+  <nav class="links" aria-label="Primary">
+    <a href="#/" data-nav="home">Home</a>
+    <a href="#/browse" data-nav="browse">Browse</a>
+    <a href="#/mylist" data-nav="mylist">My list</a>
+  </nav>
+  <span class="nsp"></span>
+  <div class="searchbar" id="searchbar"><svg class="ic s"><use href="#i-search"/></svg><input id="q" placeholder="Series, genres, moods…" aria-label="Search"><button class="x" data-act="search-close" aria-label="Close search"><svg class="ic s"><use href="#i-x"/></svg></button></div>
+  <button class="nbtn" data-act="search-open" id="searchbtn" aria-label="Search"><svg class="ic"><use href="#i-search"/></svg></button>
+  <button class="coinpill" data-act="go" data-to="#/coins" aria-label="Coin balance"><span class="coin"></span><b id="navcoins">0</b><span class="lbl" style="color:var(--text2);font-weight:500">coins</span></button>
+  <button class="signin" id="authbtn" data-act="signin">Sign in</button>
+</header>
+
+<main id="main"></main>
+<div class="playerpage" id="playerpage" role="dialog" aria-label="Player"></div>
+<div class="scrim" id="scrim"></div>
+<div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+(function(){
+'use strict';
+const $=(s,el)=>(el||document).querySelector(s), $$=(s,el)=>Array.from((el||document).querySelectorAll(s));
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const mmss=s=>{s=Math.max(0,Math.round(s));return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;};
+const fmt=n=>Number(n).toLocaleString('en-IN');
+const IMG=(kw,lock,w,h)=>`https://loremflickr.com/${w}/${h}/${kw}?lock=${lock}`;
+
+/* ============================ catalog ============================ */
+const SERIES=[
+ {id:'kaanch-ka-mahal',k:'kaanch',c1:'#3B1F2B',c2:'#C2553D',v1:'#8A4A2F',v2:'#41211A',kw:'indian,bride',lock:11,skw:'letter,handwriting',slock:51,t:'Kaanch Ka Mahal',lang:'Hindi',extra:'Tamil dub · English subs',g:'Family drama',rating:'U/A 16+',total:60,free:10,price:30,hook:'Her in-laws smiled. That\u2019s when Meera knew.',syn:'Meera marries into Lucknow\u2019s most respected family and discovers the mansion runs on secrets. Every episode ends on a turn you won\u2019t see coming — and the letter in episode ten changes everything.',tags:['in-laws saga','hidden identity'],trend:1,newEps:'2 new today'},
+ {id:'ceo-sahab',k:'ceo',c1:'#0F2A3D',c2:'#3E7C9A',v1:'#2E5E7A',v2:'#12222E',kw:'businessman,office',lock:12,skw:'businessman,office',slock:12,t:'CEO Sahab',lang:'Hindi',extra:'English subs',g:'Romance',rating:'U/A 13+',total:60,free:10,price:30,hook:'He hired her to fix his company. She fixed him instead.',syn:'Zoya takes a job at Mehra Group to save her family — and finds the cold CEO is hiding more than balance sheets.',tags:['workplace','secret billionaire'],trend:2,isNew:true},
+ {id:'neend-se-pehle',k:'neend',c1:'#1D1A2F',c2:'#6C4AB6',v1:'#4A3580',v2:'#171326',kw:'night,window',lock:13,skw:'night,window',slock:13,t:'Neend Se Pehle',lang:'Hindi',extra:'English subs',g:'Thriller',rating:'U/A 16+',total:48,free:8,price:30,hook:'Every night at 11:11, her phone rings. From her own number.',syn:'An insomniac radio host starts getting calls that predict the next day. Tonight\u2019s call is about her.',tags:['unreliable narrator'],trend:5},
+ {id:'dilli-6-ka-raaz',k:'dilli',c1:'#2B1B12',c2:'#B9772E',v1:'#8A5A22',v2:'#241708',kw:'delhi,street',lock:14,skw:'delhi,street',slock:14,t:'Dilli 6 Ka Raaz',lang:'Hindi',extra:'English subs',g:'Crime',rating:'U/A 16+',total:72,free:10,price:30,hook:'Nobody in Chandni Chowk sleeps before midnight. Tonight, nobody sleeps at all.',syn:'A street-food runner witnesses the wrong deal and becomes the only man three gangs and one cop all need alive.',tags:['underdog revenge'],trend:6},
+ {id:'saat-pheron-ka-sauda',k:'saat',c1:'#4A1620',c2:'#E0576A',v1:'#A03848',v2:'#2A0D13',kw:'wedding,india',lock:15,skw:'wedding,india',slock:15,t:'Saat Pheron Ka Sauda',lang:'Hindi',extra:'',g:'Romance',rating:'U/A 13+',total:60,free:10,price:30,hook:'She said yes for the money. He said yes for revenge.',syn:'A contract marriage between strangers with opposite reasons — and one rule neither can keep: don\u2019t fall.',tags:['contract marriage'],trend:7,isNew:true},
+ {id:'raja-ki-beti',k:'raja',c1:'#0F3A3D',c2:'#3FA796',v1:'#2C7A6E',v2:'#0C2325',kw:'palace,india',lock:16,skw:'old,key',slock:52,t:'Raja Ki Beti',lang:'Hindi',extra:'Tamil · Telugu dubs',g:'Fantasy',rating:'U/A 7+',total:60,free:12,price:30,hook:'The palace has 99 rooms. Her key opens the hundredth.',syn:'A hostel warden inherits a key, a title, and a hundred-year-old promise that someone will kill to keep buried.',tags:['secret royalty'],trend:3,isNew:true},
+ {id:'kadhal-kanakku',k:'kadhal',c1:'#2E1F3F',c2:'#D66E9D',v1:'#93476B',v2:'#20142B',kw:'college,students',lock:17,skw:'college,students',slock:17,t:'Kadhal Kanakku',lang:'Tamil',extra:'English subs',g:'Campus romance',rating:'U/A 13+',total:54,free:10,price:30,hook:'மூன்று வருடம் கழித்து, அதே வகுப்பறை. அதே இடம். அவள்.',syn:'Three years after the breakup that broke the batch, Arjun walks into his first lecture as a professor — and she\u2019s in the front row.',tags:['second chance'],trend:4},
+ {id:'prema-pariksha',k:'prema',c1:'#1B2E1F',c2:'#6DBE7A',v1:'#4A8A55',v2:'#1421166',kw:'couple,india',lock:18,skw:'couple,india',slock:18,t:'Prema Pariksha',lang:'Telugu',extra:'Hindi dub',g:'Romance',rating:'U/A 13+',total:60,free:10,price:30,hook:'పెళ్లికి ముందు 30 రోజుల పరీక్ష. మొదటి రోజే ఫెయిల్.',syn:'Her grandmother\u2019s condition: live with the stranger you\u2019re engaged to for 30 days. Day one goes very wrong.',tags:['arranged marriage'],trend:8},
+ {id:'vetri-vaasal',k:'vetri',c1:'#33261A',c2:'#E3A24A',v1:'#A87430',v2:'#241A0F',kw:'temple,tamilnadu',lock:19,skw:'temple,tamilnadu',slock:19,t:'Vetri Vaasal',lang:'Tamil',extra:'',g:'Family',rating:'U/A 13+',total:60,free:10,price:25,hook:'வீட்டு வாசலில் வெற்றி. வீட்டுக்குள்ளே யுத்தம்.',syn:'A champion kabaddi player returns home with a trophy and finds the real match is at his own front door.',tags:['sports','in-laws saga'],trend:9},
+ {id:'neeli-ankhon-wala-jhooth',k:'neeli',c1:'#142033',c2:'#4A78A8',v1:'#33567C',v2:'#0E1620',kw:'portrait,man',lock:21,skw:'portrait,man',slock:21,t:'Neeli Ankhon Wala Jhooth',lang:'Hindi',extra:'Premieres Fri',g:'Thriller',rating:'U/A 16+',total:60,free:10,price:30,hook:'The wedding photo has one face too many.',syn:'Meera counts the guests in her own wedding album and finds a stranger in every frame. Tonight, he\u2019s at the door.',tags:['hidden identity'],trend:10,comingSoon:true}
+];
+const byId=id=>SERIES.find(s=>s.id===id);
+const EPTITLES={ 'kaanch-ka-mahal':{1:'The wedding photo',2:'Tea for a stranger',10:'The letter',11:'Two names, one man',12:'Kabir finds the letter',59:'Meera\u2019s answer',60:'Finale · The glass breaks'} };
+const SUBS={
+ hi:['ये चिट्ठी… तुम्हारे नाम की है।','बहू, कल से रसोई तुम्हारी।','कबीर, तुमने माँ को क्या कहा?','यह घर काँच का है — सब दिखता है।','अब खेल शुरू होता है।','सात दिन। बस सात दिन का भरोसा चाहिए।'],
+ ta:['மூன்று வருடம் கழித்து… நீயா?','இந்த வீடு கண்ணாடி — எல்லாம் தெரியும்.','நாளை காலை எட்டு மணிக்கு, அதே இடம்.','இப்போது விளையாட்டு ஆரம்பம்.'],
+ te:['ముప్పై రోజులు. ఒక్క షరతు.','ఈ ఇల్లు గాజుది — అంతా కనిపిస్తుంది.','రేపు ఉదయం, అదే చోటు.','ఇప్పుడు అసలు ఆట మొదలు.']};
+function eps(s){ if(s._eps) return s._eps; const arr=[]; for(let n=1;n<=s.total;n++){ arr.push({n,title:(EPTITLES[s.id]&&EPTITLES[s.id][n])||`Episode ${n}`,dur:62+((n*17+s.id.length*7)%29)}); } return s._eps=arr; }
+const langKey=s=>s.lang==='Tamil'?'ta':s.lang==='Telugu'?'te':'hi';
+
+/* ============================ state ============================ */
+const U={signed:false,name:'',phone:'',coins:{b:0,n:0},firstPack:true,unlocked:{},list:new Set(),likes:new Set(),progress:{},watched:{},langs:new Set(['Hindi','Tamil','Telugu']),settings:{autoplay:true,datasaver:false,subs:true,lock:false,pin:''},ledger:[],pending:null,pinOk:new Set()};
+const bal=()=>U.coins.b+U.coins.n;
+const isFree=(s,n)=>n<=s.free;
+const access=(s,n)=>isFree(s,n)||U.unlocked[s.id]==='all'||(U.unlocked[s.id]&&U.unlocked[s.id].has(n));
+function spend(amount){ const useN=Math.min(U.coins.n,amount); U.coins.n-=useN; U.coins.b-=(amount-useN); }
+function ledger(t,ref,d){ U.ledger.unshift({t,ref,d,when:'Just now'}); }
+
+/* ============================ ui helpers ============================ */
+const toastEl=$('#toast'); let tT;
+function toast(m){ toastEl.textContent=m; toastEl.classList.add('on'); clearTimeout(tT); tT=setTimeout(()=>toastEl.classList.remove('on'),2800); }
+const modal=$('#modal'), scrim=$('#scrim');
+function openModal(html){ modal.innerHTML=html; modal.classList.add('on'); scrim.classList.add('on'); const f=modal.querySelector('input,button:not(.x)'); if(f) setTimeout(()=>f.focus(),40); }
+function closeModal(){ modal.classList.remove('on'); scrim.classList.remove('on'); modal.innerHTML=''; }
+scrim.addEventListener('click',closeModal);
+function updateNav(){ $('#navcoins').textContent=fmt(bal()); const a=$('#authbtn'); if(U.signed){ a.className='avatar'; a.textContent=U.name[0]||'M'; a.setAttribute('data-act','go'); a.setAttribute('data-to','#/profile'); a.setAttribute('aria-label','Profile'); } else { a.className='signin'; a.textContent='Sign in'; a.setAttribute('data-act','signin'); a.removeAttribute('data-to'); } const v=route().v; $$('nav.links a').forEach(x=>{ const m={home:'#/',browse:'#/browse',mylist:'#/mylist'}[x.dataset.nav]; if((v==='home'&&x.dataset.nav==='home')||('#/'+v===m)) x.setAttribute('aria-current','page'); else x.removeAttribute('aria-current'); }); }
+const posterImg=(s,w,h,kind)=>`<img src="${IMG(kind==='scene'?s.skw:s.kw,kind==='scene'?s.slock:s.lock,w,h)}" alt="" loading="lazy" onerror="this.remove()">`;
+
+/* ============================ cards & rows ============================ */
+function card(s,o){ o=o||{}; const p=U.progress[s.id];
+ return `<a class="card ${o.cont?'cont':''}" href="#/series/${s.id}" aria-label="${esc(s.t)}">
+  <div class="poster" style="--c1:${s.c1};--c2:${s.c2}">${posterImg(s,240,360)}
+   ${o.cont?'':`<span class="badge">${s.comingSoon?'Coming Fri':`Free · ${s.free} eps`}</span>`}
+   ${s.isNew&&!o.cont?'<span class="badge new" style="left:auto;right:8px">NEW</span>':''}
+   ${o.cont?'':`<span class="badge lang" style="top:auto;bottom:38px;display:none"></span>`}
+   <span class="playov"><i><svg class="ic fill" style="width:22px;height:22px;color:#fff"><use href="#i-play"/></svg></i></span>
+   <span class="t">${esc(s.t)}</span>
+  </div>
+  ${o.cont&&p?`<div class="prog"><i style="width:${Math.round(p.t/p.dur*100)}%"></i></div><div class="sub">E${p.n} · ${mmss(p.dur-p.t)} left</div>`:o.sub?`<div class="sub">${esc(o.sub)}</div>`:''}
+ </a>`; }
+function rowStrip(title,items,link){ if(!items.length) return ''; return `<section class="row"><div class="rowhead"><h2>${esc(title)}</h2>${link?`<a href="${link}">See all</a>`:''}</div><div class="strip"><button class="arrow l" data-act="scroll" data-d="-1" aria-label="Scroll left"><svg class="ic"><use href="#i-back"/></svg></button><div class="scroller">${items.join('')}</div><button class="arrow r" data-act="scroll" data-d="1" aria-label="Scroll right"><svg class="ic"><use href="#i-chev"/></svg></button></div></section>`; }
+
+/* ============================ views ============================ */
+const V={};
+V.home=()=>{ const f=byId('kaanch-ka-mahal'); const cont=Object.keys(U.progress).map(byId).filter(Boolean);
+ const hin=SERIES.filter(s=>s.lang==='Hindi').sort((a,b)=>a.trend-b.trend), tam=SERIES.filter(s=>s.lang==='Tamil'), tel=SERIES.filter(s=>s.lang==='Telugu');
+ return `<section class="billboard"><div class="art" style="--c1:${f.c1};--c2:${f.c2}">${posterImg(f,1280,720)}</div>
+  <div class="freebadge"><span class="coin s"></span>First ${f.free} episodes free · no ads</div>
+  <div class="bb"><div class="kicker">#1 in India today</div><h1>${esc(f.t)}</h1>
+  <div class="meta"><span class="rating">${f.rating}</span><span>${f.g}</span><span class="dotsep"></span><span>${f.total} episodes</span><span class="dotsep"></span><span>${f.lang} · ${f.extra}</span></div>
+  <p class="hook">${esc(f.hook)} ${esc('Every episode is 60 seconds and ends on a cliffhanger.')}</p>
+  <div class="ctas"><button class="btn p" data-act="play" data-s="${f.id}"><svg class="ic fill s"><use href="#i-play"/></svg>${U.progress[f.id]?`Resume E${U.progress[f.id].n}`:'Play E1'}</button><button class="btn s" data-act="list" data-s="${f.id}">${U.list.has(f.id)?'<svg class="ic s"><use href="#i-check"/></svg>In my list':'<svg class="ic s"><use href="#i-plus"/></svg>My list'}</button><a class="btn ghost sm" href="#/series/${f.id}">Details</a></div></div></section>
+ ${cont.length?rowStrip('Continue watching',cont.map(s=>card(s,{cont:true}))):''}
+ ${rowStrip('Trending in Hindi',hin.map(s=>card(s,{sub:`${s.g} · ${s.total} eps`})),'#/browse')}
+ ${rowStrip('New this week',SERIES.filter(s=>s.isNew||s.comingSoon).map(s=>card(s)))}
+ ${rowStrip('தமிழ் · Tamil',tam.map(s=>card(s,{sub:s.g})))}
+ ${rowStrip('తెలుగు · Telugu',tel.map(s=>card(s,{sub:s.g})))}
+ ${rowStrip('Because you watched Kaanch Ka Mahal',['saat-pheron-ka-sauda','neeli-ankhon-wala-jhooth','neend-se-pehle','ceo-sahab'].map(id=>card(byId(id))))}
+ ${footer()}`; };
+V.browse=(f)=>{ f=f||'All'; const list=SERIES.filter(s=>f==='All'||s.lang===f||s.g===f);
+ return `<div class="chips" role="tablist">${['All','Hindi','Tamil','Telugu','Romance','Thriller','Family drama','Crime','Fantasy'].map(c=>`<button class="chip ${f===c?'on':''}" data-act="browse" data-f="${c}">${c}</button>`).join('')}</div>
+ <div class="grid">${list.map(s=>card(s,{sub:`${s.lang} · ${s.g}`})).join('')}</div>${footer()}`; };
+V.search=(q)=>{ q=(q||'').toLowerCase(); const res=q?SERIES.filter(s=>(s.t+' '+s.g+' '+s.lang+' '+s.tags.join(' ')).toLowerCase().includes(q)):[];
+ return `<div class="wrap" style="padding-top:30px"><h1 style="font-size:24px;margin:0 0 6px">${q?`Results for “${esc(q)}”`:'Search'}</h1><p style="color:var(--text2);margin:0">${q?res.length+' series':'Try a title, a genre, or a mood.'}</p></div>
+ ${q?(res.length?`<div class="grid">${res.map(s=>card(s,{sub:`${s.lang} · ${s.g}`})).join('')}</div>`:`<div class="empty"><svg class="ic"><use href="#i-search"/></svg><h3>Nothing for “${esc(q)}”</h3><p>Check the spelling, or browse by language.</p><a class="btn s sm" href="#/browse" style="display:inline-flex">Browse all</a></div>`):`<div class="chips">${['saas-bahu','revenge','ceo','palace','college','contract marriage','thriller'].map(c=>`<button class="chip" data-act="searchq" data-q="${c}">${c}</button>`).join('')}</div><div class="grid">${SERIES.slice(0,6).map(s=>card(s)).join('')}</div>`}`; };
+V.series=(id)=>{ const s=byId(id); if(!s) return `<div class="empty"><h3>Series not found</h3><a class="btn s sm" href="#/" style="display:inline-flex">Home</a></div>`;
+ const p=U.progress[s.id]; const remaining=eps(s).filter(e=>!access(s,e.n)).length; const bundleCost=Math.round(remaining*s.price*0.75);
+ const list=eps(s).map(e=>{ const acc=access(s,e.n); const w=U.watched[s.id]&&U.watched[s.id].has(e.n); const cur=p&&p.n===e.n;
+  return `<div class="ep ${acc?'':'locked'} ${cur?'now':''}" data-act="watch" data-s="${s.id}" data-n="${e.n}" role="button" tabindex="0" aria-label="Episode ${e.n}${acc?'':' locked'}">
+   <span class="n">${e.n}</span><span class="th" style="--c1:${s.c1};--c2:${s.c2}">${cur?`<i style="width:${Math.round(p.t/p.dur*100)}%"></i>`:''}</span>
+   <span class="tt"><b>${esc(e.title)}</b><span>${mmss(e.dur)}${cur?` · ${mmss(p.dur-p.t)} left`:''}</span></span>
+   <span class="right">${w?'<svg class="ic s done"><use href="#i-check"/></svg>':''}${acc?(isFree(s,e.n)?'<span class="free">FREE</span>':'<span class="free" style="color:var(--info)">UNLOCKED</span>'):`<span class="price"><span class="coin s"></span>${s.price}</span><svg class="ic lockic" style="color:var(--text3)"><use href="#i-lock"/></svg>`}</span></div>`; }).join('');
+ return `<section class="shero"><div class="art" style="--c1:${s.c1};--c2:${s.c2}">${posterImg(s,1280,640)}</div>
+  <div class="sinfo"><div class="poster" style="--c1:${s.c1};--c2:${s.c2}">${posterImg(s,240,360)}</div>
+   <div><h1>${esc(s.t)}</h1><div class="meta"><span class="rating">${s.rating}</span><span>${s.g}</span><span class="dotsep"></span><span>${s.total} episodes · 60–90 s each</span><span class="dotsep"></span><span>${s.lang}${s.extra?' · '+s.extra:''}</span></div>
+   <div class="ctas">${s.comingSoon?`<button class="btn p" data-act="remind" data-s="${s.id}"><svg class="ic s"><use href="#i-bookmark"/></svg>Remind me</button>`:`<button class="btn p" data-act="play" data-s="${s.id}"><svg class="ic fill s"><use href="#i-play"/></svg>${p?`Resume E${p.n}`:'Play E1 free'}</button>`}<button class="btn s" data-act="list" data-s="${s.id}">${U.list.has(s.id)?'<svg class="ic s"><use href="#i-check"/></svg>In my list':'<svg class="ic s"><use href="#i-plus"/></svg>My list'}</button><button class="btn s" data-act="toast" data-msg="Link copied — share ${esc(s.t)}" aria-label="Share"><svg class="ic s"><use href="#i-share"/></svg></button></div></div></div></section>
+ <div class="sbody"><div><p class="syn">${esc(s.syn)}</p><div class="facts"><span class="fact">First ${s.free} free</span><span class="fact">${s.price} coins per episode</span><span class="fact">No ads</span>${s.tags.map(t=>`<span class="fact">${esc(t)}</span>`).join('')}</div>
+  ${remaining>0&&!s.comingSoon?`<div class="bundle"><span class="coin lg"></span><div><b>Unlock all ${remaining} remaining episodes</b><span>${fmt(bundleCost)} coins · save 25% vs one by one</span></div><button class="btn gold sm" data-act="bundle" data-s="${s.id}">Unlock all</button></div>`:''}
+  <p style="color:var(--text3);font-size:12.5px;margin-top:18px">Rated ${s.rating}. ${s.rating==='U/A 16+'||s.rating==='A'?'A parental lock PIN, if set, is required to play. ':''}Watching on the web uses your same Katha account and coins as the iPhone app.</p></div>
+ <aside class="epspanel"><h3>Episodes <span>${s.free} free · then ${s.price} <span class="coin s" style="display:inline-block;vertical-align:-2px"></span> each</span></h3><div class="eps">${list}</div></aside></div>${footer()}`; };
+V.coins=()=>{ const packs=[{id:'starter',pr:99,c:600,tag:U.firstPack?'2× ON FIRST PACK':'' ,gold:true},{id:'popular',pr:199,c:1300,b:'8% bonus',hi:true,tag:'MOST CHOSEN'},{id:'value',pr:499,c:3500,b:'17% bonus'},{id:'binge',pr:999,c:7500,b:'25% bonus'},{id:'mega',pr:1999,c:16000,b:'33% bonus'}];
+ return `<div class="storehead"><h1>Get coins</h1><p>Unlock episodes for about ₹4.5 each. Coins never expire while your account exists, and web purchases add a <b style="color:var(--coin)">+10% web bonus</b>.</p></div>
+ <div class="walletbar"><span class="coin lg"></span><div><b>${fmt(bal())}</b> <span>coins</span><br><span>${fmt(U.coins.b)} bought · ${fmt(U.coins.n)} bonus — bonus is spent first</span></div><span style="flex:1"></span>${U.pending?`<button class="btn p sm" data-act="resume-pending">Back to E${U.pending.n}</button>`:''}</div>
+ <div class="packs">${packs.map(p=>`<button class="pack ${p.hi?'hi':''}" data-act="buy" data-p="${p.id}">${p.tag?`<span class="tagt ${p.gold?'gold':''}">${p.tag}</span>`:''}<span class="coins"><span class="coin"></span>${fmt(p.id==='starter'&&U.firstPack?p.c*2:p.c)}</span><span class="bonus">${p.id==='starter'&&U.firstPack?'includes 2× first-pack bonus':p.b||''} ${p.b||p.id==='starter'?'· ':''}+10% web</span><span class="price">₹${p.pr}</span><span class="per">≈ ₹${(p.pr/((p.id==='starter'&&U.firstPack?p.c*2:p.c)/30)).toFixed(1)} per episode</span></button>`).join('')}</div>
+ <p class="storenote">Prices include GST; a tax invoice is emailed for every web purchase. Coins bought on the web are usable everywhere you sign in. Unused, unspent coins from web purchases are refundable within 7 days. Payments are processed by Razorpay; Katha never sees your UPI PIN.</p>${footer()}`; };
+V.mylist=()=>{ const cont=Object.keys(U.progress).map(byId).filter(Boolean); const list=[...U.list].map(byId).filter(Boolean);
+ return `${cont.length?rowStrip('Continue watching',cont.map(s=>card(s,{cont:true}))):''}
+ <div class="rowhead" style="margin-top:30px"><h2>My list</h2></div>
+ ${list.length?`<div class="grid" style="padding-top:6px">${list.map(s=>card(s,{sub:`${s.lang} · ${s.g}`})).join('')}</div>`:`<div class="empty"><svg class="ic"><use href="#i-bookmark"/></svg><h3>Your list is empty</h3><p>Tap “My list” on any series to keep it here.</p><a class="btn p sm" href="#/browse" style="display:inline-flex">Browse series</a></div>`}${footer()}`; };
+V.profile=()=>{ if(!U.signed) return `<div class="empty" style="padding-top:110px"><svg class="ic"><use href="#i-user"/></svg><h3>You\u2019re browsing as a guest</h3><p>Sign in with your phone to buy coins, sync progress with the iPhone app, and keep your list.</p><button class="btn p" data-act="signin" style="display:inline-flex">Sign in with phone</button><p style="margin-top:14px;font-size:12.5px;color:var(--text3)">Free episodes play without an account.</p></div>${footer()}`;
+ return `<div class="phead"><span class="avatar">${U.name[0]}</span><div><h1>${esc(U.name)}</h1><p>${esc(U.phone)} · member since today · 1 device</p></div></div>
+ <div class="pgrid">
+  <div class="pcard"><h3>Wallet</h3><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><span class="coin lg"></span><b style="font-size:26px">${fmt(bal())}</b><span style="color:var(--text2)">coins</span><span style="flex:1"></span><a class="btn gold sm" href="#/coins" style="display:inline-flex">Get coins</a></div>
+   <div class="ledger">${U.ledger.length?U.ledger.slice(0,6).map(l=>`<div class="lr"><span>${esc(l.t)}<br><small style="color:var(--text3)">${esc(l.ref)}</small></span><b style="color:${l.d>0?'var(--ok)':'var(--text)'}">${l.d>0?'+':''}${fmt(l.d)}</b></div>`).join(''):'<div class="lr"><span>No transactions yet</span></div>'}</div></div>
+  <div class="pcard"><h3>Content languages</h3><div class="langchips">${['Hindi','Tamil','Telugu'].map(l=>`<button class="chip ${U.langs.has(l)?'on':''}" data-act="lang" data-l="${l}">${l==='Hindi'?'हिन्दी':l==='Tamil'?'தமிழ்':'తెలుగు'} · ${l}</button>`).join('')}</div><p style="color:var(--text3);font-size:12.5px;margin:12px 0 0">Orders your Home rows. English subtitles are available on most series.</p>
+   <h3 style="margin-top:22px">Playback</h3>
+   ${[['Autoplay next episode','Counts down 5 seconds at the end','autoplay'],['Data saver','Caps quality at 540p on mobile data','datasaver'],['Subtitles by default','In your app language','subs']].map(x=>`<div class="setrow"><div class="d">${x[0]}<span>${x[1]}</span></div><button class="tog" role="switch" aria-checked="${U.settings[x[2]]}" data-act="set" data-k="${x[2]}" aria-label="${x[0]}"></button></div>`).join('')}</div>
+  <div class="pcard"><h3>Parental lock</h3><div class="setrow"><div class="d">Require PIN for 16+ and A titles<span>${U.settings.lock?'PIN is set':'Off'}</span></div><button class="tog" role="switch" aria-checked="${U.settings.lock}" data-act="lock-toggle" aria-label="Parental lock"></button></div><p style="color:var(--text3);font-size:12.5px;margin:10px 0 0">Applies on this browser and in the iPhone app.</p>
+   <h3 style="margin-top:22px">Account</h3>
+   <div class="setrow"><div class="d">Phone<span>${esc(U.phone)}</span></div></div>
+   <div class="setrow"><div class="d">Devices<span>This browser · iPhone 15</span></div><button class="btn s sm" data-act="toast" data-msg="Signed out everywhere else">Sign out others</button></div>
+   <div class="setrow"><div class="d">Sign out</div><button class="btn s sm" data-act="signout">Sign out</button></div></div>
+  <div class="pcard"><h3>About</h3><div class="ledger">
+   <div class="lr"><span>Katha is for viewers 18+. Ratings and a parental lock help you choose.</span></div>
+   <div class="lr"><span><a href="#" data-act="toast" data-msg="Terms open in a new tab">Terms</a> · <a href="#" data-act="toast" data-msg="Privacy notice (DPDP) opens">Privacy (DPDP)</a> · <a href="#" data-act="toast" data-msg="Refund policy opens">Refunds</a> · <a href="#" data-act="toast" data-msg="Grievance form opens">Grievance officer</a></span></div>
+   <div class="lr"><span>Get the iPhone app for offline, rewards and the full experience.</span><a class="btn s sm" href="#" data-act="toast" data-msg="Opens the App Store">App Store</a></div></div></div>
+ </div>${footer()}`; };
+const footer=()=>`<footer class="site"><div class="links"><a href="#" data-act="toast" data-msg="Terms open">Terms</a><a href="#" data-act="toast" data-msg="Privacy notice (DPDP) opens">Privacy</a><a href="#" data-act="toast" data-msg="Refund & cancellation policy opens">Refunds</a><a href="#" data-act="toast" data-msg="Grievance form opens — acknowledged in 24 h">Grievance officer</a><a href="#" data-act="toast" data-msg="help@katha.example">Help</a></div>© 2026 Katha Media Pvt Ltd (placeholder) · For viewers 18+ · Prices include GST · Photos are placeholders for studio key art.</footer>`;
+
+/* ============================ router ============================ */
+const main=$('#main'), pp=$('#playerpage');
+function route(){ const h=(location.hash||'#/').slice(2); const p=h.split('/'); if(p[0]==='watch') return {v:'watch',s:p[1],n:+p[2]||1}; if(p[0]==='series') return {v:'series',id:p[1]}; if(p[0]==='browse') return {v:'browse',f:decodeURIComponent(p[1]||'All')}; if(p[0]==='search') return {v:'search',q:decodeURIComponent(p[1]||'')}; return {v:p[0]||'home'}; }
+let lastNonWatch='#/';
+function render(){ const r=route();
+ if(r.v==='watch'){ const s=byId(r.s); if(!s){ location.hash='#/'; return; } openPlayer(s,r.n); updateNav(); return; }
+ closePlayer(); lastNonWatch=location.hash||'#/';
+ const html = r.v==='series'?V.series(r.id) : r.v==='browse'?V.browse(r.f) : r.v==='search'?V.search(r.q) : (V[r.v]||V.home)();
+ main.innerHTML=`<div class="page on">${html}</div>`; updateNav(); window.scrollTo(0,0); }
+window.addEventListener('hashchange',render);
+
+/* ============================ player ============================ */
+const PL={s:null,n:1,t:0,dur:60,playing:false,timer:null,cc:true,mut:false,sheet:false,over:null};
+function subtitleFor(s,t){ const lines=SUBS[langKey(s)]; if(!lines) return ''; return lines[Math.floor(t/7)%lines.length]; }
+function gate(s,fn){ if(U.settings.lock&&(s.rating==='U/A 16+'||s.rating==='A')&&!U.pinOk.has(s.id)){ pinModal(s,fn); } else fn(); }
+function openPlayer(s,n){ const e=eps(s)[n-1]; if(!e){ location.hash='#/series/'+s.id; return; }
+ gate(s,()=>{ PL.s=s; PL.n=n; PL.dur=e.dur; PL.cc=U.settings.subs; PL.sheet=false;
+  const acc=access(s,n); PL.over=acc?null:'paywall'; const p=U.progress[s.id];
+  PL.t=(acc&&p&&p.n===n)?Math.min(p.t,e.dur-1):0; PL.playing=acc;
+  pp.classList.add('on'); document.body.style.overflow='hidden'; drawPlayer(); startTick(); }); }
+function closePlayer(){ if(!pp.classList.contains('on')) return; stopTick(); saveProgress(); pp.classList.remove('on'); pp.innerHTML=''; document.body.style.overflow=''; }
+function saveProgress(){ if(!PL.s||PL.over==='paywall') return; if(PL.t>3&&PL.t<PL.dur-2){ U.progress[PL.s.id]={n:PL.n,t:PL.t,dur:PL.dur}; } }
+function startTick(){ stopTick(); PL.timer=setInterval(()=>{ if(!PL.playing||PL.over) return; PL.t+=0.25; if(PL.t>=PL.dur){ ended(); return; } tickUI(); },250); }
+function stopTick(){ clearInterval(PL.timer); PL.timer=null; }
+function ended(){ PL.t=PL.dur; PL.playing=false; (U.watched[PL.s.id]=U.watched[PL.s.id]||new Set()).add(PL.n); delete U.progress[PL.s.id];
+ const next=PL.n+1; if(next>PL.s.total){ PL.over='fin'; } else if(access(PL.s,next)){ PL.over=U.settings.autoplay?'next':'nextman'; if(PL.over==='next'){ PL.count=5; PL.cd=setInterval(()=>{ PL.count--; if(PL.count<=0){ clearInterval(PL.cd); go(next); } else { const b=$('#cdn'); if(b) b.textContent=PL.count; const c=$('#cdc'); if(c) c.setAttribute('stroke-dashoffset',163-(163*(5-PL.count)/5)); } },1000); } } else { PL.over='paywall'; U.progress[PL.s.id]={n:PL.n,t:0,dur:PL.dur}; }
+ drawPlayer(); }
+function go(n){ clearInterval(PL.cd); location.hash=`#/watch/${PL.s.id}/${n}`; }
+function tickUI(){ const pct=PL.t/PL.dur*100; const pl=$('#seekpl'),hd=$('#seekhd'),bf=$('#seekbf'),tm=$('#ptime'),sub=$('#psub');
+ if(pl){ pl.style.width=pct+'%'; hd.style.left=pct+'%'; bf.style.width=Math.min(100,pct+9)+'%'; tm.textContent=`${mmss(PL.t)} / ${mmss(PL.dur)}`; }
+ if(sub) sub.textContent=PL.cc?subtitleFor(PL.s,PL.t):''; }
+function drawPlayer(){ const s=PL.s, e=eps(s)[PL.n-1]; const pct=PL.t/PL.dur*100; const liked=U.likes.has(s.id+PL.n);
+ const epList=eps(s).map(x=>{ const acc=access(s,x.n); return `<div class="ep ${acc?'':'locked'} ${x.n===PL.n?'now':''}" data-act="watch" data-s="${s.id}" data-n="${x.n}"><span class="n">${x.n}</span><span class="th" style="--c1:${s.c1};--c2:${s.c2}"></span><span class="tt"><b>${esc(x.title)}</b><span>${mmss(x.dur)}</span></span><span class="right">${acc?(isFree(s,x.n)?'<span class="free">FREE</span>':'<svg class="ic s" style="color:var(--info)"><use href="#i-check"/></svg>'):`<span class="price"><span class="coin s"></span>${s.price}</span>`}</span></div>`; }).join('');
+ let over='';
+ if(PL.over==='paywall'){ const need=s.price-bal(); const remaining=eps(s).filter(x=>!access(s,x.n)).length; const bundleCost=Math.round(remaining*s.price*0.75);
+  over=`<div class="overlay"><div class="ocard"><h3>Unlock Episode ${PL.n}</h3><p>${esc(e.title)} · ${mmss(e.dur)} · then keep bingeing</p>
+   ${U.signed?`<div class="balance"><span class="coin"></span>${fmt(bal())} <small>coins in your wallet</small></div>
+   ${need>0?`<button class="btn gold" data-act="go" data-to="#/coins" data-pend="1">Get coins · you need ${need} more</button><button class="btn s" disabled>Unlock for ${s.price}</button>`:`<button class="btn p" data-act="unlock" data-s="${s.id}" data-n="${PL.n}"><span class="coin s" style="box-shadow:none"></span>Unlock for ${s.price} coins</button>${remaining>1?`<button class="btn s" data-act="bundle" data-s="${s.id}">Unlock all ${remaining} left · ${fmt(bundleCost)} <span style="color:var(--coin)">−25%</span></button>`:''}`}`
+   :`<p style="margin-top:-6px">Your first ${s.free} episodes were free. Sign in with your phone to unlock the rest with coins — about ₹4.5 an episode.</p><button class="btn p" data-act="signin" data-pend="1">Sign in to continue</button>`}
+   <a class="olink" href="#/series/${s.id}">Not now — back to the series</a></div></div>`; }
+ else if(PL.over==='next'){ const nx=eps(s)[PL.n]; over=`<div class="overlay"><div class="ocard"><div class="countring"><svg width="64" height="64"><circle cx="32" cy="32" r="26" fill="none" stroke="var(--raised)" stroke-width="5"/><circle id="cdc" cx="32" cy="32" r="26" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round" stroke-dasharray="163" stroke-dashoffset="163"/></svg><b id="cdn">5</b></div><h3>Up next · E${PL.n+1}</h3><p>${esc(nx.title)}</p><button class="btn p" data-act="gonext">Play now</button><button class="btn s" data-act="cancelnext">Cancel</button></div></div>`; }
+ else if(PL.over==='nextman'){ over=`<div class="overlay"><div class="ocard"><h3>Episode ${PL.n} finished</h3><p>Autoplay is off.</p><button class="btn p" data-act="gonext">Play E${PL.n+1}</button><button class="btn s" data-act="replay">Replay</button><a class="olink" href="#/series/${s.id}">Back to series</a></div></div>`; }
+ else if(PL.over==='fin'){ over=`<div class="overlay"><div class="ocard"><h3>You finished ${esc(s.t)} 🎉</h3><p>${s.id==='kaanch-ka-mahal'?'Season 2 is in the works. ':''}Here\u2019s what to watch next.</p><button class="btn p" data-act="go" data-to="#/series/saat-pheron-ka-sauda">Saat Pheron Ka Sauda</button><button class="btn s" data-act="go" data-to="#/">Back to Home</button></div></div>`; }
+ else if(PL.over==='unlocked'){ over=`<div class="unlockflash"><div class="in"><div class="ring"><svg class="ic" style="width:38px;height:38px"><use href="#i-check"/></svg></div><b style="font-size:18px">Episode ${PL.n} unlocked</b><div style="color:var(--text2);font-size:13px;margin-top:4px">−${s.price} coins · balance ${fmt(bal())}</div></div></div>`; }
+ pp.innerHTML=`<div class="stage"><div class="backfill">${posterImg(s,900,1400,'scene')}</div>
+  <div class="video" style="--v1:${s.v1};--v2:${s.v2}">${posterImg(s,390,844,'scene')}<div class="grain"></div>
+   ${PL.playing||PL.over?'':`<button class="paused" data-act="pp" aria-label="Play"><i><svg class="ic fill" style="width:34px;height:34px;color:#fff"><use href="#i-play"/></svg></i></button>`}
+   <div class="ptop"><button class="pbtn" data-act="pback" aria-label="Back"><svg class="ic"><use href="#i-back"/></svg></button><div class="name"><b>${esc(s.t)}</b>E${PL.n} · ${esc(e.title)}</div><span style="flex:1"></span><button class="pbtn ${PL.cc?'on':''}" data-act="cc" aria-label="Subtitles"><svg class="ic"><use href="#i-cc"/></svg></button><button class="pbtn" data-act="mute" aria-label="Mute">${PL.mut?'<svg class="ic"><use href="#i-mute"/></svg>':'<svg class="ic"><use href="#i-vol"/></svg>'}</button></div>
+   <div class="prail"><button data-act="like" aria-pressed="${liked}"><svg class="ic ${liked?'liked':''}" style="${liked?'fill:currentColor;stroke:none':''}"><use href="#i-heart"/></svg>${fmt(12300+PL.n*7+(liked?1:0))}</button><button data-act="sheet"><svg class="ic"><use href="#i-eps"/></svg>E${PL.n}</button><button data-act="toast" data-msg="Link copied — sharing sends friends to E1 free"><svg class="ic"><use href="#i-share"/></svg>Share</button></div>
+   <div id="psub" class="subt">${PL.cc&&PL.playing?esc(subtitleFor(s,PL.t)):''}</div>
+   <div class="pbottom"><div class="ptitle">${isFree(s,PL.n)?`Free episode ${PL.n} of ${s.free}`:'Unlocked episode'} · ${esc(s.lang)}</div>
+    <div class="seek" data-act="seek" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="${PL.dur}" aria-valuenow="${Math.round(PL.t)}"><div class="tr"></div><div class="buf" id="seekbf" style="width:${Math.min(100,pct+9)}%"></div><div class="pl" id="seekpl" style="width:${pct}%"></div><div class="hd" id="seekhd" style="left:${pct}%"></div></div>
+    <div class="pctrl"><button class="pbtn" data-act="pp" aria-label="${PL.playing?'Pause':'Play'}">${PL.playing?'<svg class="ic fill"><use href="#i-pause"/></svg>':'<svg class="ic fill"><use href="#i-play"/></svg>'}</button><button class="pbtn" data-act="gonextbtn" aria-label="Next episode"><svg class="ic fill"><use href="#i-next"/></svg></button><span class="ptime" id="ptime">${mmss(PL.t)} / ${mmss(PL.dur)}</span><span style="flex:1"></span><button class="pbtn" data-act="speed" aria-label="Speed">1×</button><button class="pbtn" data-act="toast" data-msg="Fullscreen (browser)" aria-label="Fullscreen"><svg class="ic"><use href="#i-full"/></svg></button></div></div>
+   ${over}</div>
+  <div class="epsheet ${PL.sheet?'on':''}" id="epsheet"><h3>Episodes · ${esc(s.t)}<button class="x" data-act="sheet" aria-label="Close"><svg class="ic s"><use href="#i-x"/></svg></button></h3><div class="eps">${epList}</div></div></div>`; }
+
+/* ============================ auth, pin, purchase ============================ */
+function signinModal(pend){ openModal(`<div class="mh"><h2>Sign in</h2><button class="x" data-act="mclose"><svg class="ic s"><use href="#i-x"/></svg></button></div><div class="mb"><p class="d">One account across web and iPhone. We\u2019ll text a code — no password.</p><label class="fld">Phone<input id="ph" inputmode="tel" placeholder="+91 98765 43210" value="+91 98765 43210"></label><button class="btn p" style="width:100%" data-act="otp" ${pend?'data-pend="1"':''}>Send code</button><p style="color:var(--text3);font-size:12px;margin:14px 0 0;text-align:center">By continuing you agree to the Terms and confirm you\u2019re 18+.</p></div>`); }
+function otpModal(pend){ openModal(`<div class="mh"><h2>Enter the code</h2><button class="x" data-act="mclose"><svg class="ic s"><use href="#i-x"/></svg></button></div><div class="mb"><p class="d">Sent to ${esc(U.phone)} · <a href="#" data-act="toast" data-msg="Code re-sent">resend</a></p><div class="otp">${[0,1,2,3].map(i=>`<input id="o${i}" inputmode="numeric" maxlength="1" aria-label="Digit ${i+1}">`).join('')}</div><button class="btn p" style="width:100%;margin-top:16px" data-act="verify" ${pend?'data-pend="1"':''}>Verify</button><p style="color:var(--text3);font-size:12px;margin:14px 0 0;text-align:center">Demo: any 4 digits work.</p></div>`);
+ $$('.otp input').forEach((inp,i)=>{ inp.addEventListener('input',()=>{ if(inp.value&&i<3) $('#o'+(i+1)).focus(); }); inp.addEventListener('keydown',e=>{ if(e.key==='Backspace'&&!inp.value&&i>0) $('#o'+(i-1)).focus(); }); }); }
+function pinModal(s,fn){ openModal(`<div class="mh"><h2>Parental lock</h2><button class="x" data-act="mclose"><svg class="ic s"><use href="#i-x"/></svg></button></div><div class="mb"><p class="d">${esc(s.t)} is rated ${s.rating}. Enter your 4-digit PIN to continue.</p><div class="pinpad">${[0,1,2,3].map(i=>`<input id="p${i}" type="password" inputmode="numeric" maxlength="1" aria-label="PIN digit ${i+1}">`).join('')}</div><button class="btn p" style="width:100%;margin-top:14px" id="pingo">Unlock</button></div>`);
+ $$('.pinpad input').forEach((inp,i)=>inp.addEventListener('input',()=>{ if(inp.value&&i<3) $('#p'+(i+1)).focus(); }));
+ $('#pingo').addEventListener('click',()=>{ const pin=[0,1,2,3].map(i=>$('#p'+i).value).join(''); if(pin===U.settings.pin){ U.pinOk.add(s.id); closeModal(); fn(); } else { toast('Wrong PIN'); } }); }
+function setPinModal(){ openModal(`<div class="mh"><h2>Set a parental PIN</h2><button class="x" data-act="mclose"><svg class="ic s"><use href="#i-x"/></svg></button></div><div class="mb"><p class="d">This PIN will be required before any U/A 16+ or A title plays.</p><div class="pinpad">${[0,1,2,3].map(i=>`<input id="sp${i}" inputmode="numeric" maxlength="1" aria-label="PIN digit ${i+1}">`).join('')}</div><button class="btn p" style="width:100%;margin-top:14px" id="setpin">Turn on lock</button></div>`);
+ $$('.pinpad input').forEach((inp,i)=>inp.addEventListener('input',()=>{ if(inp.value&&i<3) $('#sp'+(i+1)).focus(); }));
+ $('#setpin').addEventListener('click',()=>{ const pin=[0,1,2,3].map(i=>$('#sp'+i).value).join(''); if(!/^\d{4}$/.test(pin)){ toast('Enter 4 digits'); return; } U.settings.pin=pin; U.settings.lock=true; U.pinOk.clear(); closeModal(); render(); toast('Parental lock is on'); }); }
+const PACKS={starter:{pr:99,c:600},popular:{pr:199,c:1300},value:{pr:499,c:3500},binge:{pr:999,c:7500},mega:{pr:1999,c:16000}};
+function buyModal(pid){ const p=PACKS[pid]; const base=(pid==='starter'&&U.firstPack)?p.c*2:p.c; const webBonus=Math.round(base*0.10);
+ openModal(`<div class="mh"><h2>Pay ₹${p.pr} by UPI</h2><button class="x" data-act="mclose"><svg class="ic s"><use href="#i-x"/></svg></button></div><div class="mb">
+ <p class="d">You\u2019ll get <b style="color:var(--text)">${fmt(base)} coins</b> + <b style="color:var(--coin)">${fmt(webBonus)} web bonus</b>. GST invoice by email.</p>
+ <div class="upi"><div class="qr"><svg viewBox="0 0 29 29" width="150" height="150" shape-rendering="crispEdges" aria-label="UPI QR"><path fill="#000" d="M0 0h7v7H0zM1 1v5h5V1zM2 2h3v3H2zM22 0h7v7h-7zM23 1v5h5V1zM24 2h3v3h-3zM0 22h7v7H0zM1 23v5h5v-5zM2 24h3v3H2zM9 0h2v2H9zM12 0h1v3h-1zM14 1h3v1h-3zM18 0h2v2h-2zM9 3h1v2H9zM11 3h2v1h-2zM15 3h1v2h-1zM17 3h3v1h-3zM8 8h2v2H8zM11 8h3v1h-3zM15 8h1v2h-1zM17 9h2v2h-2zM20 8h1v3h-1zM0 9h2v1H0zM3 9h1v2H3zM5 10h2v1H5zM23 9h1v2h-1zM25 8h2v2h-2zM28 10h1v2h-1zM9 11h1v3H9zM11 12h2v2h-2zM14 11h2v1h-2zM17 12h1v2h-1zM19 13h2v1h-2zM0 13h1v2H0zM2 12h2v1H2zM4 14h3v1H4zM22 12h2v2h-2zM25 12h1v3h-1zM27 13h2v1h-2zM8 15h2v2H8zM11 16h1v2h-1zM13 15h2v1h-2zM16 16h2v1h-2zM19 15h2v2h-2zM0 17h2v2H0zM3 17h3v1H3zM22 16h2v2h-2zM25 17h1v2h-1zM27 16h2v2h-2zM9 19h2v1H9zM12 19h2v2h-2zM15 19h1v3h-1zM17 20h2v1h-2zM20 19h1v2h-1zM9 22h1v2H9zM11 23h3v1h-3zM15 23h2v2h-2zM18 22h2v2h-2zM21 23h1v2h-1zM23 22h2v1h-2zM26 22h3v1h-3zM9 26h2v2H9zM12 25h1v3h-1zM14 26h2v1h-2zM17 25h2v2h-2zM20 26h1v3h-1zM22 25h2v2h-2zM25 25h1v2h-1zM27 26h2v2h-2z"/></svg></div>
+ <div class="upiapps"><button data-act="pay" data-p="${pid}"><span class="logo" style="background:#5F259F">₹</span>PhonePe</button><button data-act="pay" data-p="${pid}"><span class="logo" style="background:#1A73E8">G</span>Google Pay</button><button data-act="pay" data-p="${pid}"><span class="logo" style="background:#00BAF2">P</span>Paytm</button><div style="font-size:12px;color:var(--text3);text-align:center">or pay to <b style="color:var(--text2)">katha@icici</b></div><button class="btn s sm" data-act="pay" data-p="${pid}" style="width:100%">I\u2019ve paid — verify</button></div></div></div>`); }
+function payingModal(pid){ openModal(`<div class="mb paying" style="padding-top:30px"><div class="spinner"></div><b>Waiting for UPI confirmation…</b><p class="d" style="margin-top:6px">Approve the request in your UPI app. Usually under 10 seconds.</p></div>`);
+ setTimeout(()=>{ const p=PACKS[pid]; const base=(pid==='starter'&&U.firstPack)?p.c*2:p.c; const webBonus=Math.round(base*0.10);
+  U.coins.b+=base; U.coins.n+=webBonus; if(pid==='starter') U.firstPack=false;
+  ledger('Coin pack · web UPI',`₹${p.pr} · ${pid} · order KW-${Math.floor(1e5+Math.random()*9e5)}`,base+webBonus);
+  openModal(`<div class="mb success" style="text-align:center;padding-top:30px"><div class="ring"><svg class="ic" style="width:34px;height:34px"><use href="#i-check"/></svg></div><h2 style="font-size:20px;margin:0 0 6px">${fmt(base+webBonus)} coins added</h2><p class="d">Balance ${fmt(bal())} · invoice emailed · works on your iPhone too</p>${U.pending?`<button class="btn p" style="width:100%" data-act="resume-pending">Continue E${U.pending.n} of ${esc(byId(U.pending.s).t)}</button>`:`<button class="btn p" style="width:100%" data-act="mclose">Done</button>`}</div>`);
+  updateNav(); },1500); }
+
+/* ============================ actions ============================ */
+function act(name,d,el){ d=d||{}; switch(name){
+ case 'toast': toast(d.msg); break;
+ case 'go': if(d.pend&&PL.s){ U.pending={s:PL.s.id,n:PL.n}; } closeModal(); location.hash=d.to; break;
+ case 'mclose': closeModal(); break;
+ case 'scroll': { const sc=el.parentElement.querySelector('.scroller'); sc.scrollBy({left:(+d.d)*sc.clientWidth*0.85,behavior:'smooth'}); break; }
+ case 'search-open': $('#searchbar').classList.add('on'); $('#searchbtn').style.display='none'; $('#q').focus(); break;
+ case 'search-close': $('#searchbar').classList.remove('on'); $('#searchbtn').style.display=''; if(route().v==='search') location.hash='#/'; break;
+ case 'searchq': $('#q').value=d.q; location.hash='#/search/'+encodeURIComponent(d.q); break;
+ case 'browse': location.hash='#/browse/'+encodeURIComponent(d.f); break;
+ case 'play': { const s=byId(d.s); const p=U.progress[s.id]; location.hash=`#/watch/${s.id}/${p?p.n:1}`; break; }
+ case 'watch': PL.sheet=false; location.hash=`#/watch/${d.s}/${d.n}`; if(route().v==='watch'&&PL.s&&PL.s.id===d.s&&PL.n===+d.n) render(); break;
+ case 'list': { const s=byId(d.s); if(U.list.has(s.id)){ U.list.delete(s.id); toast('Removed from your list'); } else { U.list.add(s.id); toast('Added to your list'); } render(); break; }
+ case 'remind': toast('We\u2019ll remind you on Friday at 8 pm'); break;
+ case 'lang': { U.langs.has(d.l)?U.langs.delete(d.l):U.langs.add(d.l); render(); break; }
+ case 'set': U.settings[d.k]=!U.settings[d.k]; render(); break;
+ case 'lock-toggle': if(U.settings.lock){ U.settings.lock=false; U.settings.pin=''; render(); toast('Parental lock is off'); } else setPinModal(); break;
+ case 'signin': if(d.pend&&PL.s){ U.pending={s:PL.s.id,n:PL.n}; } signinModal(!!d.pend); break;
+ case 'otp': U.phone=$('#ph').value.trim()||'+91 98765 43210'; otpModal(!!d.pend); break;
+ case 'verify': { const code=[0,1,2,3].map(i=>$('#o'+i).value).join(''); if(code.length<4){ toast('Enter the 4-digit code'); return; }
+   U.signed=true; U.name='Meera'; closeModal(); updateNav(); toast('Signed in as '+U.phone);
+   if(U.pending){ const p=U.pending; if(bal()>=byId(p.s).price){} location.hash=`#/watch/${p.s}/${p.n}`; if(route().v==='watch') render(); } else render(); break; }
+ case 'signout': Object.assign(U,{signed:false,name:'',phone:''}); render(); toast('Signed out'); break;
+ case 'buy': if(!U.signed){ signinModal(); toast('Sign in first — takes 10 seconds'); break; } buyModal(d.p); break;
+ case 'pay': payingModal(d.p); break;
+ case 'resume-pending': { const p=U.pending; U.pending=null; closeModal(); location.hash=`#/watch/${p.s}/${p.n}`; if(route().v==='watch') render(); break; }
+ case 'unlock': { const s=byId(d.s); if(bal()<s.price){ toast('Not enough coins'); break; } spend(s.price); (U.unlocked[s.id]=U.unlocked[s.id]||new Set()).add(+d.n); ledger(`Unlocked ${s.t} E${d.n}`,'episode',-s.price); updateNav(); PL.over='unlocked'; drawPlayer(); setTimeout(()=>{ PL.over=null; PL.playing=true; PL.t=0; drawPlayer(); },1000); break; }
+ case 'bundle': { const s=byId(d.s); const remaining=eps(s).filter(x=>!access(s,x.n)).length; const cost=Math.round(remaining*s.price*0.75);
+   if(!U.signed){ if(PL.s){U.pending={s:s.id,n:PL.n};} signinModal(true); break; }
+   if(bal()<cost){ if(PL.s){U.pending={s:s.id,n:PL.n};} toast(`You need ${fmt(cost-bal())} more coins`); location.hash='#/coins'; break; }
+   spend(cost); U.unlocked[s.id]='all'; ledger(`Unlocked all of ${s.t}`,`${remaining} episodes · −25%`,-cost); updateNav();
+   if(PL.s&&PL.s.id===s.id){ PL.over='unlocked'; drawPlayer(); setTimeout(()=>{ PL.over=null; PL.playing=true; PL.t=0; drawPlayer(); },1000); } else { render(); toast(`All episodes unlocked · −${fmt(cost)} coins`); } break; }
+ /* player */
+ case 'pback': history.length>1?history.back():(location.hash='#/series/'+PL.s.id); break;
+ case 'pp': if(PL.over) break; PL.playing=!PL.playing; if(PL.t>=PL.dur) PL.t=0; drawPlayer(); break;
+ case 'cc': PL.cc=!PL.cc; drawPlayer(); break;
+ case 'mute': PL.mut=!PL.mut; drawPlayer(); break;
+ case 'like': { const k=PL.s.id+PL.n; U.likes.has(k)?U.likes.delete(k):U.likes.add(k); drawPlayer(); break; }
+ case 'sheet': PL.sheet=!PL.sheet; drawPlayer(); break;
+ case 'speed': toast('Speed: 1× · 1.5× · 2× in the app'); break;
+ case 'seek': { const r=el.getBoundingClientRect(); const x=(d.clientX-r.left)/r.width; PL.t=Math.max(0,Math.min(PL.dur-0.5,x*PL.dur)); if(PL.over&&PL.over!=='paywall'){ PL.over=null; } PL.playing=PL.playing&&!PL.over; drawPlayer(); break; }
+ case 'gonext': go(PL.n+1); break;
+ case 'gonextbtn': { const nx=PL.n+1; if(nx>PL.s.total){ toast('This is the last episode'); break; } if(access(PL.s,nx)) go(nx); else { saveProgress(); location.hash=`#/watch/${PL.s.id}/${nx}`; } break; }
+ case 'cancelnext': clearInterval(PL.cd); PL.over='nextman'; drawPlayer(); break;
+ case 'replay': PL.over=null; PL.t=0; PL.playing=true; drawPlayer(); break;
+} }
+document.addEventListener('click',e=>{ const el=e.target.closest('[data-act]'); if(!el) return; const a=el.getAttribute('data-act');
+ if(el.tagName==='A'&&el.getAttribute('href')&&el.getAttribute('href').startsWith('#/')&&a==='go') return;
+ e.preventDefault(); const d=Object.assign({},el.dataset); if(a==='seek') d.clientX=e.clientX; act(a,d,el); });
+document.addEventListener('keydown',e=>{ const tag=(e.target.tagName||'').toLowerCase(); if(tag==='input'||tag==='textarea'){ if(e.key==='Enter'&&e.target.id==='q'){ location.hash='#/search/'+encodeURIComponent(e.target.value.trim()); } if(e.key==='Escape') closeModal(); return; }
+ if(e.key==='Escape'){ if(modal.classList.contains('on')) closeModal(); else if(PL.sheet){ PL.sheet=false; drawPlayer(); } else if(pp.classList.contains('on')) act('pback'); return; }
+ if(!pp.classList.contains('on')||modal.classList.contains('on')) return;
+ if(e.key===' '){ e.preventDefault(); act('pp'); } else if(e.key==='ArrowRight'){ PL.t=Math.min(PL.dur-0.5,PL.t+5); tickUI(); } else if(e.key==='ArrowLeft'){ PL.t=Math.max(0,PL.t-5); tickUI(); } else if(e.key.toLowerCase()==='c'){ act('cc'); } else if(e.key.toLowerCase()==='e'){ act('sheet'); } });
+$('#q').addEventListener('input',()=>{ /* live nav on submit only */ });
+
+/* enter/space on ep rows */
+document.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('ep')){ e.preventDefault(); act('watch',e.target.dataset); } });
+
+if(!location.hash) location.hash='#/';
+render();
+})();
+</script>
+</body>
+</html>

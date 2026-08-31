@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Katha — iOS app design v0.3 (all screens, relevant placeholders)</title>
+<style>
+:root{
+  --bg:#0B0B0F; --surface:#16161D; --raised:#1F1F28; --line:#23232C;
+  --text:#F5F5F7; --text2:#A1A1AA; --text3:#6B6B75;
+  --accent:#FF5C3A; --accent-p:#E04A2B; --coin:#F5C042; --ok:#2FBF71; --danger:#FF4D4F;
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+  --board:#ECEDF1; --board-text:#1B1C22; --board-muted:#5C5F6B; --board-line:#D6D8E0;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--board);color:var(--board-text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif}
+.board{max-width:1440px;margin:0 auto;padding:36px 24px 96px}
+header.hdr{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;flex-wrap:wrap}
+header.hdr h1{font-size:30px;line-height:1.15;letter-spacing:-.02em;margin:0 0 8px;font-weight:700}
+.lead{color:var(--board-muted);max-width:68ch;margin:0;font-size:15px}
+.zoom{font:13px/1 inherit;padding:10px 14px;border-radius:999px;border:1px solid var(--board-line);background:#fff;cursor:pointer;color:var(--board-text)}
+.zoom:focus-visible,.states button:focus-visible,nav.jump a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+nav.jump{position:sticky;top:0;z-index:5;display:flex;gap:8px;flex-wrap:wrap;padding:12px 24px;margin:28px -24px 0;background:rgba(236,237,241,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--board-line)}
+nav.jump a{color:var(--board-text);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:999px;background:#fff;border:1px solid var(--board-line)}
+nav.jump a:hover{border-color:var(--board-text)}
+.tokens{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0 0}
+.sw{width:124px;border-radius:10px;overflow:hidden;background:#fff;border:1px solid var(--board-line);font-size:11px}
+.sw i{display:block;height:42px}
+.sw b{display:block;padding:6px 8px 0;font-weight:600;font-size:12px}
+.sw span{display:block;padding:0 8px 7px;color:var(--board-muted)}
+.type{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;align-items:baseline;color:var(--board-text)}
+.type span{color:var(--board-muted);font-size:12px;margin-left:6px}
+section.flow{margin-top:52px}
+section.flow h2{font-size:21px;margin:0 0 4px;letter-spacing:-.01em}
+section.flow p.desc{margin:0 0 22px;color:var(--board-muted);max-width:76ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(281px,1fr));gap:34px 24px}
+.big .grid{grid-template-columns:repeat(auto-fill,minmax(390px,1fr))}
+figure{margin:0}
+figcaption{margin-top:12px;max-width:390px}
+figcaption .n{font-weight:600;font-size:14px}
+figcaption .d{color:var(--board-muted);font-size:13px;margin-top:3px;line-height:1.4}
+.states{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.states button{font:12px/1 inherit;padding:6px 10px;border-radius:999px;border:1px solid #C9CCD6;background:#fff;color:var(--board-text);cursor:pointer}
+.states button.on{background:var(--board-text);color:#fff;border-color:var(--board-text)}
+
+/* ---------- phone frame ---------- */
+.frame{--s:.72;width:calc(390px*var(--s));height:calc(844px*var(--s));position:relative}
+.big .frame{--s:1}
+.phone{position:absolute;top:0;left:0;width:390px;height:844px;transform:scale(var(--s));transform-origin:0 0;border-radius:56px;background:#000;box-shadow:0 0 0 2px #2A2A30,0 24px 50px rgba(20,22,40,.22);overflow:hidden}
+.screen{position:absolute;inset:0;background:var(--bg);color:var(--text);font:16px/22px -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:126px;height:37px;border-radius:20px;background:#000;z-index:30}
+.status{position:absolute;top:0;left:0;right:0;height:59px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 30px 15px 34px;font-size:15px;font-weight:600;z-index:29;letter-spacing:-.01em}
+.status .r{display:flex;gap:7px;align-items:center}
+.status svg{display:block}
+.homebar{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#fff;opacity:.92;z-index:30}
+[data-st]{display:none}
+.screen[data-state="a"] [data-st="a"],.screen[data-state="b"] [data-st="b"],.screen[data-state="c"] [data-st="c"],.screen[data-state="d"] [data-st="d"],.screen[data-state="e"] [data-st="e"],.screen[data-state="f"] [data-st="f"]{display:block}
+.screen[data-state="a"] .inl[data-st="a"],.screen[data-state="b"] .inl[data-st="b"]{display:inline}
+
+/* ---------- in-screen system ---------- */
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}
+.ic.s{width:18px;height:18px}
+.pad{padding:0 20px}
+.h1{font-size:28px;line-height:34px;font-weight:700;letter-spacing:-.02em}
+.h2{font-size:20px;line-height:25px;font-weight:600;letter-spacing:-.01em}
+.h3{font-size:17px;line-height:22px;font-weight:600}
+.body{font-size:16px;line-height:22px}
+.cap{font-size:13px;line-height:18px;color:var(--text2)}
+.muted{color:var(--text2)}
+.dim-t{color:var(--text3)}
+.top{position:absolute;top:59px;left:0;right:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+.top .ttl{font-size:17px;font-weight:600}
+.content{position:absolute;top:111px;left:0;right:0;bottom:0;overflow:hidden}
+.content.tabbed{bottom:83px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;border-radius:12px;font-weight:600;font-size:16px;padding:0 16px}
+.btn.p{background:var(--accent);color:#fff}
+.btn.pp{background:var(--accent-p);color:#fff}
+.btn.s{background:var(--raised);color:var(--text)}
+.btn.t{background:transparent;color:var(--text2);height:44px;font-weight:500}
+.btn.apple{background:#fff;color:#000}
+.btn.dn{background:var(--danger);color:#fff}
+.btn.dis{opacity:.4}
+.btn.sm{height:36px;font-size:14px;border-radius:999px;padding:0 14px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;background:var(--surface);color:var(--text2);font-size:13px;border:1px solid var(--line);white-space:nowrap}
+.chip.on{background:rgba(255,92,58,.14);color:var(--text);border-color:var(--accent)}
+.chip.dis{opacity:.45}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.li{display:flex;align-items:center;gap:12px;min-height:56px;padding:0 20px;border-bottom:1px solid #15151C}
+.li .grow{flex:1;min-width:0}
+.li .v{color:var(--text2);font-size:15px}
+.chev{color:var(--text3)}
+.tog{width:51px;height:31px;border-radius:16px;background:#3A3A44;position:relative;flex:none}
+.tog::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.3)}
+.tog.on{background:var(--ok)}
+.tog.on::after{left:22px}
+.coin{width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FFE9A3,#F5C042 58%,#B8861B);box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.18);flex:none}
+.coin.lg{width:28px;height:28px}
+.coinpill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 6px;border-radius:999px;background:var(--surface);font-weight:600;font-size:13px}
+.poster{border-radius:12px;position:relative;overflow:hidden;background:linear-gradient(160deg,var(--c1),var(--c2));isolation:isolate}
+.poster>*:not(.ph){position:relative;z-index:2}
+.poster>[style*="position:absolute"]:not(.ph){position:absolute}
+.video{isolation:isolate}
+.poster::before{content:"";position:absolute;inset:0;background:radial-gradient(120% 70% at 85% 0%,rgba(255,255,255,.22),transparent 55%),linear-gradient(to top,rgba(0,0,0,.62),transparent 60%)}
+.poster .t{position:absolute;left:10px;right:10px;bottom:10px;font-weight:800;font-size:15px;line-height:1.05;letter-spacing:-.02em;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)}
+.poster .t small{display:block;font-weight:500;font-size:11px;letter-spacing:0;opacity:.85;margin-top:3px}
+.poster .badge{position:absolute;top:8px;left:8px;height:22px;padding:0 8px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;backdrop-filter:blur(6px)}
+.poster .badge.new{background:var(--accent)}
+.row{margin-top:22px}
+.row .rh{display:flex;justify-content:space-between;align-items:baseline;padding:0 20px 10px}
+.row .cards{display:flex;gap:10px;padding:0 20px;overflow:hidden}
+.card{width:112px;flex:none}
+.card .poster{height:168px}
+.card .m{font-size:12px;color:var(--text2);margin-top:6px;line-height:16px}
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:83px;background:rgba(11,11,15,.94);backdrop-filter:blur(20px);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 10px 0;z-index:25}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--text3);width:70px}
+.tab.on{color:var(--text)}
+.dimm{position:absolute;inset:0;background:rgba(0,0,0,.42);z-index:26}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:16px 16px 0 0;padding:8px 20px 44px;z-index:27}
+.grab{width:36px;height:5px;border-radius:3px;background:#3A3A44;margin:6px auto 14px}
+.toast{position:absolute;left:16px;right:16px;top:66px;background:var(--raised);border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.45);z-index:28}
+.banner{display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--raised);font-size:13px;border-radius:10px;margin:0 20px}
+.sk{background:linear-gradient(90deg,#16161D 0%,#20202A 50%,#16161D 100%);border-radius:8px}
+.eps{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:0 20px}
+.ep{aspect-ratio:1;border-radius:8px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--text);position:relative}
+.ep.done{background:var(--raised)}
+.ep.done::after{content:"";position:absolute;right:5px;bottom:5px;width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.ep.cur{background:var(--accent);color:#fff}
+.ep.lock{color:var(--text3)}
+.ep.lock svg{position:absolute;right:4px;bottom:4px;width:10px;height:10px;stroke:var(--text3);stroke-width:2}
+.field{height:52px;border-radius:12px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;padding:0 14px;gap:10px;font-size:16px}
+.field.focus{border-color:var(--accent)}
+.field .ph{color:var(--text3)}
+.otp{display:flex;gap:8px}
+.otp i{flex:1;height:56px;border-radius:12px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:22px;font-weight:600}
+.otp i.cur{border-color:var(--accent)}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 6px;padding:0 6px}
+.keys b{height:46px;border-radius:6px;background:#2A2A33;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;font-weight:500;line-height:1}
+.keys b small{font-size:9px;letter-spacing:.14em;color:var(--text2);margin-top:1px}
+.keys b.blank{background:transparent}
+.pin{display:flex;gap:18px;justify-content:center}
+.pin i{width:16px;height:16px;border-radius:50%;border:2px solid var(--text2)}
+.pin i.f{background:var(--text);border-color:var(--text)}
+.stat{flex:1;text-align:center}
+.stat b{display:block;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.stat span{font-size:12px;color:var(--text2)}
+.video{position:absolute;inset:0}
+.vig{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.45),transparent 22%,transparent 60%,rgba(0,0,0,.7))}
+.rail{position:absolute;right:14px;bottom:150px;display:flex;flex-direction:column;gap:18px;align-items:center;z-index:5}
+.rail div{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:#fff;font-weight:600}
+.rail .ic{width:28px;height:28px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+.sub{position:absolute;left:24px;right:70px;bottom:152px;text-align:center;font-size:17px;line-height:24px;font-weight:600;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8);z-index:4}
+.pinfo{position:absolute;left:20px;right:70px;bottom:88px;z-index:5;color:#fff}
+.scrub{position:absolute;left:20px;right:20px;bottom:60px;z-index:5}
+.scrub .bar{height:2px;background:rgba(255,255,255,.35);border-radius:1px;position:relative}
+.scrub .bar i{position:absolute;left:0;top:0;height:2px;background:var(--accent)}
+.scrub .bar b{position:absolute;top:-5px;width:12px;height:12px;border-radius:50%;background:#fff;margin-left:-6px}
+.scrub .tm{display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.8);margin-top:8px}
+.ring{width:26px;height:26px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:#fff}
+.spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.2);border-top-color:#fff;flex:none}
+.pack{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:var(--raised);margin-top:8px;border:1px solid transparent}
+.pack.hi{border-color:var(--accent)}
+.pack .pn{font-weight:600;font-size:15px}
+.pack .pc{font-size:13px;color:var(--text2)}
+.pack .pr{height:36px;padding:0 14px;border-radius:999px;background:var(--text);color:#000;font-weight:600;font-size:14px;display:flex;align-items:center}
+.pack .bz{font-size:11px;color:var(--coin);font-weight:600}
+.tag{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;flex:none}
+.tag.acc{background:rgba(255,92,58,.18);color:#FF8A70}
+.tag.gold{background:rgba(245,192,66,.16);color:var(--coin)}
+.tag.grey{background:var(--raised);color:var(--text2)}
+.tag.ok{background:rgba(47,191,113,.16);color:#5BD48F}
+.gcard{margin:0 20px;border-radius:16px;background:var(--surface);padding:16px}
+.wm{font-weight:800;letter-spacing:-.03em}
+.wm small{display:inline-block;margin-left:6px;font-weight:500;color:var(--text2);letter-spacing:0}
+
+.poster img.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;filter:saturate(.75) contrast(1.05) brightness(.88)}
+.poster::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,var(--c1),var(--c2));opacity:.42;mix-blend-mode:multiply;z-index:1}
+.poster::before{z-index:1}
+.poster .t,.poster .badge{z-index:2}
+.video img.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.7) contrast(1.08) brightness(.75)}
+.avatar-ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.lock2{position:absolute;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:40px;text-align:center;z-index:6}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-app" viewBox="0 0 64 64"><defs><linearGradient id="appg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF7A5C"/><stop offset="1" stop-color="#E04A2B"/></linearGradient></defs><rect width="64" height="64" rx="14.5" fill="url(#appg)"/><path d="M18 14h28a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8H30l-9 8v-8h-3a8 8 0 0 1-8-8V22a8 8 0 0 1 8-8z" fill="#fff" fill-opacity=".96"/><path d="M28 22.5v15l12-7.5z" fill="#E04A2B"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/></symbol>
+  <symbol id="i-browse" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.5L6 20V5a1 1 0 0 1 1-1z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M6 12v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-7"/></symbol>
+  <symbol id="i-eps" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="4" rx="1.5"/><rect x="4" y="11" width="16" height="4" rx="1.5"/><rect x="4" y="17" width="10" height="3" rx="1.5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.6" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.2-1.6l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2.8-1.6L13.3 2h-2.6l-.4 2.8a7 7 0 0 0-2.8 1.6l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .5.1 1.1.2 1.6l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2.8 1.6l.4 2.8h2.6l.4-2.8a7 7 0 0 0 2.8-1.6l2.3.9 2-3.4-2-1.5c.1-.5.2-1.1.2-1.6z"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7"/><circle cx="12" cy="17" r=".8" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M8 7l.8 13h6.4L16 7"/></symbol>
+  <symbol id="i-wifioff" viewBox="0 0 24 24"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"/><circle cx="12" cy="19" r="1" fill="currentColor" stroke="none"/><path d="M4 4l16 16"/></symbol>
+  <symbol id="i-cc" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M10 10.5h-2.5a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H10M17 10.5h-2.5a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H17"/></symbol>
+  <symbol id="i-saver" viewBox="0 0 24 24"><path d="M12 3v18M6 9l6-6 6 6"/></symbol>
+  <symbol id="i-play-o" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3V7l-4 3H5z"/><path d="m16 10 4 4M20 10l-4 4"/></symbol>
+  <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.4 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.8-3-.8-1.6 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2-1.1 2.8-2.3.9-1.3 1.2-2.5 1.2-2.6 0 0-2.4-.9-2.4-3.8zM14.1 5.9c.6-.8 1.1-1.8 1-2.9-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.8 1 .1 2.1-.5 2.7-1.3z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-sig" viewBox="0 0 20 12"><rect x="0" y="8" width="3" height="4" rx=".6" fill="currentColor"/><rect x="5" y="6" width="3" height="6" rx=".6" fill="currentColor"/><rect x="10" y="3.5" width="3" height="8.5" rx=".6" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx=".6" fill="currentColor"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 18 12"><path d="M1 4a12 12 0 0 1 16 0M3.5 6.8a8 8 0 0 1 11 0M6 9.5a4.2 4.2 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="9" cy="11" r="1" fill="currentColor"/></symbol>
+  <symbol id="i-bat" viewBox="0 0 28 12"><rect x=".7" y=".7" width="23" height="10.6" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".5"/><rect x="2.4" y="2.4" width="18.5" height="7.2" rx="1.6" fill="currentColor"/><rect x="25.2" y="4" width="2" height="4" rx="1" fill="currentColor" opacity=".5"/></symbol>
+</svg>
+
+<div class="board">
+<header class="hdr">
+  <div>
+    <h1 style="display:flex;align-items:center;gap:12px"><svg width="40" height="40"><use href="#i-app"/></svg>Katha — iOS app design, v0.3</h1>
+    <p class="lead">Every screen from the PDD screen inventory (§10.5), plus the alternate states each one needs, drawn on the §10.1 tokens. Use the state buttons under a frame to switch states. Series, characters and people are fictional. Thumbnails are keyword-matched Creative-Commons photos (LoremFlickr, e.g. <code>indian,bride</code> for a family saga, <code>businessman,office</code> for the office romance), locked so each series keeps the same photo, tinted to its palette, with the gradient as offline fallback. They stand in for studio key art; swap any by editing its <code>img src</code> or upload your own posters and they can be wired in directly.</p>
+  </div>
+  <button class="zoom" id="zoom" type="button">Show at actual size</button>
+</header>
+
+<nav class="jump" aria-label="Sections">
+  <a href="#s-onboard">1 Onboarding &amp; login</a>
+  <a href="#s-discover">2 Discover</a>
+  <a href="#s-watch">3 Watch &amp; pay</a>
+  <a href="#s-account">4 Account</a>
+  <a href="#s-states">5 States &amp; feedback</a>
+</nav>
+
+<div class="tokens" aria-label="Design tokens">
+  <div class="sw"><i style="background:#0B0B0F"></i><b>color-bg</b><span>#0B0B0F</span></div>
+  <div class="sw"><i style="background:#16161D"></i><b>color-surface</b><span>#16161D</span></div>
+  <div class="sw"><i style="background:#1F1F28"></i><b>color-surface-raised</b><span>#1F1F28</span></div>
+  <div class="sw"><i style="background:#F5F5F7"></i><b>color-text-primary</b><span>#F5F5F7</span></div>
+  <div class="sw"><i style="background:#A1A1AA"></i><b>color-text-secondary</b><span>#A1A1AA</span></div>
+  <div class="sw"><i style="background:#FF5C3A"></i><b>color-accent</b><span>#FF5C3A · CTA, progress</span></div>
+  <div class="sw"><i style="background:#F5C042"></i><b>color-coin</b><span>#F5C042 · money</span></div>
+  <div class="sw"><i style="background:#2FBF71"></i><b>color-success</b><span>#2FBF71</span></div>
+  <div class="sw"><i style="background:#FF4D4F"></i><b>color-danger</b><span>#FF4D4F</span></div>
+</div>
+<div class="type">
+  <div style="font-size:28px;line-height:34px;font-weight:700;letter-spacing:-.02em">Display 28/34<span>series titles</span></div>
+  <div style="font-size:20px;line-height:25px;font-weight:600">Title 20/25<span>sheet titles</span></div>
+  <div style="font-size:16px;line-height:22px">Body 16/22<span>synopsis, rows</span></div>
+  <div style="font-size:13px;line-height:18px;color:#5C5F6B">Caption 13/18<span>meta</span></div>
+  <div style="font-size:13px;color:#5C5F6B">Radius 8 · 12 · 16 · pill &nbsp; Spacing 4 · 8 · 12 · 16 · 24 · 32 &nbsp; Motion 150 · 250 · 350 ms</div>
+</div>
+
+<!-- ============================ 1. ONBOARDING ============================ -->
+<section class="flow" id="s-onboard">
+  <h2>1. Onboarding and login</h2>
+  <p class="desc">No login is needed to watch free episodes. Language and interests take under 20 seconds; the app lands on Home as a guest. Login appears only at value moments — first unlock, first purchase, saving a series.</p>
+  <div class="grid">
+
+  <!-- 1 Splash -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+        <svg width="84" height="84" style="margin-bottom:14px;filter:drop-shadow(0 12px 28px rgba(255,92,58,.35))"><use href="#i-app"/></svg>
+        <div class="wm" style="font-size:44px;line-height:1">Katha</div>
+        <div style="font-size:18px;color:var(--text2)">कथा</div>
+      </div>
+      <div style="position:absolute;left:0;right:0;bottom:72px;text-align:center;color:var(--text2);font-size:15px">Stories in 2 minutes.</div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">1.1 Splash</div><div class="d">Wordmark with the Devanagari form beneath it. Shown for the launch fetch only (cold start budget ≤ 1.5 s to Home). No spinner.</div></figcaption>
+  </figure>
+
+  <!-- 2 Language -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div style="position:absolute;top:84px;left:0;right:0;bottom:0">
+        <div class="pad">
+          <div class="h1">Which languages do you watch in?</div>
+          <div class="cap" style="margin-top:8px">Pick one or more. You can change this anytime.</div>
+        </div>
+        <div style="margin-top:22px">
+          <div class="li"><div class="grow"><div class="body">हिन्दी</div><div class="cap">Hindi</div></div><svg class="ic" style="color:var(--accent)"><use href="#i-check"/></svg></div>
+          <div class="li"><div class="grow"><div class="body">தமிழ்</div><div class="cap">Tamil</div></div><svg class="ic" style="color:var(--accent)"><use href="#i-check"/></svg></div>
+          <div class="li"><div class="grow"><div class="body">తెలుగు</div><div class="cap">Telugu</div></div><div style="width:24px;height:24px;border-radius:50%;border:1.5px solid var(--text3)"></div></div>
+          <div class="li"><div class="grow"><div class="body">English</div><div class="cap">Dubbed and subtitled</div></div><div style="width:24px;height:24px;border-radius:50%;border:1.5px solid var(--text3)"></div></div>
+          <div class="li" style="opacity:.5"><div class="grow"><div class="body">বাংলা</div><div class="cap">Bengali · coming soon</div></div></div>
+          <div class="li" style="opacity:.5"><div class="grow"><div class="body">मराठी</div><div class="cap">Marathi · coming soon</div></div></div>
+        </div>
+        <div class="pad" style="margin-top:22px">
+          <div class="cap" style="margin-bottom:8px">App language</div>
+          <div style="display:flex;background:var(--surface);border-radius:10px;padding:3px">
+            <div style="flex:1;text-align:center;height:34px;line-height:34px;border-radius:8px;background:var(--raised);font-weight:600;font-size:14px">English</div>
+            <div style="flex:1;text-align:center;height:34px;line-height:34px;font-size:14px;color:var(--text2)">हिन्दी</div>
+          </div>
+        </div>
+        <div class="pad" style="position:absolute;left:0;right:0;bottom:44px"><div class="btn p">Continue</div></div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">1.2 Language picker</div><div class="d">Content languages are multi-select; each language is shown in its own script. App language is a separate, single choice. Defaults come from the device locale and from the deep link that brought the user here.</div></figcaption>
+  </figure>
+
+  <!-- 3 Interests -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><svg class="ic"><use href="#i-back"/></svg><span class="cap">2 of 2</span><span style="width:24px"></span></div>
+      <div class="content">
+        <div class="pad">
+          <div class="h1">What do you like watching?</div>
+          <div class="cap" style="margin-top:8px">Pick a few. Your feed starts here.</div>
+          <div class="chips" style="margin-top:24px;gap:10px">
+            <span class="chip on">Romance</span><span class="chip">Family drama</span><span class="chip on">Revenge</span><span class="chip">Thriller</span><span class="chip">Fantasy &amp; myth</span><span class="chip">Comedy</span><span class="chip">Horror</span><span class="chip on">Workplace</span><span class="chip">Campus</span><span class="chip">Sports</span><span class="chip">Crime</span><span class="chip">Contract marriage</span><span class="chip">Secret billionaire</span><span class="chip">Time-slip</span><span class="chip">In-laws saga</span><span class="chip">Second chance</span>
+          </div>
+        </div>
+        <div class="pad" style="position:absolute;left:0;right:0;bottom:44px">
+          <div class="btn p">Continue</div>
+          <div class="btn t" style="margin-top:6px">Skip for now</div>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">1.3 Interests</div><div class="d">Skippable. Three to five chips is enough to seed the cold-start taste vector (§22.3). Selected chips use the accent at 14% tint with an accent border, never a solid fill.</div></figcaption>
+  </figure>
+
+  <!-- 4 Login -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><svg class="ic"><use href="#i-x"/></svg><span></span><span style="width:24px"></span></div>
+      <div class="content">
+        <div class="pad">
+          <div class="h1">Save your coins and your place</div>
+          <div class="body muted" style="margin-top:10px">Log in to unlock episodes and keep watching on any device.</div>
+          <div class="field focus" style="margin-top:28px"><span style="color:var(--text2)">+91</span><span style="width:1px;height:22px;background:var(--line)"></span><span>98765 43</span><span style="width:2px;height:22px;background:var(--accent)"></span></div>
+          <div class="btn p" style="margin-top:12px">Get OTP</div>
+          <div style="display:flex;align-items:center;gap:12px;margin:22px 0"><span style="flex:1;height:1px;background:var(--line)"></span><span class="cap">or</span><span style="flex:1;height:1px;background:var(--line)"></span></div>
+          <div class="btn apple"><svg class="ic" style="width:20px;height:20px;stroke:none;fill:#000"><use href="#i-apple"/></svg>Sign in with Apple</div>
+          <div class="btn t" style="margin-top:8px">Continue as guest</div>
+        </div>
+        <div class="pad cap" style="position:absolute;left:0;right:0;bottom:48px;text-align:center;font-size:12px;line-height:17px">By continuing you agree to the Terms and the Privacy Notice. You must be 18 or older.</div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">1.4 Login</div><div class="d">Phone OTP first (+91 default), Sign in with Apple as the equal alternative, guest continue always visible. The heading says why login is being asked for at this moment. App Attest runs silently before the OTP request (§27.2).</div></figcaption>
+  </figure>
+
+  <!-- 5 OTP -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><svg class="ic"><use href="#i-back"/></svg><span></span><span style="width:24px"></span></div>
+      <div class="content">
+        <div class="pad">
+          <div class="h1">Enter the code</div>
+          <div class="body muted" style="margin-top:8px">Sent by SMS to +91 98765 43210. <span style="color:var(--text)">Change</span></div>
+          <div class="otp" style="margin-top:26px"><i>4</i><i>8</i><i>2</i><i>7</i><i class="cur"></i><i></i></div>
+          <div style="display:flex;justify-content:space-between;margin-top:16px" class="cap"><span>Resend in 0:24</span><span style="color:var(--text)">Use Apple instead</span></div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;background:#1C1C22;padding:8px 0 40px">
+          <div class="cap" style="text-align:center;margin-bottom:8px;color:var(--text3)">From Messages: 482791</div>
+          <div class="keys">
+            <b>1</b><b>2<small>ABC</small></b><b>3<small>DEF</small></b>
+            <b>4<small>GHI</small></b><b>5<small>JKL</small></b><b>6<small>MNO</small></b>
+            <b>7<small>PQRS</small></b><b>8<small>TUV</small></b><b>9<small>WXYZ</small></b>
+            <b class="blank"></b><b>0</b><b class="blank" style="font-size:18px">⌫</b>
+          </div>
+        </div>
+      </div>
+    </div></div></div>
+    <figcaption><div class="n">1.5 OTP entry</div><div class="d">Auto-fills from Messages. Resend unlocks after 30 s; three wrong codes lock the phone number for 5 minutes with plain copy. "Use Apple instead" is the escape hatch when SMS is slow.</div></figcaption>
+  </figure>
+
+  </div>
+</section>
+
+<!-- ============================ 2. DISCOVER ============================ -->
+<section class="flow" id="s-discover">
+  <h2>2. Discover</h2>
+  <p class="desc">Home leads with one large For You card (muted trailer) and rows beneath. Browse and Search are for people who know what they want. The series page does one job: get the viewer into episode 1 or back to where they left off.</p>
+  <div class="grid">
+
+  <!-- 6 Home -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen" id="scr-home" data-state="a">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><div style="display:flex;align-items:center;gap:8px"><svg width="26" height="26"><use href="#i-app"/></svg><div class="wm" style="font-size:22px">Katha</div></div><div style="display:flex;gap:10px;align-items:center"><span class="chip" style="height:30px">हिन्दी <svg class="ic s" style="width:14px;height:14px"><use href="#i-chev"/></svg></span><svg class="ic"><use href="#i-search"/></svg></div></div>
+      <div class="content tabbed">
+        <div class="gcard" style="display:flex;align-items:center;gap:12px;padding:12px 14px"><div class="coin lg"></div><div style="flex:1"><div class="h3" style="font-size:15px">Day 3 of your streak</div><div class="cap">Claim today's 5 coins</div></div><div class="btn p sm">Claim</div></div>
+        <div class="poster" style="--c1:#3B1F2B;--c2:#C2553D;margin:14px 20px 0;height:426px;border-radius:16px"><img class="ph" src="https://loremflickr.com/390/640/indian,bride?lock=11" alt="" loading="lazy" onerror="this.remove()">
+          <span class="badge">Free · 10 episodes</span>
+          <svg class="ic" style="position:absolute;top:10px;right:10px;color:#fff;opacity:.9"><use href="#i-mute"/></svg>
+          <div style="position:absolute;left:16px;right:16px;bottom:16px;color:#fff">
+            <div style="font-size:30px;line-height:32px;font-weight:800;letter-spacing:-.02em;text-shadow:0 1px 3px rgba(0,0,0,.5)">Kaanch Ka Mahal</div>
+            <div style="font-size:15px;line-height:20px;margin-top:6px;opacity:.9">Her in-laws smiled. That's when Meera knew.</div>
+            <div style="display:flex;gap:10px;margin-top:14px;align-items:center"><div class="btn p" style="height:44px;padding:0 20px;border-radius:999px"><svg class="ic s" style="fill:#fff;stroke:none"><use href="#i-play"/></svg>Play E1</div><span style="font-size:13px;opacity:.85">Romance · 60 episodes</span></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:center;gap:5px;margin-top:10px"><i style="width:14px;height:5px;border-radius:3px;background:var(--text)"></i><i style="width:5px;height:5px;border-radius:3px;background:var(--text3)"></i><i style="width:5px;height:5px;border-radius:3px;background:var(--text3)"></i><i style="width:5px;height:5px;border-radius:3px;background:var(--text3)"></i></div>
+        <div class="row" style="margin-top:16px">
+          <div class="rh"><span class="h3">Trending in Hindi</span><span class="cap">See all</span></div>
+          <div class="cards">
+            <div class="card"><div class="poster" style="--c1:#0F2A3D;--c2:#3E7C9A"><img class="ph" src="https://loremflickr.com/240/360/businessman,office?lock=12" alt="" loading="lazy" onerror="this.remove()"><span class="badge new">New</span><div class="t">CEO Sahab</div></div><div class="m">Romance · 60 eps</div></div>
+            <div class="card"><div class="poster" style="--c1:#1D1A2F;--c2:#6C4AB6"><img class="ph" src="https://loremflickr.com/240/360/night,window?lock=13" alt="" loading="lazy" onerror="this.remove()"><div class="t">Neend Se Pehle</div></div><div class="m">Thriller · 48 eps</div></div>
+            <div class="card"><div class="poster" style="--c1:#2B1B12;--c2:#B9772E"><img class="ph" src="https://loremflickr.com/240/360/delhi,street?lock=14" alt="" loading="lazy" onerror="this.remove()"><div class="t">Dilli 6 Ka Raaz</div></div><div class="m">Crime · 72 eps</div></div>
+            <div class="card"><div class="poster" style="--c1:#4A1620;--c2:#E0576A"><img class="ph" src="https://loremflickr.com/240/360/indian,wedding?lock=15" alt="" loading="lazy" onerror="this.remove()"><div class="t">Saat Pheron Ka Sauda</div></div><div class="m">Romance</div></div>
+          </div>
+        </div>
+        <!-- loading state -->
+        <div data-st="b" style="position:absolute;inset:0;background:var(--bg)">
+          <div class="sk" style="height:60px;margin:0 20px;border-radius:16px"></div>
+          <div class="sk" style="height:426px;margin:14px 20px 0;border-radius:16px"></div>
+          <div style="display:flex;gap:10px;padding:0 20px;margin-top:36px"><div class="sk" style="width:112px;height:168px;border-radius:12px"></div><div class="sk" style="width:112px;height:168px;border-radius:12px"></div><div class="sk" style="width:112px;height:168px;border-radius:12px"></div></div>
+        </div>
+        <!-- offline state -->
+        <div data-st="c" style="position:absolute;left:0;right:0;top:0">
+          <div class="banner" style="background:#2A2A33"><svg class="ic s"><use href="#i-wifioff"/></svg><span>You're offline. Showing what you watched recently.</span></div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab on"><svg class="ic"><use href="#i-home"/></svg>Home</div>
+        <div class="tab"><svg class="ic"><use href="#i-browse"/></svg>Browse</div>
+        <div class="tab"><svg class="ic"><use href="#i-list"/></svg>My list</div>
+        <div class="tab"><svg class="ic"><use href="#i-user"/></svg>Profile</div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">2.1 Home</div><div class="d">Check-in card is pinned until claimed. The For You card autoplays a muted trailer (at most two concurrently; off under data saver). Rows are 112 pt portrait cards with a peek to invite scrolling. Skeleton appears after 700 ms, never a spinner.</div>
+    <div class="states" data-for="scr-home"><button class="on" data-state="a" type="button">Loaded</button><button data-state="b" type="button">Loading</button><button data-state="c" type="button">Offline</button></div></figcaption>
+  </figure>
+
+  <!-- 7 Browse -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><span class="h1" style="font-size:26px">Browse</span></div>
+      <div class="content tabbed">
+        <div class="pad"><div class="field" style="height:44px"><svg class="ic s" style="color:var(--text3)"><use href="#i-search"/></svg><span class="ph">Series, cast, tropes</span></div></div>
+        <div class="chips" style="padding:14px 20px 0;flex-wrap:nowrap;overflow:hidden"><span class="chip">All</span><span class="chip on">हिन्दी</span><span class="chip">தமிழ்</span><span class="chip">తెలుగు</span><span class="chip">English</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px 20px 0">
+          <div class="poster" style="--c1:#4A1620;--c2:#E0576A;height:84px;border-radius:12px"><img class="ph" src="https://loremflickr.com/240/120/couple,love?lock=41" alt="" loading="lazy" onerror="this.remove()"><div class="t" style="font-size:17px">Romance</div></div>
+          <div class="poster" style="--c1:#3B1F2B;--c2:#C2553D;height:84px;border-radius:12px"><img class="ph" src="https://loremflickr.com/240/120/indian,family?lock=42" alt="" loading="lazy" onerror="this.remove()"><div class="t" style="font-size:17px">Family drama</div></div>
+          <div class="poster" style="--c1:#2B1B12;--c2:#B9772E;height:84px;border-radius:12px"><img class="ph" src="https://loremflickr.com/240/120/dark,portrait?lock=43" alt="" loading="lazy" onerror="this.remove()"><div class="t" style="font-size:17px">Revenge</div></div>
+          <div class="poster" style="--c1:#1D1A2F;--c2:#6C4AB6;height:84px;border-radius:12px"><img class="ph" src="https://loremflickr.com/240/120/night,alley?lock=44" alt="" loading="lazy" onerror="this.remove()"><div class="t" style="font-size:17px">Thriller</div></div>
+          <div class="poster" style="--c1:#0F3A3D;--c2:#3FA796;height:84px;border-radius:12px"><img class="ph" src="https://loremflickr.com/240/120/temple,sculpture?lock=45" alt="" loading="lazy" onerror="this.remove()"><div class="t" style="font-size:17px">Fantasy &amp; myth</div></div>
+          <div class="poster" style="--c1:#33261A;--c2:#E3A24A;height:84px;border-radius:12px"><img class="ph" src="https://loremflickr.com/240/120/friends,laughing?lock=46" alt="" loading="lazy" onerror="this.remove()"><div class="t" style="font-size:17px">Comedy</div></div>
+        </div>
+        <div class="row">
+          <div class="rh"><span class="h3">Top in Telugu</span><span class="cap">See all</span></div>
+          <div class="cards">
+            <div class="card"><div class="poster" style="--c1:#1B2E1F;--c2:#6DBE7A"><img class="ph" src="https://loremflickr.com/240/360/couple,india?lock=18" alt="" loading="lazy" onerror="this.remove()"><div class="t">Prema Pariksha<small>ప్రేమ పరీక్ష</small></div></div><div class="m">Romance · 60 eps</div></div>
+            <div class="card"><div class="poster" style="--c1:#2E1F3F;--c2:#D66E9D"><img class="ph" src="https://loremflickr.com/240/360/college,students?lock=17" alt="" loading="lazy" onerror="this.remove()"><div class="t">Rajahmundry Rani</div></div><div class="m">Family · 54 eps</div></div>
+            <div class="card"><div class="poster" style="--c1:#0F2A3D;--c2:#3E7C9A"><img class="ph" src="https://loremflickr.com/240/360/businessman,office?lock=12" alt="" loading="lazy" onerror="this.remove()"><div class="t">Nizam Ka Sauda</div></div><div class="m">Thriller · 48 eps</div></div>
+            <div class="card"><div class="poster" style="--c1:#33261A;--c2:#E3A24A"><img class="ph" src="https://loremflickr.com/240/360/temple,tamilnadu?lock=19" alt="" loading="lazy" onerror="this.remove()"><div class="t">Sunday Sambar</div></div><div class="m">Comedy</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><svg class="ic"><use href="#i-home"/></svg>Home</div>
+        <div class="tab on"><svg class="ic"><use href="#i-browse"/></svg>Browse</div>
+        <div class="tab"><svg class="ic"><use href="#i-list"/></svg>My list</div>
+        <div class="tab"><svg class="ic"><use href="#i-user"/></svg>Profile</div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">2.2 Browse</div><div class="d">Language chips filter everything below them. Genre tiles reuse poster gradients so the grid reads as content, not chrome. Tapping the search field pushes the Search screen.</div></figcaption>
+  </figure>
+
+  <!-- 8 Search -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen" id="scr-search" data-state="a">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top" style="gap:12px"><div class="field focus" style="height:44px;flex:1"><svg class="ic s" style="color:var(--text3)"><use href="#i-search"/></svg><span data-st="a" class="inl">kabir</span><span data-st="b" class="inl">kabeer ki</span><span style="flex:1"></span><svg class="ic s" style="color:var(--text3)"><use href="#i-x"/></svg></div><span class="body" style="color:var(--text2)">Cancel</span></div>
+      <div class="content">
+        <div data-st="a">
+          <div class="cap pad" style="margin-bottom:6px">Series</div>
+          <div class="li" style="border:0"><div class="poster" style="--c1:#3B1F2B;--c2:#C2553D;width:44px;height:62px;border-radius:8px;flex:none"><img class="ph" src="https://loremflickr.com/120/180/indian,bride?lock=11" alt="" loading="lazy" onerror="this.remove()"></div><div class="grow"><div class="body" style="font-weight:600">Kaanch Ka Mahal</div><div class="cap">Hindi · Romance · 60 episodes</div></div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+          <div class="li" style="border:0"><div class="poster" style="--c1:#0F2A3D;--c2:#3E7C9A;width:44px;height:62px;border-radius:8px;flex:none"><img class="ph" src="https://loremflickr.com/120/180/businessman,office?lock=12" alt="" loading="lazy" onerror="this.remove()"></div><div class="grow"><div class="body" style="font-weight:600">Kabir Ka Kanoon</div><div class="cap">Hindi · Crime · 48 episodes</div></div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+          <div class="li" style="border:0"><div class="poster" style="--c1:#1D1A2F;--c2:#6C4AB6;width:44px;height:62px;border-radius:8px;flex:none"><img class="ph" src="https://loremflickr.com/120/180/night,window?lock=13" alt="" loading="lazy" onerror="this.remove()"></div><div class="grow"><div class="body" style="font-weight:600">Kabir &amp; Company</div><div class="cap">Hindi · Comedy · 36 episodes</div></div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+          <div class="cap pad" style="margin:18px 0 6px">Cast</div>
+          <div class="li" style="border:0"><div style="width:44px;height:44px;border-radius:50%;background:var(--raised);display:flex;align-items:center;justify-content:center;font-weight:600">K</div><div class="grow"><div class="body" style="font-weight:600">Kabir Malhotra</div><div class="cap">Actor · 4 series</div></div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        </div>
+        <div data-st="b">
+          <div style="text-align:center;padding:56px 40px 0">
+            <svg class="ic" style="width:44px;height:44px;margin:0 auto;color:var(--text3)"><use href="#i-search"/></svg>
+            <div class="h2" style="margin-top:16px">Nothing for "kabeer ki" in Marathi yet</div>
+            <div class="body muted" style="margin-top:8px">Try Hindi, or check the spelling.</div>
+            <div class="btn s" style="margin-top:20px;display:inline-flex;height:44px;border-radius:999px">Search in Hindi</div>
+          </div>
+          <div class="cap pad" style="margin:36px 0 10px">Trending</div>
+          <div class="chips pad"><span class="chip">contract marriage</span><span class="chip">saas bahu</span><span class="chip">CEO</span><span class="chip">revenge</span><span class="chip">Kaanch Ka Mahal</span></div>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">2.3 Search</div><div class="d">Type-ahead across titles, cast and tropes, with Hinglish transliteration (kabeer → कबीर). The empty state names the language it searched in and offers the switch, because most "no results" are language mismatches.</div>
+    <div class="states" data-for="scr-search"><button class="on" data-state="a" type="button">Results</button><button data-state="b" type="button">No results</button></div></figcaption>
+  </figure>
+
+  <!-- 9 Series page -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen" id="scr-series" data-state="a">
+      <div class="island"></div>
+      <div class="status" style="color:#fff"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="poster" style="--c1:#3B1F2B;--c2:#C2553D;position:absolute;top:0;left:0;right:0;height:268px;border-radius:0"><img class="ph" src="https://loremflickr.com/390/300/indian,bride?lock=11" alt="" loading="lazy" onerror="this.remove()"></div>
+      <div style="position:absolute;top:0;left:0;right:0;height:268px;background:linear-gradient(to bottom,rgba(11,11,15,.2),rgba(11,11,15,0) 30%,rgba(11,11,15,.6) 70%,var(--bg))"></div>
+      <div class="top" style="color:#fff"><svg class="ic"><use href="#i-back"/></svg><div style="display:flex;gap:16px"><svg class="ic"><use href="#i-share"/></svg><svg class="ic"><use href="#i-more"/></svg></div></div>
+      <div style="position:absolute;top:196px;left:0;right:0;bottom:0">
+        <div class="pad">
+          <div class="h1" style="text-shadow:0 1px 3px rgba(0,0,0,.4)">Kaanch Ka Mahal</div>
+          <div class="chips" style="margin-top:10px"><span class="chip" style="height:26px;font-size:12px">Hindi</span><span class="chip" style="height:26px;font-size:12px">Romance</span><span class="chip" style="height:26px;font-size:12px;border-color:#3A3A44;color:var(--text)">U/A 16+</span><span class="chip" style="height:26px;font-size:12px">60 episodes</span></div>
+          <div class="cap" style="margin-top:10px">Audio: हिन्दी · தமிழ் (AI-dubbed) &nbsp; Subtitles: English</div>
+          <div class="body" style="margin-top:10px;color:#D4D4D8;font-size:15px;line-height:21px">Meera marries into Lucknow's most admired family and discovers the mansion runs on secrets. Every smile at the dinner table is a move. Hers is next.</div>
+          <div data-st="a" style="margin-top:14px"><div style="display:flex;gap:10px"><div class="btn p" style="flex:1"><svg class="ic s" style="fill:#fff;stroke:none"><use href="#i-play"/></svg>Play episode 1</div><div class="btn s" style="width:52px;padding:0"><svg class="ic"><use href="#i-list"/></svg></div></div></div>
+          <div data-st="b" style="margin-top:14px"><div style="display:flex;gap:10px"><div class="btn p" style="flex:1"><svg class="ic s" style="fill:#fff;stroke:none"><use href="#i-play"/></svg>Continue E7 · 1 min left</div><div class="btn s" style="width:52px;padding:0"><svg class="ic" style="color:var(--accent)"><use href="#i-check"/></svg></div></div>
+            <div class="gcard" style="margin:12px 0 0;display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--raised)"><div class="coin lg"></div><div style="flex:1"><div class="h3" style="font-size:15px">Unlock all 50 remaining</div><div class="cap">1,125 coins · save 25% vs one by one</div></div><span class="tag acc">Bundle</span></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin:20px 0 10px"><span class="h3">Episodes</span><span class="cap">1–10 free</span></div>
+        </div>
+        <div data-st="a"><div class="eps"><div class="ep">1</div><div class="ep">2</div><div class="ep">3</div><div class="ep">4</div><div class="ep">5</div><div class="ep">6</div><div class="ep">7</div><div class="ep">8</div><div class="ep">9</div><div class="ep">10</div><div class="ep lock">11<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">12<svg class="ic"><use href="#i-lock"/></svg></div></div></div>
+        <div data-st="b"><div class="eps"><div class="ep done">1</div><div class="ep done">2</div><div class="ep done">3</div><div class="ep done">4</div><div class="ep done">5</div><div class="ep done">6</div><div class="ep cur">7</div><div class="ep">8</div><div class="ep">9</div><div class="ep">10</div><div class="ep lock">11<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">12<svg class="ic"><use href="#i-lock"/></svg></div></div></div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">2.4 Series page</div><div class="d">Cover art bleeds under the status bar and fades into the page. Rating and descriptors are always visible. Returning viewers get "Continue" with time left and see the bundle offer only while ≥ 10 locked episodes remain. Episode cells: plain = free, dot = watched, accent = current, grey + lock = locked.</div>
+    <div class="states" data-for="scr-series"><button class="on" data-state="a" type="button">First visit</button><button data-state="b" type="button">Returning</button></div></figcaption>
+  </figure>
+
+  </div>
+</section>
+
+<!-- ============================ 3. WATCH & PAY ============================ -->
+<section class="flow" id="s-watch">
+  <h2>3. Watch and pay</h2>
+  <p class="desc">The player hides its chrome after 2.5 s. Swipe up for the next episode, tap to pause, double-tap to like, long-press for 2×. The paywall is a sheet over the paused frame — the story stays visible, which is the strongest reason to unlock.</p>
+  <div class="grid">
+
+  <!-- 10 Player -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen" id="scr-player" data-state="a" style="background:#000">
+      <div class="island"></div>
+      <div class="status" style="color:#fff"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="video" style="background:radial-gradient(75% 55% at 38% 34%,#8A4A2F 0%,#41211A 42%,#0B0B0F 100%)"><img class="ph" src="https://loremflickr.com/390/844/letter,handwriting?lock=51" alt="" loading="lazy" onerror="this.remove()"></div>
+      <div style="position:absolute;left:96px;top:300px;width:160px;height:110px;background:linear-gradient(135deg,#F1E4C8,#C9B48F);transform:rotate(-8deg);border-radius:2px;box-shadow:0 12px 30px rgba(0,0,0,.5);opacity:.75;z-index:1"></div>
+      <div class="vig"></div>
+      <div class="top" style="color:#fff"><svg class="ic"><use href="#i-x"/></svg><div style="display:flex;gap:16px"><svg class="ic"><use href="#i-cc"/></svg><svg class="ic" style="opacity:.6"><use href="#i-saver"/></svg></div></div>
+      <div class="rail">
+        <div><svg class="ic"><use href="#i-heart"/></svg>12.4k</div>
+        <div><svg class="ic"><use href="#i-eps"/></svg>E12</div>
+        <div><svg class="ic"><use href="#i-share"/></svg>Share</div>
+        <div><svg class="ic"><use href="#i-more"/></svg></div>
+      </div>
+      <div class="sub">ये चिट्ठी… तुम्हारे नाम की है।</div>
+      <div class="pinfo"><div style="font-size:13px;opacity:.8">Kaanch Ka Mahal</div><div style="font-size:16px;font-weight:600;margin-top:2px">E12 · Kabir finds the letter</div></div>
+      <div class="scrub"><div class="bar"><i style="width:42%"></i><b style="left:42%"></b></div><div class="tm"><span>0:48</span><span>1:12 left</span></div></div>
+      <!-- buffering -->
+      <div data-st="b" style="position:absolute;left:50%;top:50%;margin:-13px 0 0 -13px;z-index:7"><div class="ring"></div></div>
+      <!-- recording blocked -->
+      <div data-st="c"><div class="lock2"><svg class="ic" style="width:40px;height:40px;color:var(--text2)"><use href="#i-lock"/></svg><div class="h2">Recording isn't supported</div><div class="body muted">Playback resumes when screen recording stops.</div></div></div>
+      <!-- series end -->
+      <div data-st="d"><div style="position:absolute;inset:0;background:rgba(11,11,15,.88);z-index:7;display:flex;flex-direction:column;justify-content:center;padding:0 24px">
+        <div class="cap">You finished</div>
+        <div class="h1" style="margin-top:2px">Kaanch Ka Mahal</div>
+        <div class="cap" style="margin-top:6px">60 episodes · 1 h 32 min watched</div>
+        <div class="cap" style="margin:28px 0 10px">Up next in Hindi</div>
+        <div style="display:flex;gap:12px;align-items:center"><div class="poster" style="--c1:#0F2A3D;--c2:#3E7C9A;width:84px;height:126px;flex:none"><img class="ph" src="https://loremflickr.com/180/270/businessman,office?lock=12" alt="" loading="lazy" onerror="this.remove()"><div class="t" style="font-size:13px">CEO Sahab</div></div><div style="flex:1"><div class="h3">CEO Sahab</div><div class="cap" style="margin-top:4px">He hired her to fix his company. She fixed him instead. 10 free episodes.</div><div class="btn p" style="height:40px;margin-top:12px;border-radius:999px;display:inline-flex;padding:0 18px"><svg class="ic s" style="fill:#fff;stroke:none"><use href="#i-play"/></svg>Play E1</div></div></div>
+        <div class="btn t" style="margin-top:20px">Back to Home</div>
+      </div></div>
+      <!-- error -->
+      <div data-st="e" style="position:absolute;left:16px;right:16px;top:70px;z-index:8"><div class="toast" style="position:static;background:#2A2A33"><svg class="ic s"><use href="#i-wifioff"/></svg><span style="flex:1">Connection lost. Retrying…</span><span style="font-weight:600;color:var(--accent)">Retry</span></div></div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">3.1 Player</div><div class="d">Right rail sits in the thumb zone. Captions honor the system caption style. Buffering ring appears after 500 ms; two stalls in a minute drop the rendition. When screen recording is detected the video layer is hidden. The end card leads straight into the next series.</div>
+    <div class="states" data-for="scr-player"><button class="on" data-state="a" type="button">Playing</button><button data-state="b" type="button">Buffering</button><button data-state="c" type="button">Recording blocked</button><button data-state="d" type="button">Series end</button><button data-state="e" type="button">Connection lost</button></div></figcaption>
+  </figure>
+
+  <!-- 11 Episode drawer -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen" style="background:#000">
+      <div class="island"></div>
+      <div class="status" style="color:#fff"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="video" style="background:radial-gradient(75% 55% at 38% 34%,#8A4A2F 0%,#41211A 42%,#0B0B0F 100%)"><img class="ph" src="https://loremflickr.com/390/844/letter,handwriting?lock=51" alt="" loading="lazy" onerror="this.remove()"></div>
+      <div class="vig"></div>
+      <div class="dimm"></div>
+      <div class="sheet" style="height:540px">
+        <div class="grab"></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="h2">Episodes</span><span class="cap">60 · 1–10 free</span></div>
+        <div style="display:flex;align-items:center;gap:12px;margin:14px 0 16px"><div style="flex:1"><div class="body" style="font-size:15px">Auto-unlock next episodes</div><div class="cap">Charges 30 coins only when an episode starts</div></div><div class="tog"></div></div>
+        <div class="eps" style="padding:0">
+          <div class="ep done">1</div><div class="ep done">2</div><div class="ep done">3</div><div class="ep done">4</div><div class="ep done">5</div><div class="ep done">6</div>
+          <div class="ep done">7</div><div class="ep done">8</div><div class="ep done">9</div><div class="ep done">10</div><div class="ep done">11</div><div class="ep cur">12</div>
+          <div class="ep lock">13<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">14<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">15<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">16<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">17<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">18<svg class="ic"><use href="#i-lock"/></svg></div>
+          <div class="ep lock">19<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">20<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">21<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">22<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">23<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">24<svg class="ic"><use href="#i-lock"/></svg></div>
+          <div class="ep lock">25<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">26<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">27<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">28<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">29<svg class="ic"><use href="#i-lock"/></svg></div><div class="ep lock">30<svg class="ic"><use href="#i-lock"/></svg></div>
+        </div>
+        <div class="cap" style="margin-top:14px;text-align:center">Scroll for 31–60</div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">3.2 Episode drawer</div><div class="d">Opens from the rail or a swipe from the bottom edge. Playback keeps running underneath, dimmed. The auto-unlock toggle lives here and on the paywall, and is off by default.</div></figcaption>
+  </figure>
+
+  <!-- 12 Paywall -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen" id="scr-paywall" data-state="a" style="background:#000">
+      <div class="island"></div>
+      <div class="status" style="color:#fff"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="video" style="background:radial-gradient(70% 50% at 55% 40%,#2F4A5A 0%,#14232B 45%,#0B0B0F 100%)"><img class="ph" src="https://loremflickr.com/390/844/old,key?lock=52" alt="" loading="lazy" onerror="this.remove()"></div>
+      <div class="vig"></div>
+      <div class="top" style="color:#fff"><svg class="ic"><use href="#i-x"/></svg><div style="display:flex;gap:16px"><svg class="ic"><use href="#i-cc"/></svg><svg class="ic" style="opacity:.6"><use href="#i-saver"/></svg></div></div>
+      <div data-st="d"><div class="pinfo"><div style="font-size:13px;opacity:.8">Kaanch Ka Mahal</div><div style="font-size:16px;font-weight:600;margin-top:2px">E11 · Meera finds the second key</div></div></div>
+      <div data-st="d"><div class="scrub"><div class="bar"><i style="width:3%"></i><b style="left:3%"></b></div><div class="tm"><span>0:02</span><span>1:54 left</span></div></div></div>
+      <div data-st="d"><div class="toast"><svg class="ic s" style="color:var(--ok)"><use href="#i-check"/></svg><span style="flex:1">E11 unlocked</span><span style="color:var(--text2)">−30 coins</span></div></div>
+      <!-- states a, b, c share the dim + sheet -->
+      <div data-st="a"><div class="dimm"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="h2">Unlock E11</div><div class="cap" style="margin-top:2px">Meera finds the second key</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px"><div style="display:flex;align-items:center;gap:8px"><div class="coin"></div><span class="h3">30 coins</span><span class="cap">≈ ₹4.5</span></div><span class="coinpill"><span class="coin"></span>You have 120</span></div>
+          <div class="btn p" style="margin-top:16px">Unlock episode</div>
+          <div class="btn s" style="margin-top:8px;justify-content:space-between;font-size:15px"><span>Unlock all 50 remaining · 1,125 coins</span><span class="tag acc">Save 25%</span></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:16px"><div style="flex:1"><div class="body" style="font-size:15px">Auto-unlock next episodes</div><div class="cap">Charges only when an episode starts</div></div><div class="tog"></div></div>
+          <div class="cap" style="text-align:center;margin-top:18px">Restore purchases &nbsp;·&nbsp; Terms</div>
+        </div>
+      </div>
+      <div data-st="b"><div class="dimm"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="h2">Unlock E11</div><div class="cap" style="margin-top:2px">Meera finds the second key</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px"><div style="display:flex;align-items:center;gap:8px"><div class="coin"></div><span class="h3">30 coins</span><span class="cap">≈ ₹4.5</span></div><span class="coinpill" style="color:var(--danger)"><span class="coin"></span>You have 15</span></div>
+          <div class="pack hi" style="margin-top:14px"><div style="flex:1"><div class="pn">1,300 coins <span class="tag acc" style="margin-left:6px">Popular</span></div><div class="pc">Finishes this series and the next</div></div><div class="pr">₹199</div></div>
+          <div class="pack"><div style="flex:1"><div class="pn">600 coins <span class="tag gold" style="margin-left:6px">2× on your first pack</span></div><div class="pc">Enough for 20 episodes</div></div><div class="pr">₹99</div></div>
+          <div class="pack"><div style="flex:1"><div class="pn">3,500 coins <span class="bz" style="margin-left:6px">17% bonus</span></div><div class="pc">Best for binge weekends</div></div><div class="pr">₹499</div></div>
+          <div class="cap" style="text-align:center;margin-top:14px">Buy once, keep watching. Coins never expire.</div>
+          <div class="cap" style="text-align:center;margin-top:8px">Restore purchases &nbsp;·&nbsp; Terms</div>
+        </div>
+      </div>
+      <div data-st="c"><div class="dimm"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="h2">Unlock E11</div><div class="cap" style="margin-top:2px">Meera finds the second key</div>
+          <div class="pack hi" style="margin-top:18px"><div style="flex:1"><div class="pn">1,300 coins</div><div class="pc">Adding your coins…</div></div><div class="spin"></div></div>
+          <div class="pack" style="opacity:.4"><div style="flex:1"><div class="pn">600 coins</div><div class="pc">Enough for 20 episodes</div></div><div class="pr">₹99</div></div>
+          <div class="pack" style="opacity:.4"><div style="flex:1"><div class="pn">3,500 coins</div><div class="pc">Best for binge weekends</div></div><div class="pr">₹499</div></div>
+          <div class="cap" style="text-align:center;margin-top:18px">Confirming with the App Store. Your episode unlocks automatically.</div>
+        </div>
+      </div>
+      <div data-st="e"><div class="dimm"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="h2">Waiting for approval</div><div class="cap" style="margin-top:2px">Unlock E11 · Meera finds the second key</div>
+          <div class="banner" style="margin:18px 0 0;background:var(--raised)"><svg class="ic s" style="color:var(--coin)"><use href="#i-bell"/></svg><span style="flex:1">This purchase needs approval from your family organizer. We'll unlock the episode the moment it's approved.</span></div>
+          <div class="btn s" style="margin-top:16px">Keep watching free episodes</div>
+          <div class="cap" style="text-align:center;margin-top:14px">You haven't been charged yet.</div>
+        </div>
+      </div>
+      <div data-st="f"><div class="dimm"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="h2">Unlock E11</div><div class="cap" style="margin-top:2px">Meera finds the second key</div>
+          <div class="banner" style="margin:16px 0 0;background:rgba(255,77,79,.12);border-left:3px solid var(--danger)"><span style="flex:1">Payment didn't go through. You weren't charged.</span><span style="color:var(--accent);font-weight:600">Retry</span></div>
+          <div class="pack hi" style="margin-top:14px"><div style="flex:1"><div class="pn">1,300 coins <span class="tag acc" style="margin-left:6px">Popular</span></div><div class="pc">Finishes this series and the next</div></div><div class="pr">₹199</div></div>
+          <div class="pack"><div style="flex:1"><div class="pn">600 coins <span class="tag gold" style="margin-left:6px">2× on your first pack</span></div><div class="pc">Enough for 20 episodes</div></div><div class="pr">₹99</div></div>
+          <div class="cap" style="text-align:center;margin-top:14px">Restore purchases &nbsp;·&nbsp; Terms</div>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">3.3 Paywall</div><div class="d">Appears at the first locked episode as a 55% sheet over the paused, dimmed frame. Price always carries the ₹ equivalent. With too few coins the primary action becomes "Get coins" and the packs appear inline. While Apple confirms, other packs disable and the sheet stays; after 10 s copy changes to "Still confirming — you can keep browsing". On success the sheet drops and a 2-second toast confirms the debit. A cancelled purchase simply returns to the packs with no error copy (§10.3). Ask to Buy (deferred) parks the unlock until the family organizer approves — completed later via Transaction.updates.</div>
+    <div class="states" data-for="scr-paywall"><button class="on" data-state="a" type="button">Enough coins</button><button data-state="b" type="button">Not enough</button><button data-state="c" type="button">Confirming</button><button data-state="d" type="button">Unlocked</button><button data-state="e" type="button">Ask to Buy</button><button data-state="f" type="button">Failed</button></div></figcaption>
+  </figure>
+
+  <!-- 13 Coin packs -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><span class="ttl">Wallet</span></div>
+      <div class="dimm"></div>
+      <div class="sheet" style="height:730px">
+        <div class="grab"></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="h2">Get coins</span><span class="coinpill"><span class="coin"></span>120</span></div>
+        <div class="cap" style="margin-top:4px">1 coin ≈ ₹0.15. Bonus coins are used first.</div>
+        <div class="pack" style="margin-top:16px"><div style="flex:1"><div class="pn">600 coins <span class="tag gold" style="margin-left:6px">2× on your first pack</span></div><div class="pc">Starter · enough for 20 episodes</div></div><div class="pr">₹99</div></div>
+        <div class="pack hi"><div style="flex:1"><div class="pn">1,300 coins <span class="tag acc" style="margin-left:6px">Popular</span></div><div class="pc">8% bonus · finishes a series and the next</div></div><div class="pr">₹199</div></div>
+        <div class="pack"><div style="flex:1"><div class="pn">3,500 coins <span class="bz" style="margin-left:6px">17% bonus</span></div><div class="pc">Value · best for binge weekends</div></div><div class="pr">₹499</div></div>
+        <div class="pack"><div style="flex:1"><div class="pn">7,500 coins <span class="bz" style="margin-left:6px">25% bonus</span></div><div class="pc">Binge · about five series</div></div><div class="pr">₹999</div></div>
+        <div class="pack"><div style="flex:1"><div class="pn">16,000 coins <span class="bz" style="margin-left:6px">33% bonus</span></div><div class="pc">Mega · lowest price per coin</div></div><div class="pr">₹1,999</div></div>
+        <div class="cap" style="margin-top:18px;line-height:18px">Payment is handled by Apple. Coins never expire while your account exists. Prices include GST.</div>
+        <div class="cap" style="text-align:center;margin-top:14px;color:var(--text)">Restore purchases</div>
+      </div>
+    </div></div></div>
+    <figcaption><div class="n">3.4 Coin packs</div><div class="d">Five packs, each described by what it buys rather than by name. Popular is pre-highlighted; the first-purchase 2× badge sits on Starter only. Apple's payment sheet appears over this on tap.</div></figcaption>
+  </figure>
+
+  <!-- 14 Wallet -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><svg class="ic"><use href="#i-back"/></svg><span class="ttl">Wallet</span><span style="width:24px"></span></div>
+      <div class="content">
+        <div class="gcard">
+          <div class="cap">Balance</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:6px"><div class="coin lg"></div><span style="font-size:40px;line-height:44px;font-weight:700;letter-spacing:-.03em">1,300</span></div>
+          <div class="cap" style="margin-top:6px">1,200 bought · 100 bonus. Bonus coins are used first.</div>
+          <div class="btn p" style="margin-top:16px">Buy coins</div>
+        </div>
+        <div class="pad" style="margin-top:24px;display:flex;justify-content:space-between;align-items:baseline"><span class="h3">History</span><span class="cap">All</span></div>
+        <div style="margin-top:6px">
+          <div class="li"><div style="width:36px;height:36px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--text2)">−</div><div class="grow"><div class="body" style="font-size:15px">E12 · Kaanch Ka Mahal</div><div class="cap">Today, 9:12 pm</div></div><span class="body" style="font-weight:600">−30</span></div>
+          <div class="li"><div style="width:36px;height:36px;border-radius:50%;background:rgba(245,192,66,.14);display:flex;align-items:center;justify-content:center;color:var(--coin)">+</div><div class="grow"><div class="body" style="font-size:15px">Popular pack</div><div class="cap">Today, 9:10 pm · App Store</div></div><span class="body" style="font-weight:600;color:var(--coin)">+1,300</span></div>
+          <div class="li"><div style="width:36px;height:36px;border-radius:50%;background:rgba(245,192,66,.14);display:flex;align-items:center;justify-content:center;color:var(--coin)">+</div><div class="grow"><div class="body" style="font-size:15px">Daily check-in</div><div class="cap">Today, 8:02 am · bonus</div></div><span class="body" style="font-weight:600;color:var(--coin)">+5</span></div>
+          <div class="li"><div style="width:36px;height:36px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--text2)">−</div><div class="grow"><div class="body" style="font-size:15px">E11 · Kaanch Ka Mahal</div><div class="cap">Yesterday, 10:41 pm</div></div><span class="body" style="font-weight:600">−30</span></div>
+          <div class="li"><div style="width:36px;height:36px;border-radius:50%;background:rgba(245,192,66,.14);display:flex;align-items:center;justify-content:center;color:var(--coin)">+</div><div class="grow"><div class="body" style="font-size:15px">7-day streak bonus</div><div class="cap">Yesterday · bonus</div></div><span class="body" style="font-weight:600;color:var(--coin)">+25</span></div>
+        </div>
+        <div class="cap" style="text-align:center;margin-top:18px;color:var(--text)">Restore purchases</div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">3.5 Wallet and history</div><div class="d">Balance shows the bought/bonus split so spending order is never a surprise. Every ledger row names the episode or pack and its source. Restore Purchases is always one tap away, as App Review expects.</div></figcaption>
+  </figure>
+
+  <!-- 15 Push notification -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen" style="background:radial-gradient(90% 60% at 50% 20%,#3B2A4F 0%,#151425 50%,#07070B 100%)">
+      <div class="island"></div>
+      <div class="status" style="color:#fff;justify-content:flex-end"><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div style="position:absolute;top:96px;left:0;right:0;text-align:center;color:#fff"><div style="font-size:19px;font-weight:500;opacity:.9">Monday, 14 September</div><div style="font-size:88px;line-height:1;font-weight:600;letter-spacing:-.03em;margin-top:4px">8:02</div></div>
+      <div style="position:absolute;left:12px;right:12px;bottom:170px;background:rgba(40,40,50,.72);backdrop-filter:blur(30px);border-radius:22px;padding:12px 14px;color:#fff;display:flex;gap:12px">
+        <svg width="38" height="38" style="flex:none"><use href="#i-app"/></svg>
+        <div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;font-size:13px"><span style="font-weight:600">Katha</span><span style="opacity:.6">now</span></div><div style="font-size:15px;font-weight:600;margin-top:1px">E23 · Kabir finds the letter</div><div style="font-size:15px;line-height:20px;opacity:.9">4 episodes left tonight. Meera is waiting.</div></div>
+      </div>
+      <div style="position:absolute;left:0;right:0;bottom:56px;display:flex;justify-content:space-between;padding:0 48px"><div style="width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.14)"></div><div style="width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.14)"></div></div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">3.6 Episode-drop notification</div><div class="d">Title is the episode label; body hooks without spoiling. Tapping deep-links straight into the player at E23. Quiet hours 23:00–08:00 IST, max two pushes a day, one per series per day.</div></figcaption>
+  </figure>
+
+  </div>
+</section>
+
+<!-- ============================ 4. ACCOUNT ============================ -->
+<section class="flow" id="s-account">
+  <h2>4. Account</h2>
+  <p class="desc">Profile is the hub for money, saved series and settings. Guests see the same screen with one card explaining what an account protects. Settings keep language, data, notifications and the parental lock one level deep.</p>
+  <div class="grid">
+
+  <!-- 16 Profile -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen" id="scr-profile" data-state="a">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><span class="h1" style="font-size:26px">Profile</span><svg class="ic"><use href="#i-gear"/></svg></div>
+      <div class="content tabbed">
+        <div data-st="a">
+          <div class="pad" style="display:flex;align-items:center;gap:14px"><div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(160deg,#4A1620,#E0576A);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700">M</div><div><div class="h2">Meera</div><div class="cap">+91 98765 •••21 · Hindi, Tamil</div></div></div>
+          <div class="gcard" style="margin-top:18px;display:flex;padding:14px 8px"><div class="stat"><b>214</b><span>episodes</span></div><div class="stat"><b>3</b><span>series finished</span></div><div class="stat"><b>6 days</b><span>streak</span></div></div>
+        </div>
+        <div data-st="b">
+          <div class="pad" style="display:flex;align-items:center;gap:14px"><div style="width:56px;height:56px;border-radius:50%;background:var(--raised);display:flex;align-items:center;justify-content:center"><svg class="ic" style="color:var(--text2)"><use href="#i-user"/></svg></div><div><div class="h2">Guest</div><div class="cap">Hindi · watching on this iPhone only</div></div></div>
+          <div class="gcard" style="margin-top:18px"><div class="h3">Create an account to keep your coins</div><div class="cap" style="margin-top:4px">Your 45 bonus coins and your place in Kaanch Ka Mahal stay with you on any device.</div><div class="btn p" style="margin-top:14px;height:44px">Continue with phone</div><div class="btn apple" style="margin-top:8px;height:44px"><svg class="ic s" style="stroke:none;fill:#000"><use href="#i-apple"/></svg>Sign in with Apple</div></div>
+        </div>
+        <div style="margin-top:20px">
+          <div class="li"><div class="coin"></div><div class="grow body">Wallet</div><span class="v inl" data-st="a">1,300 coins</span><span class="v inl" data-st="b">45 coins</span><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+          <div class="li"><svg class="ic s" style="color:var(--text2)"><use href="#i-list"/></svg><div class="grow body">My list</div><span class="v inl" data-st="a">7</span><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+          <div class="li"><svg class="ic s" style="color:var(--text2)"><use href="#i-play-o"/></svg><div class="grow body">Continue watching</div><span class="v inl" data-st="a">4</span><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+          <div class="li"><svg class="ic s" style="color:var(--text2)"><use href="#i-bell"/></svg><div class="grow body">Notifications</div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+          <div class="li"><svg class="ic s" style="color:var(--text2)"><use href="#i-help"/></svg><div class="grow body">Help &amp; grievance</div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><svg class="ic"><use href="#i-home"/></svg>Home</div>
+        <div class="tab"><svg class="ic"><use href="#i-browse"/></svg>Browse</div>
+        <div class="tab"><svg class="ic"><use href="#i-list"/></svg>My list</div>
+        <div class="tab on"><svg class="ic"><use href="#i-user"/></svg>Profile</div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">4.1 Profile</div><div class="d">Members see their stats and masked phone number. Guests see exactly what an account protects — coins and progress — with the two login paths in one card. Same list beneath in both states.</div>
+    <div class="states" data-for="scr-profile"><button class="on" data-state="a" type="button">Member</button><button data-state="b" type="button">Guest</button></div></figcaption>
+  </figure>
+
+  <!-- 17 Settings -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><svg class="ic"><use href="#i-back"/></svg><span class="ttl">Settings</span><span style="width:24px"></span></div>
+      <div class="content">
+        <div class="cap pad" style="margin-bottom:4px">Languages</div>
+        <div class="li"><div class="grow body">Content languages</div><span class="v">हिन्दी, தமிழ்</span><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="li"><div class="grow body">App language</div><span class="v">English</span><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="cap pad" style="margin:20px 0 4px">Playback</div>
+        <div class="li"><div class="grow"><div class="body">Data saver</div><div class="cap">Caps quality at 540p on mobile data</div></div><div class="tog on"></div></div>
+        <div class="li"><div class="grow"><div class="body">Autoplay trailers</div><div class="cap">Muted previews on Home</div></div><div class="tog on"></div></div>
+        <div class="li"><div class="grow body">Notifications</div><span class="v">New episodes, coins</span><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="cap pad" style="margin:20px 0 4px">Safety</div>
+        <div class="li"><div class="grow"><div class="body">Parental lock</div><div class="cap">Ask for a PIN on U/A 16+ and A</div></div><span class="v">Off</span><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="li" style="opacity:.45"><div class="grow"><div class="body">Downloads</div><div class="cap">Coming soon</div></div></div>
+        <div class="cap pad" style="margin:20px 0 4px">About</div>
+        <div class="li"><div class="grow body">Help &amp; grievance</div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="li"><div class="grow body">Terms · Privacy Notice</div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="li"><div class="grow body" style="color:var(--danger)">Delete account</div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="cap pad" style="margin-top:14px;color:var(--text3)">Version 1.0.0 (120)</div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">4.2 Settings</div><div class="d">Grouped by what the person is deciding, not by system module. Data saver is on by default for cellular. Delete account sits in the list in the danger colour, as App Review requires it to be reachable.</div></figcaption>
+  </figure>
+
+  <!-- 18 Parental lock -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><svg class="ic"><use href="#i-back"/></svg><span class="ttl">Parental lock</span><span style="width:24px"></span></div>
+      <div class="content">
+        <div class="pad" style="text-align:center;padding-top:28px">
+          <svg class="ic" style="width:40px;height:40px;margin:0 auto;color:var(--text2)"><use href="#i-shield"/></svg>
+          <div class="h2" style="margin-top:16px">Set a 4-digit PIN</div>
+          <div class="body muted" style="margin-top:8px">It's asked for before any U/A 16+ or A rated series plays.</div>
+          <div class="pin" style="margin-top:32px"><i class="f"></i><i class="f"></i><i></i><i></i></div>
+          <div class="cap" style="margin-top:28px">Forgot it later? We'll verify your phone number.</div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;background:#1C1C22;padding:8px 0 40px">
+          <div class="keys">
+            <b>1</b><b>2<small>ABC</small></b><b>3<small>DEF</small></b>
+            <b>4<small>GHI</small></b><b>5<small>JKL</small></b><b>6<small>MNO</small></b>
+            <b>7<small>PQRS</small></b><b>8<small>TUV</small></b><b>9<small>WXYZ</small></b>
+            <b class="blank"></b><b>0</b><b class="blank" style="font-size:18px">⌫</b>
+          </div>
+        </div>
+      </div>
+    </div></div></div>
+    <figcaption><div class="n">4.3 Parental lock</div><div class="d">The IT Rules access-control requirement (§15) made concrete: a PIN gate for U/A 16+ and A titles. Recovery goes through phone verification, not email.</div></figcaption>
+  </figure>
+
+  <!-- 19 My list -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen" id="scr-list" data-state="a">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><span class="h1" style="font-size:26px">My list</span><span class="cap inl" data-st="a">7 series</span></div>
+      <div class="content tabbed">
+        <div data-st="a">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:0 20px">
+            <div><div class="poster" style="height:168px;--c1:#3B1F2B;--c2:#C2553D"><img class="ph" src="https://loremflickr.com/240/360/indian,bride?lock=11" alt="" loading="lazy" onerror="this.remove()"><span class="badge new">E24 today</span><div class="t">Kaanch Ka Mahal</div></div><div class="cap" style="margin-top:6px;font-size:12px">On E7</div></div>
+            <div><div class="poster" style="height:168px;--c1:#0F2A3D;--c2:#3E7C9A"><img class="ph" src="https://loremflickr.com/240/360/businessman,office?lock=12" alt="" loading="lazy" onerror="this.remove()"><div class="t">CEO Sahab</div></div><div class="cap" style="margin-top:6px;font-size:12px">Not started</div></div>
+            <div><div class="poster" style="height:168px;--c1:#2E1F3F;--c2:#D66E9D"><img class="ph" src="https://loremflickr.com/240/360/college,students?lock=17" alt="" loading="lazy" onerror="this.remove()"><span class="badge">Tamil</span><div class="t">Kadhal Kanakku</div></div><div class="cap" style="margin-top:6px;font-size:12px">On E31</div></div>
+            <div><div class="poster" style="height:168px;--c1:#1D1A2F;--c2:#6C4AB6"><img class="ph" src="https://loremflickr.com/240/360/night,window?lock=13" alt="" loading="lazy" onerror="this.remove()"><div class="t">Neend Se Pehle</div></div><div class="cap" style="margin-top:6px;font-size:12px">Finished</div></div>
+            <div><div class="poster" style="height:168px;--c1:#0F3A3D;--c2:#3FA796"><img class="ph" src="https://loremflickr.com/240/360/palace,india?lock=16" alt="" loading="lazy" onerror="this.remove()"><span class="badge">Fri 8 pm</span><div class="t">Raja Ki Beti</div></div><div class="cap" style="margin-top:6px;font-size:12px">Reminder on</div></div>
+            <div><div class="poster" style="height:168px;--c1:#33261A;--c2:#E3A24A"><img class="ph" src="https://loremflickr.com/240/360/temple,tamilnadu?lock=19" alt="" loading="lazy" onerror="this.remove()"><div class="t">Vetri Vaasal</div></div><div class="cap" style="margin-top:6px;font-size:12px">On E12</div></div>
+            <div><div class="poster" style="height:168px;--c1:#2B1B12;--c2:#B9772E"><img class="ph" src="https://loremflickr.com/240/360/delhi,street?lock=14" alt="" loading="lazy" onerror="this.remove()"><div class="t">Dilli 6 Ka Raaz</div></div><div class="cap" style="margin-top:6px;font-size:12px">Not started</div></div>
+          </div>
+        </div>
+        <div data-st="b">
+          <div style="text-align:center;padding:96px 40px 0">
+            <svg class="ic" style="width:44px;height:44px;margin:0 auto;color:var(--text3)"><use href="#i-list"/></svg>
+            <div class="h2" style="margin-top:16px">Nothing saved yet</div>
+            <div class="body muted" style="margin-top:8px">Save a series and we'll nudge you when new episodes drop.</div>
+            <div class="btn s" style="margin-top:20px;display:inline-flex;height:44px;border-radius:999px">Browse series</div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab"><svg class="ic"><use href="#i-home"/></svg>Home</div>
+        <div class="tab"><svg class="ic"><use href="#i-browse"/></svg>Browse</div>
+        <div class="tab on"><svg class="ic"><use href="#i-list"/></svg>My list</div>
+        <div class="tab"><svg class="ic"><use href="#i-user"/></svg>Profile</div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">4.4 My list</div><div class="d">Three-column grid. Badges carry the one fact that matters: a new episode today, a scheduled premiere, a language. The empty state tells the person what saving does for them.</div>
+    <div class="states" data-for="scr-list"><button class="on" data-state="a" type="button">Saved series</button><button data-state="b" type="button">Empty</button></div></figcaption>
+  </figure>
+
+  <!-- 20 Continue watching -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><svg class="ic"><use href="#i-back"/></svg><span class="ttl">Continue watching</span><span style="width:24px"></span></div>
+      <div class="content">
+        <div class="li" style="min-height:96px;border:0"><div class="poster" style="--c1:#3B1F2B;--c2:#C2553D;width:56px;height:80px;border-radius:8px;flex:none"><img class="ph" src="https://loremflickr.com/120/180/indian,bride?lock=11" alt="" loading="lazy" onerror="this.remove()"></div><div class="grow"><div class="body" style="font-weight:600">Kaanch Ka Mahal</div><div class="cap">E7 · 1 min left</div><div style="height:3px;background:var(--raised);border-radius:2px;margin-top:8px"><div style="width:58%;height:3px;background:var(--accent);border-radius:2px"></div></div></div><div class="btn s sm" style="border-radius:999px"><svg class="ic s" style="fill:currentColor;stroke:none;width:14px;height:14px"><use href="#i-play"/></svg>Resume</div></div>
+        <div class="li" style="min-height:96px;border:0"><div class="poster" style="--c1:#2E1F3F;--c2:#D66E9D;width:56px;height:80px;border-radius:8px;flex:none"><img class="ph" src="https://loremflickr.com/120/180/college,students?lock=17" alt="" loading="lazy" onerror="this.remove()"></div><div class="grow"><div class="body" style="font-weight:600">Kadhal Kanakku</div><div class="cap">E31 · 40 s left</div><div style="height:3px;background:var(--raised);border-radius:2px;margin-top:8px"><div style="width:74%;height:3px;background:var(--accent);border-radius:2px"></div></div></div><div class="btn s sm" style="border-radius:999px"><svg class="ic s" style="fill:currentColor;stroke:none;width:14px;height:14px"><use href="#i-play"/></svg>Resume</div></div>
+        <div class="li" style="min-height:96px;border:0"><div class="poster" style="--c1:#33261A;--c2:#E3A24A;width:56px;height:80px;border-radius:8px;flex:none"><img class="ph" src="https://loremflickr.com/120/180/temple,tamilnadu?lock=19" alt="" loading="lazy" onerror="this.remove()"></div><div class="grow"><div class="body" style="font-weight:600">Vetri Vaasal</div><div class="cap">E12 · next is locked · 30 coins</div><div style="height:3px;background:var(--raised);border-radius:2px;margin-top:8px"><div style="width:100%;height:3px;background:var(--accent);border-radius:2px"></div></div></div><div class="btn s sm" style="border-radius:999px"><svg class="ic s" style="width:14px;height:14px"><use href="#i-lock"/></svg>Unlock</div></div>
+        <div class="li" style="min-height:96px;border:0"><div class="poster" style="--c1:#0F2A3D;--c2:#3E7C9A;width:56px;height:80px;border-radius:8px;flex:none"><img class="ph" src="https://loremflickr.com/120/180/businessman,office?lock=12" alt="" loading="lazy" onerror="this.remove()"></div><div class="grow"><div class="body" style="font-weight:600">CEO Sahab</div><div class="cap">E2 · 1 min 30 s left</div><div style="height:3px;background:var(--raised);border-radius:2px;margin-top:8px"><div style="width:22%;height:3px;background:var(--accent);border-radius:2px"></div></div></div><div class="btn s sm" style="border-radius:999px"><svg class="ic s" style="fill:currentColor;stroke:none;width:14px;height:14px"><use href="#i-play"/></svg>Resume</div></div>
+        <div class="cap pad" style="margin-top:16px">Swipe left on a row to remove it.</div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">4.5 Continue watching</div><div class="d">Each row says exactly where you are and how much is left. When the next episode is locked, the row's action becomes Unlock with the price, so the paywall is never a surprise.</div></figcaption>
+  </figure>
+
+  <!-- 21 Help & grievance -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><svg class="ic"><use href="#i-back"/></svg><span class="ttl">Help</span><span style="width:24px"></span></div>
+      <div class="content">
+        <div class="gcard" style="display:flex;gap:12px;align-items:center"><div style="width:44px;height:44px;border-radius:50%;background:rgba(255,92,58,.16);display:flex;align-items:center;justify-content:center;color:var(--accent)"><svg class="ic"><use href="#i-help"/></svg></div><div style="flex:1"><div class="h3">Chat with us</div><div class="cap">Answers in Hindi and English. A person steps in when needed.</div></div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="cap pad" style="margin:22px 0 4px">Common questions</div>
+        <div class="li"><div class="grow body">How do coins work?</div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="li"><div class="grow body">I paid but didn't get my coins</div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="li"><div class="grow body">Refunds and cancellations</div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="li"><div class="grow body">Change languages or subtitles</div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="li"><div class="grow body">Report a series or episode</div><svg class="ic s chev"><use href="#i-chev"/></svg></div>
+        <div class="gcard" style="margin-top:22px">
+          <div class="h3">Grievance officer</div>
+          <div class="body" style="margin-top:6px;font-size:15px">Name (to be appointed)<br><span class="muted">grievance@katha.example</span></div>
+          <div class="cap" style="margin-top:10px;line-height:18px">Complaints are acknowledged within 24 hours and resolved within 15 days, as required under the IT Rules 2021.</div>
+          <div class="btn s" style="margin-top:14px;height:44px">File a complaint</div>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">4.6 Help and grievance</div><div class="d">The AI assistant is the first door; the grievance officer card is a legal requirement (IT Rules Part III) and states the SLA in plain words. "I paid but didn't get my coins" is the first question because it is the most common P1 ticket.</div></figcaption>
+  </figure>
+
+  <!-- 22 Delete account -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><svg class="ic"><use href="#i-back"/></svg><span class="ttl">Delete account</span><span style="width:24px"></span></div>
+      <div class="content">
+        <div class="pad">
+          <div class="h1">Delete your account?</div>
+          <div class="body muted" style="margin-top:12px">Here's what happens:</div>
+          <div style="margin-top:14px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;gap:12px"><svg class="ic s" style="color:var(--text2);flex:none;margin-top:2px"><use href="#i-trash"/></svg><div class="body" style="font-size:15px">Your 1,300 coins and unlocked episodes are removed after 7 days.</div></div>
+            <div style="display:flex;gap:12px"><svg class="ic s" style="color:var(--text2);flex:none;margin-top:2px"><use href="#i-check"/></svg><div class="body" style="font-size:15px">Log in within 7 days to cancel the deletion.</div></div>
+            <div style="display:flex;gap:12px"><svg class="ic s" style="color:var(--text2);flex:none;margin-top:2px"><use href="#i-shield"/></svg><div class="body" style="font-size:15px">Your phone number and watch history are deleted within 30 days. Purchases made through Apple follow Apple's refund policy.</div></div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:26px"><div style="width:24px;height:24px;border-radius:7px;border:1.5px solid var(--text2)"></div><div class="body" style="font-size:15px">I understand my coins won't be refunded.</div></div>
+        </div>
+        <div class="pad" style="position:absolute;left:0;right:0;bottom:44px">
+          <div class="btn dn dis">Delete my account</div>
+          <div class="btn t" style="margin-top:6px">Keep my account</div>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">4.7 Delete account</div><div class="d">Required in-app by App Review and by DPDP. The consequences are spelled out, the destructive button stays disabled until the acknowledgement is ticked, and there is a 7-day grace period to change your mind.</div></figcaption>
+  </figure>
+
+  </div>
+</section>
+
+<!-- ============================ 5. STATES & FEEDBACK ============================ -->
+<section class="flow" id="s-states">
+  <h2>5. States and feedback</h2>
+  <p class="desc">Nothing is ever a blank screen. Toasts confirm what changed in the same words as the button that caused it; errors say what happened and what to do; empty states point somewhere.</p>
+  <div class="grid">
+
+  <!-- 23 Component states -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div style="position:absolute;top:70px;left:0;right:0;bottom:0">
+        <div class="cap pad">Toasts (2 s, top of screen)</div>
+        <div class="toast" style="position:static;margin:8px 16px 0"><svg class="ic s" style="color:var(--ok)"><use href="#i-check"/></svg><span style="flex:1">E11 unlocked</span><span style="color:var(--text2)">−30 coins</span></div>
+        <div class="toast" style="position:static;margin:8px 16px 0"><div class="coin"></div><span style="flex:1">5 coins added · streak day 3</span></div>
+        <div class="toast" style="position:static;margin:8px 16px 0;border-left:3px solid var(--danger)"><span style="flex:1">Payment didn't go through. You weren't charged.</span><span style="font-weight:600;color:var(--accent)">Retry</span></div>
+        <div class="cap pad" style="margin-top:22px">Banners</div>
+        <div class="banner" style="margin-top:8px"><svg class="ic s"><use href="#i-wifioff"/></svg><span>You're offline. Showing what you watched recently.</span></div>
+        <div class="banner" style="margin-top:8px;background:rgba(255,92,58,.14)"><svg class="ic s" style="color:var(--accent)"><use href="#i-saver"/></svg><span style="flex:1">A new version is required to keep buying coins.</span><span style="font-weight:600">Update</span></div>
+        <div class="cap pad" style="margin-top:22px">Buttons</div>
+        <div style="display:flex;gap:8px;padding:8px 20px 0"><div class="btn p" style="flex:1;height:44px;font-size:14px">Default</div><div class="btn pp" style="flex:1;height:44px;font-size:14px">Pressed</div><div class="btn p dis" style="flex:1;height:44px;font-size:14px">Disabled</div><div class="btn p" style="flex:1;height:44px"><div class="spin"></div></div></div>
+        <div class="cap pad" style="margin-top:22px">Chips and episode cells</div>
+        <div style="display:flex;gap:8px;padding:8px 20px 0;align-items:center"><span class="chip">Default</span><span class="chip on">Selected</span><span class="chip dis">Unavailable</span></div>
+        <div style="display:flex;gap:8px;padding:10px 20px 0"><div class="ep" style="width:46px">1</div><div class="ep done" style="width:46px">2</div><div class="ep cur" style="width:46px">3</div><div class="ep lock" style="width:46px">4<svg class="ic"><use href="#i-lock"/></svg></div><div class="cap" style="align-self:center;margin-left:6px">free · watched · current · locked</div></div>
+        <div class="cap pad" style="margin-top:22px">Skeleton</div>
+        <div style="display:flex;gap:10px;padding:8px 20px 0"><div class="sk" style="width:80px;height:120px;border-radius:12px"></div><div style="flex:1"><div class="sk" style="height:16px;width:70%"></div><div class="sk" style="height:12px;width:45%;margin-top:8px"></div><div class="sk" style="height:12px;width:90%;margin-top:18px"></div></div></div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">5.1 Component states</div><div class="d">The feedback vocabulary used across the app: success toast with the debit, coin toast, error toast with a retry, offline and force-update banners, button states, chips, episode cells, skeleton.</div></figcaption>
+  </figure>
+
+  <!-- 24 Guest prompt -->
+  <figure>
+    <div class="frame"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status" style="color:#fff"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="poster" style="--c1:#3B1F2B;--c2:#C2553D;position:absolute;top:0;left:0;right:0;height:268px;border-radius:0"><img class="ph" src="https://loremflickr.com/390/300/indian,bride?lock=11" alt="" loading="lazy" onerror="this.remove()"></div>
+      <div style="position:absolute;top:0;left:0;right:0;height:268px;background:linear-gradient(to bottom,rgba(11,11,15,.2),rgba(11,11,15,0) 30%,rgba(11,11,15,.6) 70%,var(--bg))"></div>
+      <div style="position:absolute;top:196px;left:0;right:0;bottom:0"><div class="pad"><div class="h1">Kaanch Ka Mahal</div><div class="chips" style="margin-top:10px"><span class="chip" style="height:26px;font-size:12px">Hindi</span><span class="chip" style="height:26px;font-size:12px">Romance</span><span class="chip" style="height:26px;font-size:12px;border-color:#3A3A44;color:var(--text)">U/A 16+</span></div></div></div>
+      <div class="dimm"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="h2">Save your coins and your place</div>
+        <div class="body muted" style="margin-top:8px;font-size:15px">You're about to unlock E11. Log in so your 120 coins and your progress stay with you on any device.</div>
+        <div class="btn p" style="margin-top:20px">Continue with phone</div>
+        <div class="btn apple" style="margin-top:8px"><svg class="ic s" style="stroke:none;fill:#000"><use href="#i-apple"/></svg>Sign in with Apple</div>
+        <div class="btn t" style="margin-top:6px">Not now</div>
+      </div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <figcaption><div class="n">5.2 Login prompt at a value moment</div><div class="d">Guests are asked to log in only when it protects something: the first unlock, the first purchase, or saving a series. The sheet names the specific thing at stake and returns the person to exactly where they were.</div></figcaption>
+  </figure>
+
+  </div>
+</section>
+
+<section class="flow">
+  <h2>Notes</h2>
+  <p class="desc">Photo placeholders: every poster and video frame carries a keyword-matched Creative-Commons photo (for example <code>loremflickr.com/240/360/indian,bride?lock=11</code>) tinted with the series gradient at 42% multiply so the board stays cohesive. Because these are CC-licensed Flickr photos, they are for internal review only — do not publish the board with them, and attribute or replace before any external use. Production key art from studios follows the cover-art guidelines in PDD §25.2 (face-forward, high contrast, title-safe zones) and replaces these one-for-one. Cast and avatars stay as initials on purpose — no real faces stand in for fictional characters.</p>
+  <h2>Not in this board (planned)</h2>
+  <p class="desc">P1: App Clip for episode 1, Continue Watching and daily-coins widgets, Live Activity for episode drops, share-clip flow, rewarded-ad coin flow, referral screen, dub/subtitle switcher in the player, Tamil and Telugu UI. P2: offline downloads, iPad layouts, SharePlay watch party. Web store and admin dashboard are designed separately (PDD §21).</p>
+</section>
+</div>
+
+<script>
+document.querySelectorAll('.states').forEach(function(g){
+  g.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    var scr=document.getElementById(g.getAttribute('data-for')); if(!scr) return;
+    scr.setAttribute('data-state',b.getAttribute('data-state'));
+    g.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b);});
+  });
+});
+var z=document.getElementById('zoom');
+z.addEventListener('click',function(){
+  var big=document.body.classList.toggle('big');
+  z.textContent=big?'Show at board size':'Show at actual size';
+});
+</script>
+</body>
+</html>

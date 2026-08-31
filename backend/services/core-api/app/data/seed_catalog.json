@@ -1,0 +1,2470 @@
+{
+  "_meta": {
+    "purpose": "Seed/test catalog for Katha dev and staging environments. Metadata crawled from public catalog pages of ReelShort and DramaBox on 2026-08-31. METADATA ONLY - no video content was downloaded. These titles are third-party IP: use for internal schema testing, recommendation-pipeline development and market research only. Never ship, publish, or use in marketing.",
+    "pricing_profile": {
+      "free_episode_count": 10,
+      "episode_coin_price": 30,
+      "bundle_discount_pct": 25
+    },
+    "crawled_at": "2026-08-31",
+    "series_count": 6,
+    "total_episodes": 386
+  },
+  "series": [
+    {
+      "slug": "his-one-and-only-love",
+      "title": "His One and Only Love",
+      "synopsis": "A dark romance following Lyla, who is rescued by billionaire Leo Adams at a casino. After becoming pregnant with his child and beginning to develop feelings for him, Lyla faces interference from Kim, who claims to be Leo's fiancee, putting Lyla's life and trust in jeopardy.",
+      "genres": [
+        "Romance",
+        "Dark Romance",
+        "Billionaire"
+      ],
+      "tropes": [
+        "secret billionaire",
+        "accidental pregnancy",
+        "love rival"
+      ],
+      "episode_count": 81,
+      "source": {
+        "platform": "ReelShort",
+        "url": "https://www.reelshort.com/full-episodes/his-one-and-only-love-66f5f5c7f0ebf2edf50638f7"
+      },
+      "primary_language": "en",
+      "status": "seed_test_data",
+      "episodes": [
+        {
+          "number": 1,
+          "title": "Episode 1",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 2,
+          "title": "Episode 2",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 3,
+          "title": "Episode 3",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 4,
+          "title": "Episode 4",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 5,
+          "title": "Episode 5",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 6,
+          "title": "Episode 6",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 7,
+          "title": "Episode 7",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 8,
+          "title": "Episode 8",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 9,
+          "title": "Episode 9",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 10,
+          "title": "Episode 10",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 11,
+          "title": "Episode 11",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 12,
+          "title": "Episode 12",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 13,
+          "title": "Episode 13",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 14,
+          "title": "Episode 14",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 15,
+          "title": "Episode 15",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 16,
+          "title": "Episode 16",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 17,
+          "title": "Episode 17",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 18,
+          "title": "Episode 18",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 19,
+          "title": "Episode 19",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 20,
+          "title": "Episode 20",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 21,
+          "title": "Episode 21",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 22,
+          "title": "Episode 22",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 23,
+          "title": "Episode 23",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 24,
+          "title": "Episode 24",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 25,
+          "title": "Episode 25",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 26,
+          "title": "Episode 26",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 27,
+          "title": "Episode 27",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 28,
+          "title": "Episode 28",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 29,
+          "title": "Episode 29",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 30,
+          "title": "Episode 30",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 31,
+          "title": "Episode 31",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 32,
+          "title": "Episode 32",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 33,
+          "title": "Episode 33",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 34,
+          "title": "Episode 34",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 35,
+          "title": "Episode 35",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 36,
+          "title": "Episode 36",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 37,
+          "title": "Episode 37",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 38,
+          "title": "Episode 38",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 39,
+          "title": "Episode 39",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 40,
+          "title": "Episode 40",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 41,
+          "title": "Episode 41",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 42,
+          "title": "Episode 42",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 43,
+          "title": "Episode 43",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 44,
+          "title": "Episode 44",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 45,
+          "title": "Episode 45",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 46,
+          "title": "Episode 46",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 47,
+          "title": "Episode 47",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 48,
+          "title": "Episode 48",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 49,
+          "title": "Episode 49",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 50,
+          "title": "Episode 50",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 51,
+          "title": "Episode 51",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 52,
+          "title": "Episode 52",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 53,
+          "title": "Episode 53",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 54,
+          "title": "Episode 54",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 55,
+          "title": "Episode 55",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 56,
+          "title": "Episode 56",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 57,
+          "title": "Episode 57",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 58,
+          "title": "Episode 58",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 59,
+          "title": "Episode 59",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 60,
+          "title": "Episode 60",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 61,
+          "title": "Episode 61",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 62,
+          "title": "Episode 62",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 63,
+          "title": "Episode 63",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 64,
+          "title": "Episode 64",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 65,
+          "title": "Episode 65",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 66,
+          "title": "Episode 66",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 67,
+          "title": "Episode 67",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 68,
+          "title": "Episode 68",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 69,
+          "title": "Episode 69",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 70,
+          "title": "Episode 70",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 71,
+          "title": "Episode 71",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 72,
+          "title": "Episode 72",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 73,
+          "title": "Episode 73",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 74,
+          "title": "Episode 74",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 75,
+          "title": "Episode 75",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 76,
+          "title": "Episode 76",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 77,
+          "title": "Episode 77",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 78,
+          "title": "Episode 78",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 79,
+          "title": "Episode 79",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 80,
+          "title": "Episode 80",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 81,
+          "title": "Episode 81",
+          "is_free": false,
+          "coin_price": 30
+        }
+      ]
+    },
+    {
+      "slug": "deny-me-dragon-king",
+      "title": "Deny Me, Dragon King",
+      "synopsis": "Human Lyra stumbles on Dragon King Kael and shares a passionate night. Tricked by a fake prophecy, he casts her out - only for Lyra to bear his half-dragon daughter Amber. Years later, she returns seeking a healer to save her sick child. Old sparks reignite, jealous rivals plot, and hidden blood ties surface as they fight for their family and broken love.",
+      "genres": [
+        "Romance",
+        "Fantasy"
+      ],
+      "tropes": [
+        "secret child",
+        "second chance",
+        "hidden identity"
+      ],
+      "episode_count": 50,
+      "source": {
+        "platform": "DramaBox",
+        "url": "https://www.dramaboxdb.com/movie/42000021382/deny-me-dragon-king"
+      },
+      "primary_language": "en",
+      "status": "seed_test_data",
+      "episodes": [
+        {
+          "number": 1,
+          "title": "Episode 1",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 2,
+          "title": "Episode 2",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 3,
+          "title": "Episode 3",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 4,
+          "title": "Episode 4",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 5,
+          "title": "Episode 5",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 6,
+          "title": "Episode 6",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 7,
+          "title": "Episode 7",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 8,
+          "title": "Episode 8",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 9,
+          "title": "Episode 9",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 10,
+          "title": "Episode 10",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 11,
+          "title": "Episode 11",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 12,
+          "title": "Episode 12",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 13,
+          "title": "Episode 13",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 14,
+          "title": "Episode 14",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 15,
+          "title": "Episode 15",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 16,
+          "title": "Episode 16",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 17,
+          "title": "Episode 17",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 18,
+          "title": "Episode 18",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 19,
+          "title": "Episode 19",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 20,
+          "title": "Episode 20",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 21,
+          "title": "Episode 21",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 22,
+          "title": "Episode 22",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 23,
+          "title": "Episode 23",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 24,
+          "title": "Episode 24",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 25,
+          "title": "Episode 25",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 26,
+          "title": "Episode 26",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 27,
+          "title": "Episode 27",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 28,
+          "title": "Episode 28",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 29,
+          "title": "Episode 29",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 30,
+          "title": "Episode 30",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 31,
+          "title": "Episode 31",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 32,
+          "title": "Episode 32",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 33,
+          "title": "Episode 33",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 34,
+          "title": "Episode 34",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 35,
+          "title": "Episode 35",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 36,
+          "title": "Episode 36",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 37,
+          "title": "Episode 37",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 38,
+          "title": "Episode 38",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 39,
+          "title": "Episode 39",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 40,
+          "title": "Episode 40",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 41,
+          "title": "Episode 41",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 42,
+          "title": "Episode 42",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 43,
+          "title": "Episode 43",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 44,
+          "title": "Episode 44",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 45,
+          "title": "Episode 45",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 46,
+          "title": "Episode 46",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 47,
+          "title": "Episode 47",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 48,
+          "title": "Episode 48",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 49,
+          "title": "Episode 49",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 50,
+          "title": "Episode 50",
+          "is_free": false,
+          "coin_price": 30
+        }
+      ]
+    },
+    {
+      "slug": "tempest-the-last-mecha",
+      "title": "Tempest: The Last Mecha",
+      "synopsis": "Broken by his parents' deaths, Colt Thorne, the Mech King, hides as a lowly janitor after being saved by Freya. When Freya, the woman he secretly loves, is betrayed and forced into a lethal mech duel, Colt unleashes his hidden identity, unlocking his legendary 100% Neural Sync to command The Tempest and crush his enemies.",
+      "genres": [
+        "Action",
+        "Science Fiction"
+      ],
+      "tropes": [
+        "hidden identity",
+        "underdog revenge",
+        "son-in-law"
+      ],
+      "episode_count": 58,
+      "source": {
+        "platform": "DramaBox",
+        "url": "https://www.dramaboxdb.com/movie/42000018529/tempest-the-last-mecha"
+      },
+      "primary_language": "en",
+      "status": "seed_test_data",
+      "episodes": [
+        {
+          "number": 1,
+          "title": "Episode 1",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 2,
+          "title": "Episode 2",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 3,
+          "title": "Episode 3",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 4,
+          "title": "Episode 4",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 5,
+          "title": "Episode 5",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 6,
+          "title": "Episode 6",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 7,
+          "title": "Episode 7",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 8,
+          "title": "Episode 8",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 9,
+          "title": "Episode 9",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 10,
+          "title": "Episode 10",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 11,
+          "title": "Episode 11",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 12,
+          "title": "Episode 12",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 13,
+          "title": "Episode 13",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 14,
+          "title": "Episode 14",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 15,
+          "title": "Episode 15",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 16,
+          "title": "Episode 16",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 17,
+          "title": "Episode 17",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 18,
+          "title": "Episode 18",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 19,
+          "title": "Episode 19",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 20,
+          "title": "Episode 20",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 21,
+          "title": "Episode 21",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 22,
+          "title": "Episode 22",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 23,
+          "title": "Episode 23",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 24,
+          "title": "Episode 24",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 25,
+          "title": "Episode 25",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 26,
+          "title": "Episode 26",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 27,
+          "title": "Episode 27",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 28,
+          "title": "Episode 28",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 29,
+          "title": "Episode 29",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 30,
+          "title": "Episode 30",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 31,
+          "title": "Episode 31",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 32,
+          "title": "Episode 32",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 33,
+          "title": "Episode 33",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 34,
+          "title": "Episode 34",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 35,
+          "title": "Episode 35",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 36,
+          "title": "Episode 36",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 37,
+          "title": "Episode 37",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 38,
+          "title": "Episode 38",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 39,
+          "title": "Episode 39",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 40,
+          "title": "Episode 40",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 41,
+          "title": "Episode 41",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 42,
+          "title": "Episode 42",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 43,
+          "title": "Episode 43",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 44,
+          "title": "Episode 44",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 45,
+          "title": "Episode 45",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 46,
+          "title": "Episode 46",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 47,
+          "title": "Episode 47",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 48,
+          "title": "Episode 48",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 49,
+          "title": "Episode 49",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 50,
+          "title": "Episode 50",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 51,
+          "title": "Episode 51",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 52,
+          "title": "Episode 52",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 53,
+          "title": "Episode 53",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 54,
+          "title": "Episode 54",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 55,
+          "title": "Episode 55",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 56,
+          "title": "Episode 56",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 57,
+          "title": "Episode 57",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 58,
+          "title": "Episode 58",
+          "is_free": false,
+          "coin_price": 30
+        }
+      ]
+    },
+    {
+      "slug": "step-back-im-the-hidden-king",
+      "title": "Step Back! I'm the Hidden King",
+      "synopsis": "On a New York-bound flight, Arthur meets Throne Tech heiress Anya, who offers a fake marriage to escape an arranged union. Arthur refuses, yet upgrades her investment bid to $100 billion. Later dumped by his fiancee Serena, Arthur is defended by Anya. At a grand gala, Arthur reveals himself as Titan Group's CEO. He funds Anya, and the two choose to build a new life together.",
+      "genres": [
+        "Romance",
+        "Billionaire"
+      ],
+      "tropes": [
+        "secret billionaire",
+        "contract marriage",
+        "hidden identity"
+      ],
+      "episode_count": 63,
+      "source": {
+        "platform": "DramaBox",
+        "url": "https://www.dramaboxdb.com/movie/42000017882/step-back-im-the-hidden-king"
+      },
+      "primary_language": "en",
+      "status": "seed_test_data",
+      "episodes": [
+        {
+          "number": 1,
+          "title": "Episode 1",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 2,
+          "title": "Episode 2",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 3,
+          "title": "Episode 3",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 4,
+          "title": "Episode 4",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 5,
+          "title": "Episode 5",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 6,
+          "title": "Episode 6",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 7,
+          "title": "Episode 7",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 8,
+          "title": "Episode 8",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 9,
+          "title": "Episode 9",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 10,
+          "title": "Episode 10",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 11,
+          "title": "Episode 11",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 12,
+          "title": "Episode 12",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 13,
+          "title": "Episode 13",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 14,
+          "title": "Episode 14",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 15,
+          "title": "Episode 15",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 16,
+          "title": "Episode 16",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 17,
+          "title": "Episode 17",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 18,
+          "title": "Episode 18",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 19,
+          "title": "Episode 19",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 20,
+          "title": "Episode 20",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 21,
+          "title": "Episode 21",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 22,
+          "title": "Episode 22",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 23,
+          "title": "Episode 23",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 24,
+          "title": "Episode 24",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 25,
+          "title": "Episode 25",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 26,
+          "title": "Episode 26",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 27,
+          "title": "Episode 27",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 28,
+          "title": "Episode 28",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 29,
+          "title": "Episode 29",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 30,
+          "title": "Episode 30",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 31,
+          "title": "Episode 31",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 32,
+          "title": "Episode 32",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 33,
+          "title": "Episode 33",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 34,
+          "title": "Episode 34",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 35,
+          "title": "Episode 35",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 36,
+          "title": "Episode 36",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 37,
+          "title": "Episode 37",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 38,
+          "title": "Episode 38",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 39,
+          "title": "Episode 39",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 40,
+          "title": "Episode 40",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 41,
+          "title": "Episode 41",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 42,
+          "title": "Episode 42",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 43,
+          "title": "Episode 43",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 44,
+          "title": "Episode 44",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 45,
+          "title": "Episode 45",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 46,
+          "title": "Episode 46",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 47,
+          "title": "Episode 47",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 48,
+          "title": "Episode 48",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 49,
+          "title": "Episode 49",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 50,
+          "title": "Episode 50",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 51,
+          "title": "Episode 51",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 52,
+          "title": "Episode 52",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 53,
+          "title": "Episode 53",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 54,
+          "title": "Episode 54",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 55,
+          "title": "Episode 55",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 56,
+          "title": "Episode 56",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 57,
+          "title": "Episode 57",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 58,
+          "title": "Episode 58",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 59,
+          "title": "Episode 59",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 60,
+          "title": "Episode 60",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 61,
+          "title": "Episode 61",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 62,
+          "title": "Episode 62",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 63,
+          "title": "Episode 63",
+          "is_free": false,
+          "coin_price": 30
+        }
+      ]
+    },
+    {
+      "slug": "i-wish-it-were-you",
+      "title": "I Wish It Were You",
+      "synopsis": "Bound by a family alliance, Isabel found herself reluctantly married to a stranger named Jared. Despite being wed for a year, their encounters were so scarce they could barely recall each other's faces. As Isabel navigated her new life at work, she unexpectedly fell deeply for her boss - the billionaire Lorenzo Bellini - only to discover that the captivating Lorenzo was, in fact, her husband Jared.",
+      "genres": [
+        "Romance",
+        "Sweet Love"
+      ],
+      "tropes": [
+        "contract marriage",
+        "hidden identity",
+        "office romance"
+      ],
+      "episode_count": 78,
+      "source": {
+        "platform": "DramaBox",
+        "url": "https://www.dramaboxdb.com/movie/41000102982/i-wish-it-were-you"
+      },
+      "primary_language": "en",
+      "status": "seed_test_data",
+      "episodes": [
+        {
+          "number": 1,
+          "title": "Episode 1",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 2,
+          "title": "Episode 2",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 3,
+          "title": "Episode 3",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 4,
+          "title": "Episode 4",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 5,
+          "title": "Episode 5",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 6,
+          "title": "Episode 6",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 7,
+          "title": "Episode 7",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 8,
+          "title": "Episode 8",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 9,
+          "title": "Episode 9",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 10,
+          "title": "Episode 10",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 11,
+          "title": "Episode 11",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 12,
+          "title": "Episode 12",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 13,
+          "title": "Episode 13",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 14,
+          "title": "Episode 14",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 15,
+          "title": "Episode 15",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 16,
+          "title": "Episode 16",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 17,
+          "title": "Episode 17",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 18,
+          "title": "Episode 18",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 19,
+          "title": "Episode 19",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 20,
+          "title": "Episode 20",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 21,
+          "title": "Episode 21",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 22,
+          "title": "Episode 22",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 23,
+          "title": "Episode 23",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 24,
+          "title": "Episode 24",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 25,
+          "title": "Episode 25",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 26,
+          "title": "Episode 26",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 27,
+          "title": "Episode 27",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 28,
+          "title": "Episode 28",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 29,
+          "title": "Episode 29",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 30,
+          "title": "Episode 30",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 31,
+          "title": "Episode 31",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 32,
+          "title": "Episode 32",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 33,
+          "title": "Episode 33",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 34,
+          "title": "Episode 34",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 35,
+          "title": "Episode 35",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 36,
+          "title": "Episode 36",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 37,
+          "title": "Episode 37",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 38,
+          "title": "Episode 38",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 39,
+          "title": "Episode 39",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 40,
+          "title": "Episode 40",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 41,
+          "title": "Episode 41",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 42,
+          "title": "Episode 42",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 43,
+          "title": "Episode 43",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 44,
+          "title": "Episode 44",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 45,
+          "title": "Episode 45",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 46,
+          "title": "Episode 46",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 47,
+          "title": "Episode 47",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 48,
+          "title": "Episode 48",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 49,
+          "title": "Episode 49",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 50,
+          "title": "Episode 50",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 51,
+          "title": "Episode 51",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 52,
+          "title": "Episode 52",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 53,
+          "title": "Episode 53",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 54,
+          "title": "Episode 54",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 55,
+          "title": "Episode 55",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 56,
+          "title": "Episode 56",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 57,
+          "title": "Episode 57",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 58,
+          "title": "Episode 58",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 59,
+          "title": "Episode 59",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 60,
+          "title": "Episode 60",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 61,
+          "title": "Episode 61",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 62,
+          "title": "Episode 62",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 63,
+          "title": "Episode 63",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 64,
+          "title": "Episode 64",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 65,
+          "title": "Episode 65",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 66,
+          "title": "Episode 66",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 67,
+          "title": "Episode 67",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 68,
+          "title": "Episode 68",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 69,
+          "title": "Episode 69",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 70,
+          "title": "Episode 70",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 71,
+          "title": "Episode 71",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 72,
+          "title": "Episode 72",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 73,
+          "title": "Episode 73",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 74,
+          "title": "Episode 74",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 75,
+          "title": "Episode 75",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 76,
+          "title": "Episode 76",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 77,
+          "title": "Episode 77",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 78,
+          "title": "Episode 78",
+          "is_free": false,
+          "coin_price": 30
+        }
+      ]
+    },
+    {
+      "slug": "lady-diamonds-lost-heiress-returns",
+      "title": "Lady Diamond's Lost Heiress Returns",
+      "synopsis": "A young woman named Bella sacrifices herself to the mafia to save her mother Maria. Twenty years later, Maria has become 'Lady Diamond,' a wealthy and influential mogul searching for her lost daughter. When Bella is betrayed and humiliated at her own wedding by her fiance Vince, Maria recognizes her daughter's birthmark and uses her power to protect Bella and destroy their enemies.",
+      "genres": [
+        "Revenge",
+        "Family Drama"
+      ],
+      "tropes": [
+        "lost heiress",
+        "underdog revenge",
+        "strong female lead"
+      ],
+      "episode_count": 56,
+      "source": {
+        "platform": "DramaBox",
+        "url": "https://www.dramaboxdb.com/movie/42000012143/lady-diamonds-lost-heiress-returns"
+      },
+      "primary_language": "en",
+      "status": "seed_test_data",
+      "episodes": [
+        {
+          "number": 1,
+          "title": "Episode 1",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 2,
+          "title": "Episode 2",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 3,
+          "title": "Episode 3",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 4,
+          "title": "Episode 4",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 5,
+          "title": "Episode 5",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 6,
+          "title": "Episode 6",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 7,
+          "title": "Episode 7",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 8,
+          "title": "Episode 8",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 9,
+          "title": "Episode 9",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 10,
+          "title": "Episode 10",
+          "is_free": true,
+          "coin_price": 0
+        },
+        {
+          "number": 11,
+          "title": "Episode 11",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 12,
+          "title": "Episode 12",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 13,
+          "title": "Episode 13",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 14,
+          "title": "Episode 14",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 15,
+          "title": "Episode 15",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 16,
+          "title": "Episode 16",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 17,
+          "title": "Episode 17",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 18,
+          "title": "Episode 18",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 19,
+          "title": "Episode 19",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 20,
+          "title": "Episode 20",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 21,
+          "title": "Episode 21",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 22,
+          "title": "Episode 22",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 23,
+          "title": "Episode 23",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 24,
+          "title": "Episode 24",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 25,
+          "title": "Episode 25",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 26,
+          "title": "Episode 26",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 27,
+          "title": "Episode 27",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 28,
+          "title": "Episode 28",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 29,
+          "title": "Episode 29",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 30,
+          "title": "Episode 30",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 31,
+          "title": "Episode 31",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 32,
+          "title": "Episode 32",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 33,
+          "title": "Episode 33",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 34,
+          "title": "Episode 34",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 35,
+          "title": "Episode 35",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 36,
+          "title": "Episode 36",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 37,
+          "title": "Episode 37",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 38,
+          "title": "Episode 38",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 39,
+          "title": "Episode 39",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 40,
+          "title": "Episode 40",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 41,
+          "title": "Episode 41",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 42,
+          "title": "Episode 42",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 43,
+          "title": "Episode 43",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 44,
+          "title": "Episode 44",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 45,
+          "title": "Episode 45",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 46,
+          "title": "Episode 46",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 47,
+          "title": "Episode 47",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 48,
+          "title": "Episode 48",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 49,
+          "title": "Episode 49",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 50,
+          "title": "Episode 50",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 51,
+          "title": "Episode 51",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 52,
+          "title": "Episode 52",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 53,
+          "title": "Episode 53",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 54,
+          "title": "Episode 54",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 55,
+          "title": "Episode 55",
+          "is_free": false,
+          "coin_price": 30
+        },
+        {
+          "number": 56,
+          "title": "Episode 56",
+          "is_free": false,
+          "coin_price": 30
+        }
+      ]
+    }
+  ]
+}

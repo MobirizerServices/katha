@@ -1,0 +1,14 @@
+# Local dev stack for Katha. `docker compose up` brings up the data layer;
+# run services with the Makefile (make api) against these.
+services:
+  postgres:
+    image: postgres:16
+    environment: { POSTGRES_DB: katha, POSTGRES_USER: katha, POSTGRES_PASSWORD: katha }
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+  # core-api / admin-api / ai-service / workers are added here once dockerized (§9 SAD).
+volumes:
+  pgdata:

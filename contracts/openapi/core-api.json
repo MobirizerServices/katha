@@ -1,0 +1,957 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Katha core-api",
+    "description": "Public mobile + web API. Money is an append-only ledger; the client computes no prices or entitlements.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/v1/home": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Home",
+        "operationId": "home_v1_home_get",
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "hi",
+              "title": "Lang"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/series": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "List Series",
+        "operationId": "list_series_v1_series_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SeriesSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Series V1 Series Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/series/{slug}": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Series Detail",
+        "operationId": "series_detail_v1_series__slug__get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/series/{slug}/episodes/{number}/playback": {
+      "post": {
+        "tags": [
+          "playback"
+        ],
+        "summary": "Playback",
+        "operationId": "playback_v1_series__slug__episodes__number__playback_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/wallet": {
+      "get": {
+        "tags": [
+          "wallet"
+        ],
+        "summary": "Wallet",
+        "operationId": "wallet_v1_wallet_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/iap/packs": {
+      "get": {
+        "tags": [
+          "wallet"
+        ],
+        "summary": "Packs",
+        "operationId": "packs_v1_iap_packs_get",
+        "parameters": [
+          {
+            "name": "storefront",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "IN",
+              "title": "Storefront"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CoinPack"
+                  },
+                  "title": "Response Packs V1 Iap Packs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/iap/verify": {
+      "post": {
+        "tags": [
+          "wallet"
+        ],
+        "summary": "Iap Verify",
+        "description": "Verify a StoreKit 2 transaction and credit coins idempotently.\n\nDev stub: accepts a non-empty JWS and maps SKU\u2192coins. Production validates the JWS\nwith Apple's App Store Server Library and keys on the real transactionId (PDD \u00a712.7).",
+        "operationId": "iap_verify_v1_iap_verify_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IapVerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/web/orders": {
+      "post": {
+        "tags": [
+          "wallet"
+        ],
+        "summary": "Web Order",
+        "description": "Web coin purchase (UPI). Credits the pack + the +10% web bonus (PDD \u00a721.4).\n\nDev stub: simulates a captured Razorpay webhook. Production credits only after the\nsignature-verified `payment.captured` webhook, idempotent by payment id.",
+        "operationId": "web_order_v1_web_orders_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/series/{slug}/episodes/{number}/unlock": {
+      "post": {
+        "tags": [
+          "wallet"
+        ],
+        "summary": "Unlock Episode",
+        "operationId": "unlock_episode_v1_series__slug__episodes__number__unlock_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnlockRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnlockResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/series/{slug}/unlock-all": {
+      "post": {
+        "tags": [
+          "wallet"
+        ],
+        "summary": "Unlock All",
+        "operationId": "unlock_all_v1_series__slug__unlock_all_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnlockRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnlockResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/config": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Config",
+        "description": "Remote config the clients read (feature flags, pricing defaults, min version).",
+        "operationId": "config_v1_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Config V1 Config Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CoinPack": {
+        "properties": {
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          },
+          "storefront": {
+            "type": "string",
+            "title": "Storefront"
+          },
+          "price_minor": {
+            "type": "integer",
+            "title": "Price Minor"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "coins": {
+            "type": "integer",
+            "title": "Coins"
+          },
+          "bonus_coins": {
+            "type": "integer",
+            "title": "Bonus Coins",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "sku",
+          "storefront",
+          "price_minor",
+          "currency",
+          "coins"
+        ],
+        "title": "CoinPack"
+      },
+      "Episode": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "is_free": {
+            "type": "boolean",
+            "title": "Is Free"
+          },
+          "coin_price": {
+            "type": "integer",
+            "title": "Coin Price"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "title",
+          "is_free",
+          "coin_price"
+        ],
+        "title": "Episode"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HomeResponse": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/HomeRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "HomeResponse"
+      },
+      "HomeRow": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesSummary"
+            },
+            "type": "array",
+            "title": "Series"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "series"
+        ],
+        "title": "HomeRow"
+      },
+      "IapVerifyRequest": {
+        "properties": {
+          "jws": {
+            "type": "string",
+            "title": "Jws"
+          },
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jws",
+          "sku"
+        ],
+        "title": "IapVerifyRequest"
+      },
+      "SeriesDetail": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "genres": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Genres"
+          },
+          "episode_count": {
+            "type": "integer",
+            "title": "Episode Count"
+          },
+          "primary_language": {
+            "type": "string",
+            "title": "Primary Language"
+          },
+          "synopsis": {
+            "type": "string",
+            "title": "Synopsis"
+          },
+          "tropes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tropes"
+          },
+          "free_episode_count": {
+            "type": "integer",
+            "title": "Free Episode Count"
+          },
+          "episode_coin_price": {
+            "type": "integer",
+            "title": "Episode Coin Price"
+          },
+          "bundle_discount_pct": {
+            "type": "integer",
+            "title": "Bundle Discount Pct"
+          },
+          "episodes": {
+            "items": {
+              "$ref": "#/components/schemas/Episode"
+            },
+            "type": "array",
+            "title": "Episodes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "title",
+          "genres",
+          "episode_count",
+          "primary_language",
+          "synopsis",
+          "free_episode_count",
+          "episode_coin_price",
+          "bundle_discount_pct",
+          "episodes"
+        ],
+        "title": "SeriesDetail"
+      },
+      "SeriesSummary": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "genres": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Genres"
+          },
+          "episode_count": {
+            "type": "integer",
+            "title": "Episode Count"
+          },
+          "primary_language": {
+            "type": "string",
+            "title": "Primary Language"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "title",
+          "genres",
+          "episode_count",
+          "primary_language"
+        ],
+        "title": "SeriesSummary"
+      },
+      "UnlockRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key"
+        ],
+        "title": "UnlockRequest"
+      },
+      "UnlockResponse": {
+        "properties": {
+          "episode_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Episode Ids"
+          },
+          "spent_bonus": {
+            "type": "integer",
+            "title": "Spent Bonus"
+          },
+          "spent_bought": {
+            "type": "integer",
+            "title": "Spent Bought"
+          },
+          "wallet": {
+            "$ref": "#/components/schemas/WalletResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "episode_ids",
+          "spent_bonus",
+          "spent_bought",
+          "wallet"
+        ],
+        "title": "UnlockResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WalletResponse": {
+        "properties": {
+          "balance_bought": {
+            "type": "integer",
+            "title": "Balance Bought"
+          },
+          "balance_bonus": {
+            "type": "integer",
+            "title": "Balance Bonus"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "balance_bought",
+          "balance_bonus",
+          "total"
+        ],
+        "title": "WalletResponse"
+      },
+      "WebOrderRequest": {
+        "properties": {
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sku"
+        ],
+        "title": "WebOrderRequest"
+      }
+    }
+  }
+}

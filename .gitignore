@@ -1,0 +1,47 @@
+# --- Dev media: the generated HLS placeholder catalog (534MB) is regenerable, never committed
+media/
+*.mp4
+*.ts
+*.m3u8
+
+# --- Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# --- Node / web
+node_modules/
+.next/
+out/
+web/**/.env*
+
+# --- Generated clients (regenerated from contracts/ in CI — never hand-edited, never committed)
+ios/Generated/
+web/**/src/api/generated/
+backend/**/_generated/
+
+# --- Swift
+ios/**/.build/
+ios/**/*.xcodeproj/xcuserdata/
+
+# --- Secrets & env (never commit)
+.env
+.env.*
+*.pem
+*.p8
+secrets/
+
+# --- OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# --- Terraform
+infra/**/.terraform/
+*.tfstate
+*.tfstate.*

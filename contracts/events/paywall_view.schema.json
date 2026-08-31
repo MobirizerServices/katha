@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "katha/events/paywall_view/1",
+  "title": "paywall_view",
+  "description": "Emitted when the in-player paywall is shown (PDD §13.1). One entry in the event-schema registry; CI blocks unregistered events.",
+  "type": "object",
+  "required": ["name", "ts", "session_id", "props"],
+  "properties": {
+    "name": { "const": "paywall_view" },
+    "ts": { "type": "string", "format": "date-time" },
+    "session_id": { "type": "string" },
+    "user_id": { "type": "string" },
+    "is_guest": { "type": "boolean" },
+    "app_version": { "type": "string" },
+    "props": {
+      "type": "object",
+      "required": ["series_id", "episode_no", "price_coins", "balance_bought", "balance_bonus"],
+      "properties": {
+        "series_id": { "type": "string" },
+        "episode_no": { "type": "integer" },
+        "price_coins": { "type": "integer" },
+        "balance_bought": { "type": "integer" },
+        "balance_bonus": { "type": "integer" },
+        "variant": { "type": "object" }
+      }
+    }
+  }
+}

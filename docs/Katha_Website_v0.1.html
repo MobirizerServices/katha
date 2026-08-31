@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Katha — Stories in 2 minutes. In your language. No ads.</title>
+<meta name="description" content="Katha is a micro-drama app for iPhone: Hindi, Tamil and Telugu originals in 1–2 minute episodes. Watch the first 10 episodes of every series free, then unlock the rest for about ₹4.5 each.">
+<meta name="apple-itunes-app" content="app-id=0000000000">
+<meta property="og:title" content="Katha — Stories in 2 minutes">
+<meta property="og:description" content="Micro-dramas in Hindi, Tamil and Telugu. First 10 episodes free. No ads.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://katha.example/en">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Katha — Stories in 2 minutes">
+<meta name="twitter:description" content="Micro-dramas in Hindi, Tamil and Telugu. First 10 episodes free. No ads.">
+<link rel="canonical" href="https://katha.example/en">
+<link rel="alternate" hreflang="en-IN" href="https://katha.example/en">
+<link rel="alternate" hreflang="hi-IN" href="https://katha.example/hi">
+<link rel="alternate" hreflang="ta-IN" href="https://katha.example/ta">
+<link rel="alternate" hreflang="te-IN" href="https://katha.example/te">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+ {"@type":"Organization","name":"Katha","url":"https://katha.example","logo":"https://katha.example/icon.png","contactPoint":[{"@type":"ContactPoint","contactType":"customer support","email":"help@katha.example"},{"@type":"ContactPoint","contactType":"grievance officer","email":"grievance@katha.example"}]},
+ {"@type":"MobileApplication","name":"Katha","operatingSystem":"iOS 17 or later","applicationCategory":"EntertainmentApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"}},
+ {"@type":"FAQPage","mainEntity":[
+  {"@type":"Question","name":"How do coins work?","acceptedAnswer":{"@type":"Answer","text":"The first 10 episodes of every series are free. After that each episode costs 30 coins, about ₹4.5. Coins are bought in packs through the App Store and never expire while your account exists."}},
+  {"@type":"Question","name":"Can I get a refund?","acceptedAnswer":{"@type":"Answer","text":"Purchases made through the App Store are refunded by Apple under Apple's policy. Coins bought on the Katha website can be refunded within 7 days if they are unspent."}},
+  {"@type":"Question","name":"Which languages are available?","acceptedAnswer":{"@type":"Answer","text":"Hindi, Tamil and Telugu at launch, with Bengali, Marathi, Kannada and Malayalam following. Most series are available in all three launch languages with subtitles in English."}}
+ ]}
+]}
+</script>
+<style>
+:root{
+  --bg:#0B0B0F; --surface:#16161D; --raised:#1F1F28; --line:#23232C;
+  --text:#F5F5F7; --text2:#A1A1AA; --text3:#6B6B75;
+  --accent:#FF5C3A; --accent-p:#E04A2B; --coin:#F5C042; --ok:#2FBF71; --danger:#FF4D4F;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+img{display:block}
+.skip{position:absolute;left:-9999px;top:16px;background:#fff;color:#000;padding:10px 14px;border-radius:8px;z-index:200}
+.skip:focus{left:16px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:var(--surface);padding:1px 6px;border-radius:6px}
+
+/* ---- header ---- */
+header.site{position:sticky;top:0;z-index:50;background:rgba(11,11,15,.82);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:66px;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:22px;letter-spacing:-.03em;text-decoration:none}
+.brand small{font-weight:500;color:var(--text2);font-size:15px;letter-spacing:0;margin-left:2px}
+.links{display:flex;gap:26px;font-size:15px}
+.links a{text-decoration:none;color:var(--text2);padding:6px 0}
+.links a:hover,.links a[aria-current="page"]{color:var(--text)}
+.right{display:flex;align-items:center;gap:12px}
+.lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.lang button{background:none;border:0;color:var(--text2);padding:7px 12px;font:inherit;font-size:13px;cursor:pointer}
+.lang button.on{background:var(--surface);color:var(--text)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;padding:0 20px;border-radius:12px;font-weight:600;font-size:16px;text-decoration:none;border:0;cursor:pointer;font-family:inherit}
+.btn.p{background:var(--accent);color:#fff}
+.btn.p:hover{background:var(--accent-p)}
+.btn.s{background:var(--raised);color:var(--text)}
+.btn.s:hover{background:#2A2A35}
+.btn.store{background:#fff;color:#000;padding:0 18px 0 14px;text-align:left;line-height:1.05}
+.btn.store small{display:block;font-size:11px;font-weight:500;color:#333}
+.btn.sm{height:40px;padding:0 16px;font-size:14px;border-radius:999px}
+.menu{display:none;background:none;border:1px solid var(--line);border-radius:10px;color:var(--text);width:42px;height:42px;font-size:20px;cursor:pointer}
+.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ---- pages ---- */
+.page{display:none}
+body[data-page="home"] #page-home,body[data-page="business"] #page-business{display:block}
+
+/* ---- hero ---- */
+.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;padding-top:64px;padding-bottom:24px;min-height:calc(100vh - 66px)}
+h1.h{font-size:clamp(36px,5.6vw,60px);line-height:1.02;letter-spacing:-.035em;margin:0;font-weight:800;text-wrap:balance}
+.h-hi{font-size:clamp(20px,2.4vw,27px);color:var(--text2);margin:16px 0 0;font-weight:500;line-height:1.35}
+.sub{font-size:18px;color:var(--text2);max-width:54ch;margin:18px 0 0}
+.ctas{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px;align-items:center}
+.qr{display:flex;align-items:center;gap:12px;color:var(--text2);font-size:13px;margin-top:20px}
+.qr svg{background:#fff;border-radius:8px;padding:5px;width:64px;height:64px}
+.trust{display:flex;gap:10px 22px;flex-wrap:wrap;margin-top:28px;color:var(--text2);font-size:14px}
+.trust span{display:flex;align-items:center;gap:7px}
+.trust .ic{width:16px;height:16px;color:var(--ok)}
+
+/* ---- phone mockups (shared with the design board) ---- */
+.stage{position:relative;height:680px}
+.frame{--s:.66;position:absolute;width:calc(390px*var(--s));height:calc(844px*var(--s))}
+.frame.a{left:6%;top:0}
+.frame.b{--s:.56;right:0;top:110px}
+.phone{position:absolute;top:0;left:0;width:390px;height:844px;transform:scale(var(--s));transform-origin:0 0;border-radius:56px;background:#000;box-shadow:0 0 0 2px #2A2A30,0 40px 80px rgba(0,0,0,.6);overflow:hidden}
+.screen{position:absolute;inset:0;background:var(--bg);color:var(--text);font:16px/22px -apple-system,BlinkMacSystemFont,"SF Pro Text",Helvetica,Arial,sans-serif;overflow:hidden}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:126px;height:37px;border-radius:20px;background:#000;z-index:30}
+.status{position:absolute;top:0;left:0;right:0;height:59px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 30px 15px 34px;font-size:15px;font-weight:600;z-index:29}
+.status .r{display:flex;gap:7px;align-items:center}
+.homebar{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#fff;opacity:.92;z-index:30}
+.top{position:absolute;top:59px;left:0;right:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+.wm{font-weight:800;letter-spacing:-.03em}
+.chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;background:var(--surface);color:var(--text2);font-size:13px;border:1px solid var(--line);white-space:nowrap}
+.gcard{margin:0 20px;border-radius:16px;background:var(--surface);padding:12px 14px;display:flex;align-items:center;gap:12px}
+.coin{width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FFE9A3,#F5C042 58%,#B8861B);box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.18);flex:none}
+.coin.lg{width:28px;height:28px}
+.poster{border-radius:12px;position:relative;overflow:hidden;background:linear-gradient(160deg,var(--c1),var(--c2));isolation:isolate}
+.poster img.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;filter:saturate(.75) contrast(1.05) brightness(.88)}
+.poster::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,var(--c1),var(--c2));opacity:.42;mix-blend-mode:multiply;z-index:1}
+.poster::before{content:"";position:absolute;inset:0;background:radial-gradient(120% 70% at 85% 0%,rgba(255,255,255,.22),transparent 55%),linear-gradient(to top,rgba(0,0,0,.66),transparent 60%);z-index:1}
+.poster>*:not(.ph){position:relative;z-index:2}
+.poster>[style*="position:absolute"]:not(.ph){position:absolute}
+.poster .t{position:absolute;left:12px;right:12px;bottom:12px;font-weight:800;font-size:17px;line-height:1.05;letter-spacing:-.02em;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)}
+.poster .badge{position:absolute;top:10px;left:10px;height:22px;padding:0 8px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;backdrop-filter:blur(6px)}
+.poster .badge.new{background:var(--accent)}
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:83px;background:rgba(11,11,15,.94);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 10px 0;z-index:25}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--text3);width:70px}
+.tab.on{color:var(--text)}
+.tab .ic{width:24px;height:24px}
+.video{position:absolute;inset:0;isolation:isolate}
+.video img.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.7) contrast(1.08) brightness(.75)}
+.vig{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.45),transparent 22%,transparent 60%,rgba(0,0,0,.7))}
+.rail{position:absolute;right:14px;bottom:150px;display:flex;flex-direction:column;gap:18px;align-items:center;z-index:5}
+.rail div{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:#fff;font-weight:600}
+.rail .ic{width:28px;height:28px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+.subt{position:absolute;left:24px;right:70px;bottom:152px;text-align:center;font-size:17px;line-height:24px;font-weight:600;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8);z-index:4}
+.pinfo{position:absolute;left:20px;right:70px;bottom:88px;z-index:5;color:#fff}
+.scrub{position:absolute;left:20px;right:20px;bottom:60px;z-index:5}
+.scrub .bar{height:2px;background:rgba(255,255,255,.35);border-radius:1px;position:relative}
+.scrub .bar i{position:absolute;left:0;top:0;height:2px;background:var(--accent)}
+.scrub .bar b{position:absolute;top:-5px;width:12px;height:12px;border-radius:50%;background:#fff;margin-left:-6px}
+.scrub .tm{display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.8);margin-top:8px}
+
+/* ---- sections ---- */
+section.band{padding:80px 0}
+section.band.alt{background:var(--surface)}
+h2.sec{font-size:clamp(28px,3.6vw,42px);letter-spacing:-.025em;line-height:1.08;margin:0 0 12px;font-weight:800}
+.lead2{color:var(--text2);font-size:18px;max-width:62ch;margin:0 0 36px}
+.rowhead{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip.on{background:rgba(255,92,58,.14);color:var(--text);border-color:var(--accent)}
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+.card .poster{aspect-ratio:2/3}
+.card .m{font-size:13px;color:var(--text2);margin-top:8px;line-height:1.4}
+.card .m b{display:block;color:var(--text);font-weight:600;font-size:14px}
+.card a.play{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;font-weight:600;color:var(--text);text-decoration:none}
+.card a.play .ic{width:14px;height:14px;fill:currentColor;stroke:none}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:step}
+.step{background:var(--raised);border-radius:16px;padding:26px 24px;position:relative}
+.step::before{counter-increment:step;content:counter(step);display:inline-flex;width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;align-items:center;justify-content:center;font-weight:700;margin-bottom:16px}
+.step h3{margin:0 0 8px;font-size:20px;letter-spacing:-.01em}
+.step p{margin:0;color:var(--text2)}
+.step .ex{margin-top:14px;padding:12px 14px;background:var(--surface);border-radius:10px;font-size:14px;display:flex;align-items:center;gap:10px}
+.why{display:grid;grid-template-columns:repeat(3,1fr);gap:28px 32px}
+.why div{border-top:1px solid var(--line);padding-top:18px}
+.why h3{margin:0 0 6px;font-size:18px}
+.why p{margin:0;color:var(--text2);font-size:15px}
+table.pr{width:100%;border-collapse:collapse;font-size:15px}
+table.pr th,table.pr td{text-align:left;padding:14px 12px;border-bottom:1px solid var(--line)}
+table.pr th{color:var(--text2);font-weight:500;font-size:13px}
+table.pr td.num{font-variant-numeric:tabular-nums}
+table.pr tr.hi td{background:rgba(255,92,58,.08)}
+.tag{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap}
+.tag.acc{background:rgba(255,92,58,.18);color:#FF8A70}
+.tag.gold{background:rgba(245,192,66,.16);color:var(--coin)}
+.note{color:var(--text2);font-size:14px;margin-top:16px;max-width:70ch}
+.faq details{border-top:1px solid var(--line);padding:18px 0}
+.faq details:last-child{border-bottom:1px solid var(--line)}
+.faq summary{cursor:pointer;font-weight:600;font-size:18px;list-style:none;display:flex;justify-content:space-between;gap:16px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";color:var(--text2);font-weight:400;font-size:22px;line-height:1}
+.faq details[open] summary::after{content:"–"}
+.faq p{margin:12px 0 0;color:var(--text2);max-width:70ch}
+.cta-band{background:linear-gradient(135deg,#1A1015,#0B0B0F 60%);border:1px solid var(--line);border-radius:24px;padding:48px;display:grid;grid-template-columns:1.2fr .8fr;gap:32px;align-items:center}
+.cta-band h2{margin:0 0 10px}
+footer.site{border-top:1px solid var(--line);padding:56px 0 40px;color:var(--text2);font-size:14px}
+.fgrid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1.3fr;gap:32px}
+.fgrid h4{color:var(--text);font-size:14px;margin:0 0 12px}
+.fgrid a{display:block;color:var(--text2);text-decoration:none;margin:8px 0}
+.fgrid a:hover{color:var(--text)}
+.griev{background:var(--surface);border-radius:12px;padding:16px;font-size:13px;line-height:1.5}
+.griev b{color:var(--text)}
+.fbot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:36px;padding-top:20px;border-top:1px solid var(--line);font-size:13px}
+
+/* ---- business page ---- */
+.bhero{padding-top:72px;padding-bottom:40px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+.mosaic{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;transform:rotate(-4deg)}
+.mosaic .poster{aspect-ratio:2/3}
+.mosaic .poster:nth-child(2),.mosaic .poster:nth-child(5){transform:translateY(24px)}
+.aud{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.aud article{background:var(--raised);border-radius:18px;padding:28px 26px;display:flex;flex-direction:column}
+.aud h3{margin:0 0 8px;font-size:22px;letter-spacing:-.015em}
+.aud p{margin:0 0 16px;color:var(--text2)}
+.aud ul{margin:0 0 20px;padding-left:18px;color:var(--text2);font-size:15px}
+.aud ul li{margin:6px 0}
+.aud .btn{margin-top:auto;align-self:flex-start}
+.tiers{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.tier{background:var(--raised);border-radius:14px;padding:20px}
+.tier b{display:block;font-size:17px}
+.tier span{color:var(--coin);font-weight:600;display:block;margin:6px 0 8px}
+.tier p{margin:0;color:var(--text2);font-size:14px}
+.process{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;counter-reset:pr}
+.process div{background:var(--surface);border-radius:14px;padding:18px}
+.process div::before{counter-increment:pr;content:counter(pr);color:var(--accent);font-weight:800;font-size:22px;display:block;margin-bottom:8px}
+.process b{display:block;margin-bottom:4px}
+.process p{margin:0;color:var(--text2);font-size:14px}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.field{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--text2)}
+.field input,.field select,.field textarea{background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:14px;font:inherit}
+.field textarea{min-height:120px;resize:vertical}
+.field.full{grid-column:1/-1}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--raised);border:1px solid var(--line);color:var(--text);padding:12px 18px;border-radius:12px;display:none;z-index:99}
+.toast.on{display:block}
+.brandmark{display:flex;gap:10px;flex-wrap:wrap}
+.brandmark span{border:1px solid var(--line);border-radius:999px;padding:8px 14px;color:var(--text2);font-size:14px}
+
+/* ---- responsive ---- */
+@media (max-width:1000px){
+  .hero{grid-template-columns:1fr;min-height:0;padding-top:40px}
+  .stage{height:560px;max-width:420px;margin:0 auto}
+  .frame.a{left:0}
+  .frame.b{right:0;top:80px}
+  .cards{grid-template-columns:repeat(3,1fr)}
+  .steps,.why,.aud,.tiers{grid-template-columns:1fr 1fr}
+  .process{grid-template-columns:repeat(2,1fr)}
+  .fgrid{grid-template-columns:1fr 1fr}
+  .cta-band,.bhero{grid-template-columns:1fr}
+}
+@media (max-width:680px){
+  .links{display:none}
+  .links.open{display:flex;flex-direction:column;position:absolute;left:0;right:0;top:66px;background:var(--bg);padding:16px 24px 24px;border-bottom:1px solid var(--line);gap:14px}
+  .menu{display:block}
+  .right .btn{display:none}
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .steps,.why,.aud,.tiers,.formgrid,.fgrid,.process{grid-template-columns:1fr}
+  .stage{height:520px}
+  .frame.b{display:none}
+  .frame.a{--s:.6;left:50%;margin-left:-117px}
+  section.band{padding:56px 0}
+  .cta-band{padding:28px}
+  .qr{display:none}
+}
+</style>
+</head>
+<body data-page="home">
+<a class="skip" href="#main">Skip to content</a>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-app" viewBox="0 0 64 64"><defs><linearGradient id="appg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF7A5C"/><stop offset="1" stop-color="#E04A2B"/></linearGradient></defs><rect width="64" height="64" rx="14.5" fill="url(#appg)"/><path d="M18 14h28a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8H30l-9 8v-8h-3a8 8 0 0 1-8-8V22a8 8 0 0 1 8-8z" fill="#fff" fill-opacity=".96"/><path d="M28 22.5v15l12-7.5z" fill="#E04A2B"/></symbol>
+  <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.4 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.8-3-.8-1.6 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2-1.1 2.8-2.3.9-1.3 1.2-2.5 1.2-2.6 0 0-2.4-.9-2.4-3.8zM14.1 5.9c.6-.8 1.1-1.8 1-2.9-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.8 1 .1 2.1-.5 2.7-1.3z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/></symbol>
+  <symbol id="i-browse" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.5L6 20V5a1 1 0 0 1 1-1z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M6 12v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-7"/></symbol>
+  <symbol id="i-eps" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="4" rx="1.5"/><rect x="4" y="11" width="16" height="4" rx="1.5"/><rect x="4" y="17" width="10" height="3" rx="1.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-cc" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M10 10.5h-2.5a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H10M17 10.5h-2.5a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H17"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3V7l-4 3H5z"/><path d="m16 10 4 4M20 10l-4 4"/></symbol>
+  <symbol id="i-sig" viewBox="0 0 20 12"><rect x="0" y="8" width="3" height="4" rx=".6" fill="currentColor"/><rect x="5" y="6" width="3" height="6" rx=".6" fill="currentColor"/><rect x="10" y="3.5" width="3" height="8.5" rx=".6" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx=".6" fill="currentColor"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 18 12"><path d="M1 4a12 12 0 0 1 16 0M3.5 6.8a8 8 0 0 1 11 0M6 9.5a4.2 4.2 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="9" cy="11" r="1" fill="currentColor"/></symbol>
+  <symbol id="i-bat" viewBox="0 0 28 12"><rect x=".7" y=".7" width="23" height="10.6" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".5"/><rect x="2.4" y="2.4" width="18.5" height="7.2" rx="1.6" fill="currentColor"/><rect x="25.2" y="4" width="2" height="4" rx="1" fill="currentColor" opacity=".5"/></symbol>
+</svg>
+
+<header class="site">
+  <div class="wrap nav">
+    <a class="brand" href="#/" data-nav="home"><svg width="30" height="30" aria-hidden="true"><use href="#i-app"/></svg>Katha<small>कथा</small></a>
+    <nav class="links" id="links" aria-label="Primary">
+      <a href="#series" data-nav="home">Series</a>
+      <a href="#how" data-nav="home">How coins work</a>
+      <a href="#faq" data-nav="home">Help</a>
+      <a href="#business" data-nav="business">For studios &amp; brands</a>
+    </nav>
+    <div class="right">
+      <div class="lang" role="group" aria-label="Language"><button class="on" data-lang="en" type="button">English</button><button data-lang="hi" type="button">हिन्दी</button></div>
+      <a class="btn p sm" href="#get" data-en="Get the app" data-hi="ऐप पाएँ">Get the app</a>
+      <button class="menu" id="menu" aria-label="Menu" aria-expanded="false" type="button">☰</button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<!-- ======================================================= HOME ======================================================= -->
+<div class="page" id="page-home">
+<section class="wrap hero" id="get">
+  <div>
+    <h1 class="h" data-en="Stories in 2 minutes.<br>In your language. No ads." data-hi="2 मिनट की कहानियाँ।<br>आपकी भाषा में। बिना विज्ञापन।">Stories in 2 minutes.<br>In your language. No ads.</h1>
+    <p class="h-hi" data-en="Micro-dramas in Hindi, Tamil and Telugu — 1–2 minute episodes that end on a cliffhanger." data-hi="हिन्दी, तमिल और तेलुगु में माइक्रो-ड्रामा — 1–2 मिनट के एपिसोड, हर एक क्लिफहैंगर पर खत्म।">Micro-dramas in Hindi, Tamil and Telugu — 1–2 minute episodes that end on a cliffhanger.</p>
+    <p class="sub" data-en="Watch the first 10 episodes of every series free. Unlock the rest for about ₹4.5 each with coins. No subscription, nothing to cancel, and never an ad." data-hi="हर सीरीज़ के पहले 10 एपिसोड मुफ़्त देखें। बाकी को कॉइन्स से लगभग ₹4.5 प्रति एपिसोड में अनलॉक करें। कोई सब्सक्रिप्शन नहीं, कोई विज्ञापन नहीं।">Watch the first 10 episodes of every series free. Unlock the rest for about ₹4.5 each with coins. No subscription, nothing to cancel, and never an ad.</p>
+    <div class="ctas">
+      <a class="btn store" href="#" aria-label="Download on the App Store"><svg class="ic" style="width:26px;height:26px;stroke:none;fill:#000"><use href="#i-apple"/></svg><span><small>Download on the</small>App Store</span></a>
+      <a class="btn s" href="#series" data-en="Watch a free episode" data-hi="एक मुफ़्त एपिसोड देखें">Watch a free episode</a>
+    </div>
+    <div class="qr"><svg viewBox="0 0 29 29" aria-hidden="true" shape-rendering="crispEdges"><path fill="#000" d="M0 0h7v7H0zM1 1v5h5V1zM2 2h3v3H2zM22 0h7v7h-7zM23 1v5h5V1zM24 2h3v3h-3zM0 22h7v7H0zM1 23v5h5v-5zM2 24h3v3H2zM9 0h2v2H9zM12 0h1v3h-1zM14 1h3v1h-3zM18 0h2v2h-2zM9 3h1v2H9zM11 3h2v1h-2zM15 3h1v2h-1zM17 3h3v1h-3zM8 8h2v2H8zM11 8h3v1h-3zM15 8h1v2h-1zM17 9h2v2h-2zM20 8h1v3h-1zM0 9h2v1H0zM3 9h1v2H3zM5 10h2v1H5zM23 9h1v2h-1zM25 8h2v2h-2zM28 10h1v2h-1zM9 11h1v3H9zM11 12h2v2h-2zM14 11h2v1h-2zM17 12h1v2h-1zM19 13h2v1h-2zM0 13h1v2H0zM2 12h2v1H2zM4 14h3v1H4zM22 12h2v2h-2zM25 12h1v3h-1zM27 13h2v1h-2zM8 15h2v2H8zM11 16h1v2h-1zM13 15h2v1h-2zM16 16h2v1h-2zM19 15h2v2h-2zM0 17h2v2H0zM3 17h3v1H3zM22 16h2v2h-2zM25 17h1v2h-1zM27 16h2v2h-2zM9 19h2v1H9zM12 19h2v2h-2zM15 19h1v3h-1zM17 20h2v1h-2zM20 19h1v2h-1zM9 22h1v2H9zM11 23h3v1h-3zM15 23h2v2h-2zM18 22h2v2h-2zM21 23h1v2h-1zM23 22h2v1h-2zM26 22h3v1h-3zM9 26h2v2H9zM12 25h1v3h-1zM14 26h2v1h-2zM17 25h2v2h-2zM20 26h1v3h-1zM22 25h2v2h-2zM25 25h1v2h-1zM27 26h2v2h-2z"/></svg><span data-en="Scan with your iPhone camera.<br>iOS 17 or later." data-hi="अपने iPhone कैमरे से स्कैन करें।<br>iOS 17 या नया।">Scan with your iPhone camera.<br>iOS 17 or later.</span></div>
+    <div class="trust">
+      <span><svg class="ic"><use href="#i-check"/></svg>First 10 episodes free</span>
+      <span><svg class="ic"><use href="#i-check"/></svg>No ads, ever</span>
+      <span><svg class="ic"><use href="#i-check"/></svg>Works on 4G</span>
+      <span><svg class="ic"><use href="#i-check"/></svg>Parental lock</span>
+    </div>
+  </div>
+
+  <div class="stage" aria-label="App preview">
+    <!-- Home screen -->
+    <div class="frame a"><div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="top"><div style="display:flex;align-items:center;gap:8px"><svg width="26" height="26"><use href="#i-app"/></svg><div class="wm" style="font-size:22px">Katha</div></div><div style="display:flex;gap:10px;align-items:center"><span class="chip">हिन्दी</span><svg class="ic"><use href="#i-search"/></svg></div></div>
+      <div style="position:absolute;top:111px;left:0;right:0;bottom:83px;overflow:hidden">
+        <div class="gcard"><div class="coin lg"></div><div style="flex:1"><div style="font-weight:600;font-size:15px">Day 3 of your streak</div><div style="font-size:13px;color:var(--text2)">Claim today's 5 coins</div></div><span class="btn p sm" style="height:36px">Claim</span></div>
+        <div class="poster" style="--c1:#3B1F2B;--c2:#C2553D;margin:14px 20px 0;height:426px;border-radius:16px">
+          <img class="ph" src="https://loremflickr.com/390/640/indian,bride?lock=11" alt="" loading="lazy" onerror="this.remove()">
+          <span class="badge">Free · 10 episodes</span>
+          <svg class="ic" style="position:absolute;top:10px;right:10px;color:#fff;opacity:.9"><use href="#i-mute"/></svg>
+          <div style="position:absolute;left:16px;right:16px;bottom:16px;color:#fff">
+            <div style="font-size:30px;line-height:32px;font-weight:800;letter-spacing:-.02em;text-shadow:0 1px 3px rgba(0,0,0,.5)">Kaanch Ka Mahal</div>
+            <div style="font-size:15px;line-height:20px;margin-top:6px;opacity:.9">Her in-laws smiled. That's when Meera knew.</div>
+            <div style="display:flex;gap:10px;margin-top:14px;align-items:center"><span class="btn p" style="height:44px;padding:0 20px;border-radius:999px"><svg class="ic" style="width:16px;height:16px;fill:#fff;stroke:none"><use href="#i-play"/></svg>Play E1</span><span style="font-size:13px;opacity:.85">Romance · 60 episodes</span></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:24px 20px 10px"><span style="font-weight:600;font-size:17px">Trending in Hindi</span><span style="font-size:13px;color:var(--text2)">See all</span></div>
+        <div style="display:flex;gap:10px;padding:0 20px">
+          <div class="poster" style="--c1:#0F2A3D;--c2:#3E7C9A;width:112px;height:168px;flex:none"><img class="ph" src="https://loremflickr.com/240/360/businessman,office?lock=12" alt="" loading="lazy" onerror="this.remove()"><span class="badge new">New</span><div class="t" style="font-size:15px">CEO Sahab</div></div>
+          <div class="poster" style="--c1:#1D1A2F;--c2:#6C4AB6;width:112px;height:168px;flex:none"><img class="ph" src="https://loremflickr.com/240/360/night,window?lock=13" alt="" loading="lazy" onerror="this.remove()"><div class="t" style="font-size:15px">Neend Se Pehle</div></div>
+          <div class="poster" style="--c1:#2B1B12;--c2:#B9772E;width:112px;height:168px;flex:none"><img class="ph" src="https://loremflickr.com/240/360/delhi,street?lock=14" alt="" loading="lazy" onerror="this.remove()"><div class="t" style="font-size:15px">Dilli 6 Ka Raaz</div></div>
+        </div>
+      </div>
+      <div class="tabbar"><div class="tab on"><svg class="ic"><use href="#i-home"/></svg>Home</div><div class="tab"><svg class="ic"><use href="#i-browse"/></svg>Browse</div><div class="tab"><svg class="ic"><use href="#i-list"/></svg>My list</div><div class="tab"><svg class="ic"><use href="#i-user"/></svg>Profile</div></div>
+      <div class="homebar"></div>
+    </div></div></div>
+    <!-- Player -->
+    <div class="frame b"><div class="phone"><div class="screen" style="background:#000">
+      <div class="island"></div>
+      <div class="status" style="color:#fff"><span>9:41</span><span class="r"><svg width="20" height="12"><use href="#i-sig"/></svg><svg width="18" height="12"><use href="#i-wifi"/></svg><svg width="28" height="12"><use href="#i-bat"/></svg></span></div>
+      <div class="video" style="background:radial-gradient(75% 55% at 38% 34%,#8A4A2F 0%,#41211A 42%,#0B0B0F 100%)"><img class="ph" src="https://loremflickr.com/390/844/letter,handwriting?lock=51" alt="" loading="lazy" onerror="this.remove()"></div>
+      <div class="vig"></div>
+      <div class="top" style="color:#fff"><svg class="ic"><use href="#i-x"/></svg><svg class="ic"><use href="#i-cc"/></svg></div>
+      <div class="rail"><div><svg class="ic"><use href="#i-heart"/></svg>12.4k</div><div><svg class="ic"><use href="#i-eps"/></svg>E12</div><div><svg class="ic"><use href="#i-share"/></svg>Share</div></div>
+      <div class="subt">ये चिट्ठी… तुम्हारे नाम की है।</div>
+      <div class="pinfo"><div style="font-size:13px;opacity:.8">Kaanch Ka Mahal</div><div style="font-size:16px;font-weight:600;margin-top:2px">E12 · Kabir finds the letter</div></div>
+      <div class="scrub"><div class="bar"><i style="width:42%"></i><b style="left:42%"></b></div><div class="tm"><span>0:48</span><span>1:12 left</span></div></div>
+      <div class="homebar"></div>
+    </div></div></div>
+  </div>
+</section>
+
+<!-- Trending series -->
+<section class="band" id="series">
+  <div class="wrap">
+    <div class="rowhead">
+      <div><h2 class="sec">Trending this week</h2><p class="lead2" style="margin:0">Every series starts free. Watch episode 1 right here in your browser.</p></div>
+      <div class="chips" role="group" aria-label="Language"><span class="chip on">हिन्दी</span><span class="chip">தமிழ்</span><span class="chip">తెలుగు</span><span class="chip">All</span></div>
+    </div>
+    <div class="cards">
+      <div class="card"><div class="poster" style="--c1:#3B1F2B;--c2:#C2553D"><img class="ph" src="https://loremflickr.com/240/360/indian,bride?lock=11" alt="Kaanch Ka Mahal poster" loading="lazy" onerror="this.remove()"><span class="badge">Free · 10 eps</span><div class="t">Kaanch Ka Mahal</div></div><div class="m"><b>Kaanch Ka Mahal</b>Family drama · Hindi · 60 episodes</div><a class="play" href="#"><svg class="ic"><use href="#i-play"/></svg>Watch E1 free</a></div>
+      <div class="card"><div class="poster" style="--c1:#0F2A3D;--c2:#3E7C9A"><img class="ph" src="https://loremflickr.com/240/360/businessman,office?lock=12" alt="CEO Sahab poster" loading="lazy" onerror="this.remove()"><span class="badge new">New</span><div class="t">CEO Sahab</div></div><div class="m"><b>CEO Sahab</b>Romance · Hindi · 60 episodes</div><a class="play" href="#"><svg class="ic"><use href="#i-play"/></svg>Watch E1 free</a></div>
+      <div class="card"><div class="poster" style="--c1:#1D1A2F;--c2:#6C4AB6"><img class="ph" src="https://loremflickr.com/240/360/night,window?lock=13" alt="Neend Se Pehle poster" loading="lazy" onerror="this.remove()"><span class="badge">Free · 10 eps</span><div class="t">Neend Se Pehle</div></div><div class="m"><b>Neend Se Pehle</b>Thriller · Hindi · 48 episodes</div><a class="play" href="#"><svg class="ic"><use href="#i-play"/></svg>Watch E1 free</a></div>
+      <div class="card"><div class="poster" style="--c1:#2B1B12;--c2:#B9772E"><img class="ph" src="https://loremflickr.com/240/360/delhi,street?lock=14" alt="Dilli 6 Ka Raaz poster" loading="lazy" onerror="this.remove()"><span class="badge">Free · 10 eps</span><div class="t">Dilli 6 Ka Raaz</div></div><div class="m"><b>Dilli 6 Ka Raaz</b>Crime · Hindi · 72 episodes</div><a class="play" href="#"><svg class="ic"><use href="#i-play"/></svg>Watch E1 free</a></div>
+      <div class="card"><div class="poster" style="--c1:#2E1F3F;--c2:#D66E9D"><img class="ph" src="https://loremflickr.com/240/360/college,students?lock=17" alt="Kadhal Kanakku poster" loading="lazy" onerror="this.remove()"><span class="badge">தமிழ்</span><div class="t">Kadhal Kanakku</div></div><div class="m"><b>Kadhal Kanakku</b>Campus romance · Tamil · 54 episodes</div><a class="play" href="#"><svg class="ic"><use href="#i-play"/></svg>Watch E1 free</a></div>
+      <div class="card"><div class="poster" style="--c1:#1B2E1F;--c2:#6DBE7A"><img class="ph" src="https://loremflickr.com/240/360/couple,india?lock=18" alt="Prema Pariksha poster" loading="lazy" onerror="this.remove()"><span class="badge">తెలుగు</span><div class="t">Prema Pariksha</div></div><div class="m"><b>Prema Pariksha</b>Romance · Telugu · 60 episodes</div><a class="play" href="#"><svg class="ic"><use href="#i-play"/></svg>Watch E1 free</a></div>
+    </div>
+    <p class="note">New series every week in every language. Posters shown here are placeholders for studio key art.</p>
+  </div>
+</section>
+
+<!-- How coins work -->
+<section class="band alt" id="how">
+  <div class="wrap">
+    <h2 class="sec" data-en="Pay only for what you watch" data-hi="जितना देखें, उतना ही दें">Pay only for what you watch</h2>
+    <p class="lead2" data-en="No subscription. Coins are a simple way to unlock the episodes you actually want to see." data-hi="कोई सब्सक्रिप्शन नहीं। कॉइन्स से सिर्फ़ वे एपिसोड अनलॉक करें जो आप सच में देखना चाहते हैं।">No subscription. Coins are a simple way to unlock the episodes you actually want to see.</p>
+    <div class="steps">
+      <div class="step"><h3>Watch 10 episodes free</h3><p>Every series opens with ten free episodes — about 15 minutes of story. No login needed.</p><div class="ex"><svg class="ic" style="color:var(--ok)"><use href="#i-check"/></svg>Episodes 1–10 · ₹0</div></div>
+      <div class="step"><h3>Unlock the next one</h3><p>Hooked? The next episode costs 30 coins — about ₹4.5. Unlock one at a time, or the whole series at once and save 25%.</p><div class="ex"><span class="coin"></span>30 coins ≈ ₹4.5 per episode</div></div>
+      <div class="step"><h3>Buy coins, keep them forever</h3><p>Coins come in packs from ₹99 through the App Store. They never expire while your account exists, and bonus coins are used first.</p><div class="ex"><span class="coin"></span>₹199 → 1,300 coins · finishes a series and the next</div></div>
+    </div>
+    <div style="margin-top:44px">
+      <table class="pr" aria-label="Coin packs">
+        <thead><tr><th>Pack</th><th>Price</th><th>Coins</th><th>Bonus</th><th>Roughly</th></tr></thead>
+        <tbody>
+          <tr><td>Starter <span class="tag gold" style="margin-left:6px">2× on your first pack</span></td><td class="num">₹99</td><td class="num">600</td><td>—</td><td>20 episodes</td></tr>
+          <tr class="hi"><td>Popular <span class="tag acc" style="margin-left:6px">Most chosen</span></td><td class="num">₹199</td><td class="num">1,300</td><td>8%</td><td>A full series and the next</td></tr>
+          <tr><td>Value</td><td class="num">₹499</td><td class="num">3,500</td><td>17%</td><td>Two or three series</td></tr>
+          <tr><td>Binge</td><td class="num">₹999</td><td class="num">7,500</td><td>25%</td><td>About five series</td></tr>
+          <tr><td>Mega</td><td class="num">₹1,999</td><td class="num">16,000</td><td>33%</td><td>Lowest price per coin</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Prices include GST. Payment is handled by Apple in the app. A 60-episode series with 10 free episodes costs about ₹225 episode by episode, or about ₹170 unlocked all at once.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Why Katha -->
+<section class="band">
+  <div class="wrap">
+    <h2 class="sec">Made for the two minutes you actually have</h2>
+    <p class="lead2">Micro-dramas are full stories told in 1–2 minute episodes. Katha makes them in Indian languages, for Indian phones, without ads.</p>
+    <div class="why">
+      <div><h3>Originals in your language</h3><p>Written and shot in Hindi, Tamil and Telugu — small-town families, offices, campuses, palaces — not dubbed leftovers.</p></div>
+      <div><h3>Every episode ends on a hook</h3><p>One to two minutes, then a turn you didn't see coming. Swipe up and the next one is already playing.</p></div>
+      <div><h3>Never an ad</h3><p>Not before, not between, not inside. You pay a few rupees for an episode and that's the whole deal.</p></div>
+      <div><h3>Built for 4G, not fibre</h3><p>Fast start on crowded networks, data saver that caps quality on mobile data, and small downloads for older iPhones.</p></div>
+      <div><h3>Ratings and a parental lock</h3><p>Every series carries a U/A rating and content descriptors. A PIN gates 16+ and adult-rated titles.</p></div>
+      <div><h3>Subtitles and dubs</h3><p>Most series are available in all three launch languages, with English subtitles. Dubbed tracks are labelled as such.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="band alt" id="faq">
+  <div class="wrap" style="max-width:860px">
+    <h2 class="sec">Questions people ask</h2>
+    <p class="lead2">Can't find it here? The in-app assistant answers in Hindi and English, and a person steps in when needed.</p>
+    <div class="faq">
+      <details><summary>How do coins work?</summary><p>The first 10 episodes of every series are free. After that each episode costs 30 coins, about ₹4.5. You buy coins in packs through the App Store; they never expire while your account exists, and bonus coins are spent before purchased coins.</p></details>
+      <details><summary>Can I get a refund?</summary><p>Purchases made through the App Store are refunded by Apple under Apple's policy — you can request one from your Apple account. If you paid but didn't receive coins, contact us and we'll fix it, usually within hours.</p></details>
+      <details><summary>Which languages are available?</summary><p>Hindi, Tamil and Telugu at launch. Bengali, Marathi, Kannada and Malayalam follow. Most series are available in all three launch languages with English subtitles; the app and this site are in English and Hindi, with Tamil and Telugu on the way.</p></details>
+      <details><summary>Which devices does it work on?</summary><p>iPhone running iOS 17 or later. You can also watch the free episodes of any series on this website. An Android app is planned.</p></details>
+      <details><summary>Is there a parental lock?</summary><p>Yes. Set a 4-digit PIN in Settings and it will be required before any series rated U/A 16+ or A plays. Katha is for viewers 18 and older.</p></details>
+      <details><summary>Can I watch offline?</summary><p>Not yet. Downloads are on the roadmap. Data saver keeps mobile-data usage low in the meantime.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="band">
+  <div class="wrap">
+    <div class="cta-band">
+      <div>
+        <h2 class="sec" data-en="Ten free episodes are waiting." data-hi="दस मुफ़्त एपिसोड आपका इंतज़ार कर रहे हैं।">Ten free episodes are waiting.</h2>
+        <p class="lead2" style="margin:0 0 22px" data-en="Install Katha, pick your language, and start the first series in under a minute." data-hi="Katha इंस्टॉल करें, अपनी भाषा चुनें, और एक मिनट से कम में पहली सीरीज़ शुरू करें।">Install Katha, pick your language, and start the first series in under a minute.</p>
+        <div class="ctas" style="margin-top:0"><a class="btn store" href="#" aria-label="Download on the App Store"><svg class="ic" style="width:26px;height:26px;stroke:none;fill:#000"><use href="#i-apple"/></svg><span><small>Download on the</small>App Store</span></a><a class="btn s" href="#series">Watch a free episode</a></div>
+      </div>
+      <div class="brandmark" aria-label="Available languages"><span>हिन्दी</span><span>தமிழ்</span><span>తెలుగు</span><span>English subtitles</span><span>iOS 17+</span></div>
+    </div>
+  </div>
+</section>
+</div><!-- /page-home -->
+
+<!-- ======================================================= BUSINESS ======================================================= -->
+<div class="page" id="page-business">
+<section class="wrap bhero">
+  <div>
+    <h1 class="h">Make the next binge.</h1>
+    <p class="sub" style="font-size:20px">Katha commissions Indian-language micro-dramas from studios, places brands inside stories instead of between them, and pays creators for the audiences they bring.</p>
+    <div class="ctas"><a class="btn p" href="#studios">For studios</a><a class="btn s" href="#brands">For brands</a><a class="btn s" href="#creators">For creators</a></div>
+    <div class="trust"><span><svg class="ic"><use href="#i-check"/></svg>Every series in 3 languages within 24 hours</span><span><svg class="ic"><use href="#i-check"/></svg>Greenlight decisions in 10 working days</span><span><svg class="ic"><use href="#i-check"/></svg>Payment on delivery, not on performance</span></div>
+  </div>
+  <div class="mosaic" aria-hidden="true">
+    <div class="poster" style="--c1:#3B1F2B;--c2:#C2553D"><img class="ph" src="https://loremflickr.com/240/360/indian,bride?lock=11" alt="" loading="lazy" onerror="this.remove()"><div class="t">Kaanch Ka Mahal</div></div>
+    <div class="poster" style="--c1:#0F2A3D;--c2:#3E7C9A"><img class="ph" src="https://loremflickr.com/240/360/businessman,office?lock=12" alt="" loading="lazy" onerror="this.remove()"><div class="t">CEO Sahab</div></div>
+    <div class="poster" style="--c1:#0F3A3D;--c2:#3FA796"><img class="ph" src="https://loremflickr.com/240/360/palace,india?lock=16" alt="" loading="lazy" onerror="this.remove()"><div class="t">Raja Ki Beti</div></div>
+    <div class="poster" style="--c1:#2E1F3F;--c2:#D66E9D"><img class="ph" src="https://loremflickr.com/240/360/college,students?lock=17" alt="" loading="lazy" onerror="this.remove()"><div class="t">Kadhal Kanakku</div></div>
+    <div class="poster" style="--c1:#2B1B12;--c2:#B9772E"><img class="ph" src="https://loremflickr.com/240/360/delhi,street?lock=14" alt="" loading="lazy" onerror="this.remove()"><div class="t">Dilli 6 Ka Raaz</div></div>
+    <div class="poster" style="--c1:#33261A;--c2:#E3A24A"><img class="ph" src="https://loremflickr.com/240/360/temple,tamilnadu?lock=19" alt="" loading="lazy" onerror="this.remove()"><div class="t">Vetri Vaasal</div></div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="aud">
+      <article id="studios">
+        <h3>Studios and production houses</h3>
+        <p>We commission 50–100 episode vertical series in Hindi, Tamil and Telugu, and license finished catalogues for dubbing.</p>
+        <ul>
+          <li>Budget tiers from lean single-location series to star-led tentpoles</li>
+          <li>Six-week concept-to-master schedule on core titles</li>
+          <li>We handle subtitles, dubs, marketing clips and distribution</li>
+          <li>Rights buyout with sequel options; payment on delivery</li>
+        </ul>
+        <a class="btn p" href="#pitch">Pitch a series</a>
+      </article>
+      <article id="brands">
+        <h3>Brands and agencies</h3>
+        <p>Your product as a character in a story people chose to watch — not an interruption they skip.</p>
+        <ul>
+          <li>Branded micro-drama series (5–20 episodes) written around your brief</li>
+          <li>Integrations inside existing hits; sponsored premieres</li>
+          <li>Ad-free environment: 100% of attention is on the story</li>
+          <li>Reported on completion, replays, saves and brand recall</li>
+        </ul>
+        <a class="btn p" href="#pitch">Talk to us</a>
+      </article>
+      <article id="creators">
+        <h3>Creators</h3>
+        <p>Share the series you love and earn on every first purchase your audience makes.</p>
+        <ul>
+          <li>20% of first purchases for 90 days after install</li>
+          <li>Early access to premieres and cast collaborations</li>
+          <li>Ready-made clips with your own link, in your language</li>
+          <li>Monthly payouts by UPI; transparent dashboard</li>
+        </ul>
+        <a class="btn p" href="#pitch">Join the creator program</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="band alt">
+  <div class="wrap">
+    <h2 class="sec">What we commission</h2>
+    <p class="lead2">Four budget tiers, one quality bar. Every series is shot vertical, delivered to our technical spec, and released in three languages.</p>
+    <div class="tiers">
+      <div class="tier"><b>Tentpole</b><span>Star-led · 60–100 episodes</span><p>One a month. Recognizable lead, premiere event, marketing anchor for the whole slate.</p></div>
+      <div class="tier"><b>Core original</b><span>60 episodes · 8–10 shoot days</span><p>The bulk of what we make. Romance, family drama, revenge, thriller, fantasy and comedy.</p></div>
+      <div class="tier"><b>Lean original</b><span>45–60 episodes · 3–5 shoot days</span><p>Single location, small cast, AI-assisted post. Fast, frequent, experimental.</p></div>
+      <div class="tier"><b>Licensed catalogue</b><span>Finished series · dubbed</span><p>Chinese, Korean and Turkish micro-dramas we adapt and dub for Indian audiences.</p></div>
+    </div>
+    <div style="margin-top:48px">
+      <h2 class="sec" style="font-size:28px">How a series gets made with us</h2>
+      <div class="process">
+        <div><b>Pitch</b><p>A one-page premise, tropes, language and budget tier. We reply within 10 working days.</p></div>
+        <div><b>Greenlight</b><p>Outline and pilot cut tested with real viewers in the target language.</p></div>
+        <div><b>Produce</b><p>Your crew, our spec and QC. Six weeks for a core title.</p></div>
+        <div><b>Launch</b><p>Subtitles and dubs within 24 hours; clip factory and paid campaigns from day one.</p></div>
+        <div><b>Get paid</b><p>On delivery and acceptance. Bonus for titles that pass 3× payback.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="pitch">
+  <div class="wrap" style="max-width:860px">
+    <h2 class="sec">Tell us what you want to make</h2>
+    <p class="lead2">Studios, brands and creators use the same form. We reply within three working days.</p>
+    <form class="formgrid" id="pitchform" novalidate>
+      <label class="field">Your name<input type="text" name="name" required autocomplete="name"></label>
+      <label class="field">Company or channel<input type="text" name="company" autocomplete="organization"></label>
+      <label class="field">Email<input type="email" name="email" required autocomplete="email"></label>
+      <label class="field">You are a<select name="kind"><option>Studio or production house</option><option>Brand or agency</option><option>Creator</option><option>Distributor or rights holder</option><option>Something else</option></select></label>
+      <label class="field full">What do you have in mind?<textarea name="msg" placeholder="A premise, a brand brief, a catalogue, your channel — a few lines is enough."></textarea></label>
+      <div class="field full" style="flex-direction:row;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px"><span>Or write to <a href="mailto:partners@katha.example">partners@katha.example</a></span><button class="btn p" type="submit">Send</button></div>
+    </form>
+  </div>
+</section>
+</div><!-- /page-business -->
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="fgrid">
+      <div>
+        <a class="brand" href="#/" data-nav="home" style="margin-bottom:12px"><svg width="30" height="30" aria-hidden="true"><use href="#i-app"/></svg>Katha<small>कथा</small></a>
+        <p style="margin:0;max-width:34ch">Micro-dramas in Indian languages. Two-minute episodes, no ads, pay only for what you watch. For viewers 18 and older.</p>
+        <p style="margin:14px 0 0"><a href="#" style="display:inline">App Store</a> · <a href="#series" style="display:inline">Watch free episodes</a></p>
+      </div>
+      <div>
+        <h4>Katha</h4>
+        <a href="#series" data-nav="home">Series</a>
+        <a href="#how" data-nav="home">How coins work</a>
+        <a href="#business" data-nav="business">For studios &amp; brands</a>
+        <a href="#">Careers</a>
+        <a href="#">Press</a>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <a href="#">Terms of Use</a>
+        <a href="#">Privacy Notice (DPDP)</a>
+        <a href="#">Refund &amp; Cancellation Policy</a>
+        <a href="#">Content ratings &amp; parental controls</a>
+        <a href="#">Report content</a>
+      </div>
+      <div>
+        <h4>Help and grievances</h4>
+        <div class="griev">
+          <b>Support:</b> help@katha.example · in-app chat, 9 am–9 pm IST<br>
+          <b>Grievance officer:</b> Name (to be appointed)<br>grievance@katha.example<br>
+          Complaints are acknowledged within 24 hours and resolved within 15 days, as required under the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021.
+        </div>
+      </div>
+    </div>
+    <div class="fbot"><span>© 2026 Katha Media Private Limited (placeholder). All series, characters and people shown are fictional; photos are placeholders for studio key art.</span><span>English · <a href="#" style="color:inherit">हिन्दी</a> · <a href="#" style="color:inherit">தமிழ்</a> · <a href="#" style="color:inherit">తెలుగు</a></span></div>
+  </div>
+</footer>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  var body=document.body, links=document.getElementById('links'), menu=document.getElementById('menu');
+  function setPage(p){ body.setAttribute('data-page',p);
+    document.querySelectorAll('.links a').forEach(function(a){ if(a.getAttribute('data-nav')===p && (p==='business' || a.getAttribute('href')==='#series')) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+  }
+  function route(){ var h=location.hash; if(h==='#business' || h==='#studios' || h==='#brands' || h==='#creators' || h==='#pitch'){ setPage('business'); } else { setPage('home'); }
+    if(h && h!=='#/'){ var el=document.querySelector(h); if(el){ setTimeout(function(){ el.scrollIntoView({block:'start'}); },0); } } else { window.scrollTo(0,0); } }
+  window.addEventListener('hashchange',route); route();
+  menu.addEventListener('click',function(){ var o=links.classList.toggle('open'); menu.setAttribute('aria-expanded',o); });
+  links.addEventListener('click',function(){ links.classList.remove('open'); menu.setAttribute('aria-expanded',false); });
+  // Hindi / English toggle for key strings (full site localization is route-based in production)
+  document.querySelectorAll('.lang button').forEach(function(b){ b.addEventListener('click',function(){
+    var l=b.getAttribute('data-lang'); document.querySelectorAll('.lang button').forEach(function(x){x.classList.toggle('on',x===b);});
+    document.querySelectorAll('[data-en]').forEach(function(el){ el.innerHTML=el.getAttribute('data-'+l); });
+    document.documentElement.lang = l==='hi'?'hi':'en';
+  });});
+  // Pitch form (demo only)
+  var f=document.getElementById('pitchform'), t=document.getElementById('toast');
+  f.addEventListener('submit',function(e){ e.preventDefault(); var name=f.name.value.trim(), email=f.email.value.trim();
+    if(!name||!email||email.indexOf('@')<0){ t.textContent='Add your name and a valid email so we can reply.'; }
+    else { t.textContent='Thanks, '+name+'. We reply within three working days.'; f.reset(); }
+    t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('on');},3500); });
+})();
+</script>
+</body>
+</html>
