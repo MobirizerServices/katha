@@ -95,3 +95,85 @@ class ProblemDetail(BaseModel):
     title: str
     status: int
     detail: str | None = None
+
+
+# ---- auth -----------------------------------------------------------------
+class OtpRequestBody(BaseModel):
+    phone: str
+
+
+class OtpRequestResponse(BaseModel):
+    request_id: str
+    phone: str
+    # Dev only: surfaced so the harness/UI can auto-fill. Never returned in prod.
+    dev_hint: str = "any 4-digit code works in the dev slice"
+
+
+class OtpVerifyBody(BaseModel):
+    phone: str
+    code: str
+
+
+class AppleAuthBody(BaseModel):
+    identity_token: str
+    full_name: str | None = None
+
+
+class AuthToken(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: "UserProfileResponse"
+
+
+class UserProfileResponse(BaseModel):
+    user_id: str
+    kind: str
+    display_name: str
+    language: str
+    phone: str | None = None
+
+
+class UserProfilePatch(BaseModel):
+    display_name: str | None = None
+    language: str | None = None
+
+
+# ---- engagement -----------------------------------------------------------
+class ProgressItemBody(BaseModel):
+    slug: str
+    number: int
+    position_ms: int = 0
+    duration_ms: int = 0
+
+
+class ProgressBatchBody(BaseModel):
+    items: list[ProgressItemBody]
+
+
+class ContinueItem(BaseModel):
+    slug: str
+    number: int
+    episode_id: str
+    position_ms: int
+    duration_ms: int
+    title: str
+    percent: int
+
+
+class ContinueResponse(BaseModel):
+    items: list[ContinueItem]
+
+
+class MyListResponse(BaseModel):
+    slugs: list[str]
+    series: list[SeriesSummary]
+
+
+class CheckinResponse(BaseModel):
+    granted_coins: int
+    already_claimed: bool
+    day: str
+    wallet: WalletResponse
+
+
+AuthToken.model_rebuild()

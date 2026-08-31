@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Generate placeholder dev videos + HLS ladders for every episode in docs/seed-catalog.json.
+"""Generate placeholder dev videos + HLS ladders for docs/katha-catalog.json.
+
+The catalogue is Katha's OWNED slate (tools/build_katha_catalog.py), so these
+assets are safe to show in demos. Cover art comes from tools/generate_covers.py.
 
 Output layout (mirrors the SAD §6.5 media layout, locally):
   media/{series_slug}/e{NNN}/source.mp4          mezzanine, 1080x1920
@@ -20,7 +23,11 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CATALOG = ROOT / "docs" / "seed-catalog.json"
+CATALOG = Path(os.environ.get("KATHA_CATALOG", ROOT / "docs" / "katha-catalog.json"))
+# Demo builds only ever play the free run and the first paid episodes, so
+# generating all 786 would burn ~1.1 GB for nothing. Override with --all or
+# KATHA_MAX_EPISODES=N.
+MAX_EPISODES = int(os.environ.get("KATHA_MAX_EPISODES", "12"))
 MEDIA = ROOT / "media"
 FONT = "/System/Library/Fonts/Helvetica.ttc"
 
@@ -28,9 +35,6 @@ FFMPEG = os.environ.get("FFMPEG") or subprocess.run(
     [sys.executable, "-c", "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"],
     capture_output=True, text=True,
 ).stdout.strip() or "ffmpeg"
-
-# one distinct background per series so QA can tell them apart at a glance
-SERIES_COLORS = ["0x1B2A4A", "0x3A1B4A", "0x4A1B1B", "0x1B4A2E", "0x4A3A1B", "0x2E2E3E"]
 
 LADDER = [  # (name, w, h, maxrate_k)
     ("1080p", 1080, 1920, 6000),
@@ -40,13 +44,17 @@ LADDER = [  # (name, w, h, maxrate_k)
 ]
 
 
-def episode_duration(ep_no: int) -> int:
-    """Deterministic 12-18s per episode. Bump to 60-120 for full-length assets."""
-    return 12 + (ep_no % 7)
+def episode_duration(ep: dict) -> int:
+    """Deterministic 12-18s per episode. Bump to 60-120 for full-length assets.
+
+    The E10 cliff runs 6s long on purpose: Content Bible 3.3 gives the turn air,
+    and the paused frame under the paywall sheet is the sales asset.
+    """
+    return 12 + (ep["number"] % 7) + (6 if ep.get("is_cliff") else 0)
 
 
-def build_episode(series_idx, slug, title, ep):
-    n, dur = ep["number"], episode_duration(ep["number"])
+def build_episode(color, slug, title, ep):
+    n, dur = ep["number"], episode_duration(ep)
     out = MEDIA / slug / f"e{n:03d}"
     if (out / "hls" / "master.m3u8").exists():
         return (slug, n, dur, "skipped")
@@ -54,12 +62,12 @@ def build_episode(series_idx, slug, title, ep):
     for name, *_ in LADDER:
         (out / "hls" / name).mkdir(parents=True, exist_ok=True)
 
-    color = SERIES_COLORS[series_idx % len(SERIES_COLORS)]
     badge = "FREE" if ep["is_free"] else f"LOCKED - {ep['coin_price']} COINS"
     badge_color = "0x2FBF71" if ep["is_free"] else "0xF5C042"
 
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as tf:
-        tf.write(f"KATHA DEV BUILD\n\n{title}\n\nEpisode {n}")
+        label = ep.get("title") or f"Episode {n}"
+        tf.write(f"KATHA DEV BUILD\n\n{title}\n\nE{n} - {label}")
         titlefile = tf.name
 
     vf = (
@@ -106,10 +114,12 @@ def build_episode(series_idx, slug, title, ep):
 
 def main():
     catalog = json.loads(CATALOG.read_text())
+    cap = None if "--all" in sys.argv else MAX_EPISODES
     jobs = []
-    for idx, s in enumerate(catalog["series"]):
-        for ep in s["episodes"]:
-            jobs.append((idx, s["slug"], s["title"], ep))
+    for s in catalog["series"]:
+        eps = s["episodes"] if cap is None else s["episodes"][:cap]
+        for ep in eps:
+            jobs.append((s.get("cover_hue", "0x1B2A4A"), s["slug"], s["title"], ep))
 
     print(f"{len(jobs)} episodes to generate -> {MEDIA}", flush=True)
     done = failed = 0
@@ -125,17 +135,37 @@ def main():
                 failed += 1
                 print(f"  FAILED: {e}", flush=True)
 
-    manifest = {"base_note": "Serve with: cd media && python3 -m http.server 8788", "series": []}
-    for idx, s in enumerate(catalog["series"]):
+    manifest = {
+        "base_note": "Serve with: cd media && python3 -m http.server 8788",
+        "catalogue": str(CATALOG.relative_to(ROOT)),
+        "episodes_generated_per_series": cap or "all",
+        "series": [],
+    }
+    for s in catalog["series"]:
+        gen = s["episodes"] if cap is None else s["episodes"][:cap]
         eps = [{
             "number": ep["number"],
+            "title": ep.get("title") or f"Episode {ep['number']}",
             "is_free": ep["is_free"],
             "coin_price": ep["coin_price"],
-            "duration_ms": episode_duration(ep["number"]) * 1000,
+            "is_cliff": ep.get("is_cliff", False),
+            "duration_ms": episode_duration(ep) * 1000,
             "source": f"{s['slug']}/e{ep['number']:03d}/source.mp4",
             "hls_master": f"{s['slug']}/e{ep['number']:03d}/hls/master.m3u8",
-        } for ep in s["episodes"]]
-        manifest["series"].append({"slug": s["slug"], "title": s["title"], "episodes": eps})
+        } for ep in gen]
+        manifest["series"].append({
+            "slug": s["slug"],
+            "title": s["title"],
+            "tagline": s.get("tagline"),
+            "language": s["primary_language"],
+            "genres": s["genres"],
+            "content_rating": s["content_rating"],
+            "episode_count": s["episode_count"],
+            "episodes_available": len(eps),
+            "cover_9x16": f"{s['slug']}/cover_9x16.jpg",
+            "cover_16x9": f"{s['slug']}/cover_16x9.jpg",
+            "episodes": eps,
+        })
     (MEDIA / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(f"Done: {done} ok, {failed} failed. Manifest at media/manifest.json", flush=True)
 

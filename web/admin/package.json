@@ -1,0 +1,25 @@
+{
+  "name": "katha-admin",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Katha admin dashboard — React 19 + Vite + TypeScript. Talks to admin-api (/admin/v1) with a static mock fallback.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
+  }
+}

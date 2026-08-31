@@ -9,7 +9,9 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from katha_domain import catalog
+from .routers import auth as auth_router
 from .routers import catalog as catalog_router
+from .routers import engagement as engagement_router
 from .routers import playback as playback_router
 from .routers import wallet as wallet_router
 
@@ -20,7 +22,9 @@ app = FastAPI(
                 "computes no prices or entitlements.",
 )
 
+app.include_router(auth_router.router)
 app.include_router(catalog_router.router)
+app.include_router(engagement_router.router)
 app.include_router(playback_router.router)
 app.include_router(wallet_router.router)
 

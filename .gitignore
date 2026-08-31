@@ -45,3 +45,7 @@ secrets/
 infra/**/.terraform/
 *.tfstate
 *.tfstate.*
+
+# SQLite dev databases
+*.db
+*.db-journal
