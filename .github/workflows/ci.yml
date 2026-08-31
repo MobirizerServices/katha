@@ -6,9 +6,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
-      - run: cd backend && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python "fastapi>=0.115" "uvicorn[standard]" "pydantic>=2" httpx pytest
-      - run: cd backend && PYTHONPATH=packages/ledger .venv/bin/python -m pytest packages/ledger/tests -q
-      - run: cd backend && PYTHONPATH=packages/ledger:packages/domain:services/core-api .venv/bin/python -m pytest services/core-api/tests -q
+      - run: cd backend && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python "fastapi>=0.115" "uvicorn[standard]" "pydantic>=2" httpx sqlalchemy aiosqlite pyjwt pytest pytest-cov
+      - name: backend tests + coverage gate (>=95%)
+        run: cd backend && .venv/bin/python -m pytest
       - name: contract drift gate
         run: cd backend && PYTHONPATH=packages/ledger:packages/domain:services/core-api .venv/bin/python -c "import json;from app.main import app;cur=open('../contracts/openapi/core-api.json').read();new=json.dumps(app.openapi(),indent=2);exit(0 if cur==new else print('OpenAPI drift: run make openapi') or 1)"
   ios:

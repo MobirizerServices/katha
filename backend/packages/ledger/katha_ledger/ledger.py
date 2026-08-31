@@ -120,11 +120,16 @@ class Ledger:
         idempotency_key: str,
         created_at: str,
         source: str = "unlock",
+        total_cost: int | None = None,
     ) -> UnlockResult:
         """Unlock one or more episodes atomically. Bundle = many episodes, one debit.
 
         Skips episodes already entitled (idempotent at the episode level too), so a
         retried bundle unlock never double-charges. Bonus coins are spent first.
+
+        `total_cost` charges an EXACT total for the set (used by bundle unlock-all so
+        the charge equals the advertised discounted price, not a per-episode rounding).
+        When omitted, cost = price_per_episode × episodes actually unlocked.
         """
         if idempotency_key in self._by_key:
             original = self._by_key[idempotency_key]
@@ -139,7 +144,12 @@ class Ledger:
             raise BalanceNegative("settle negative balance before unlocking")
 
         to_unlock = [e for e in episode_ids if (user_id, e) not in self._entitlements]
-        cost = price_per_episode * len(to_unlock)
+        if not to_unlock:
+            cost = 0
+        elif total_cost is not None:
+            cost = total_cost
+        else:
+            cost = price_per_episode * len(to_unlock)
         if cost == 0:
             # Everything already owned — no-op, return existing entitlements.
             ents = [self._entitlements[(user_id, e)] for e in episode_ids]

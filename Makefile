@@ -15,13 +15,16 @@ help:
 setup:
 	cd backend && uv venv --python 3.12 .venv
 	cd backend && uv pip install --python .venv/bin/python \
-		"fastapi>=0.115" "uvicorn[standard]" "pydantic>=2" httpx pytest
+		"fastapi>=0.115" "uvicorn[standard]" "pydantic>=2" httpx \
+		sqlalchemy aiosqlite pyjwt pytest pytest-cov
 
 test: test-backend test-ios
 
+# Backend tests WITH the coverage gate (fails under 95%). Config in backend/pytest.ini.
 test-backend:
-	cd backend && PYTHONPATH=packages/ledger .venv/bin/python -m pytest packages/ledger/tests -q
-	cd backend && PYTHONPATH=$(PP:backend/%=%) .venv/bin/python -m pytest services/core-api/tests -q
+	cd backend && .venv/bin/python -m pytest
+
+cov: test-backend    # alias — coverage report is always part of the backend run
 
 test-ios:
 	cd ios/KathaKit && swift test

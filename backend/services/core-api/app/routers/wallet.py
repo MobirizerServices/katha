@@ -102,13 +102,15 @@ def unlock_all(slug: str, req: UnlockRequest, user: str = Depends(current_user))
         raise HTTPException(status_code=404, detail="series not found")
     locked = [catalog.episode_id(slug, n)
               for n in range(series.free_episode_count + 1, series.episode_count + 1)]
-    remaining = series.episode_count - series.free_episode_count
-    bundle_total = catalog.bundle_price(series, remaining)
-    per_ep = bundle_total // max(1, len(locked))   # discounted effective price
+    # Charge the EXACT advertised bundle price for the episodes not already owned,
+    # so what the paywall showed equals what the ledger debits (no per-episode rounding).
+    not_owned = [e for e in locked if not store.ledger.is_entitled(user, e)]
+    bundle_total = catalog.bundle_price(series, len(not_owned))
     try:
-        res = store.ledger.unlock(user, locked, price_per_episode=per_ep, reference_type="bundle",
-                                  reference_id=slug, idempotency_key=req.idempotency_key,
-                                  created_at=CLOCK, source="bundle")
+        res = store.ledger.unlock(user, locked, price_per_episode=series.episode_coin_price,
+                                  reference_type="bundle", reference_id=slug,
+                                  idempotency_key=req.idempotency_key, created_at=CLOCK,
+                                  source="bundle", total_cost=bundle_total)
     except InsufficientCoins as e:
         raise HTTPException(status_code=402, detail=str(e))
     return UnlockResponse(episode_ids=locked, spent_bonus=res.spent_bonus,
