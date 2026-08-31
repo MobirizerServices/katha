@@ -18,16 +18,23 @@ setup:
 		"fastapi>=0.115" "uvicorn[standard]" "pydantic>=2" httpx \
 		sqlalchemy aiosqlite pyjwt pytest pytest-cov
 
-test: test-backend test-ios
+# All surfaces, each with an enforced >=95% coverage gate.
+test: test-backend test-web test-ios
 
 # Backend tests WITH the coverage gate (fails under 95%). Config in backend/pytest.ini.
 test-backend:
 	cd backend && .venv/bin/python -m pytest
 
-cov: test-backend    # alias — coverage report is always part of the backend run
+# Web coverage gates (Vitest thresholds in each vitest.config.ts; exit non-zero < 95%).
+test-web:
+	cd web/site && npm run coverage
+	cd web/admin && npm run coverage
 
+# iOS coverage gate (swift test --enable-code-coverage + llvm-cov; fails < 95%).
 test-ios:
-	cd ios/KathaKit && swift test
+	cd ios/KathaKit && ./coverage.sh
+
+cov: test    # alias — every surface's run prints and gates its coverage
 
 api:
 	cd backend && PYTHONPATH=$(PP:backend/%=%) .venv/bin/python -m uvicorn app.main:app --reload --port 8799

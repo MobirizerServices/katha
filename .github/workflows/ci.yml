@@ -15,4 +15,22 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-      - run: cd ios/KathaKit && swift test
+      - name: iOS KathaKit tests + coverage gate (>=95%)
+        run: cd ios/KathaKit && ./coverage.sh
+  web-site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: cd web/site && npm install && npm run build
+      - name: web/site tests + coverage gate (>=95%)
+        run: cd web/site && npm run coverage
+  web-admin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: web/admin tests + coverage gate (>=95%)
+        run: cd web/admin && npm install && npm run coverage

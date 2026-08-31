@@ -49,3 +49,9 @@ infra/**/.terraform/
 # SQLite dev databases
 *.db
 *.db-journal
+
+# Coverage output
+coverage/
+.nyc_output/
+*.profdata
+*.profraw

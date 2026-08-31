@@ -37,7 +37,7 @@ const INITIAL: WalletState = {
   unlocked: {},
 };
 
-interface WalletCtx extends WalletState {
+export interface WalletCtx extends WalletState {
   balance: number;
   ready: boolean;
   signIn: (phone: string) => void;
