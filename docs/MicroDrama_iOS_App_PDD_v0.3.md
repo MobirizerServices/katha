@@ -4,8 +4,8 @@
 |---|---|
 | **Product** | India-first micro-drama streaming app — native iOS (SwiftUI) · FastAPI backend · Next.js web · React admin · LangGraph AI platform |
 | **Monetization** | Coin unlock (pay per episode), consumable in-app purchase |
-| **Version / Status** | v0.3 — draft for review (adds content strategy, growth engine, design depth, iOS-native features, trust & safety, SRE, QA, data, financial model, support, governance, legal pack) |
-| **Date** | 31 August 2026 |
+| **Version / Status** | v0.3.2 — v0.3.1 review fixes + build-status appendix (Appendix D): the v1 product surface is implemented and tested |
+| **Date** | 2 September 2026 (v0.3: 31 August 2026) |
 | **Owners** | Product (doc owner) · Design · iOS Eng · Backend Eng · Web Eng · AI/ML Eng · Head of Content · Growth · Data · SRE · Legal/Finance |
 
 > "Katha" (story) is a placeholder. Run a trademark and App Store name search before using any name.
@@ -1440,3 +1440,24 @@ Linear or Jira using the P0/P1/P2 tags from this document; architecture decision
 - **v0.3 (31 Aug 2026):** added §23 content strategy and production ops, §24 growth engine, §25 design depth (brand, motion/haptics, component library, remaining screens, localization, accessibility, research), §26 iOS-native delight, §27 trust/safety/fraud, §28 reliability and SRE, §29 QA strategy, §30 data platform, §31 financial model, §32 support operations, §33 team and governance, §34 legal/IP/insurance pack; updated exec summary, roadmap parallel tracks, team pointer, risks 16–19 and decisions 14–17.
 - **v0.2 (31 Aug 2026):** backend changed to FastAPI-only (Django removed); added §21 web surfaces (marketing landing page, series/episode pages with deep links and SEO, web coin store with UPI, React admin dashboard) and §22 AI platform on LangGraph (writers' room, personalization, subtitles/dubbing, support and moderation); updated scope (§5), architecture (§12), data model and APIs (§12.4–12.5b), events (§13), compliance (§15), roadmap now 16 weeks (§16), team and costs (§17), risks (§18) and decisions (§19).
 - **v0.1 (31 Aug 2026):** initial draft.
+
+---
+
+## Appendix D — Build status (2 September 2026)
+
+What this document specifies versus what the repo actually runs. Everything below is implemented, coverage-gated and end-to-end verified (see the SAD §15 for the engineering detail; the README for run commands).
+
+| PDD area | Status |
+|---|---|
+| §7–§9 content model, coin economy, key flows | **Built.** 14 owned originals (Content Bible) served by core-api; 10 free episodes → 30-coin unlocks, bonus-first spend, exact 25% bundle charge, +10% web bonus — all through the append-only ledger, idempotent, proven on iOS (physical device), web and admin. |
+| §10–§11 iOS screens & architecture | **Built.** All 23 design-board screens incl. player states (capture shield works on hardware), paywall with auto-unlock, wallet/ledger, check-in, parental PIN, episode-drop notifications (§14/3.6). 12-flow XCUITest suite green on simulator + iPhone 16. |
+| §12 backend | **Built** as the dev-parity slice: FastAPI core-api (24 paths) + admin-api (51 paths) over one shared ledger DB; JWT auth with per-user token versions ("sign out everywhere"); grievance intake; `/v1/config` with flags, % rollouts and experiment assignments. Payments/OTP/attest remain stubs behind real seams. |
+| §13 analytics & experimentation | **v1 built.** Server-side event emission (paywall/play/purchase/unlock/check-in/watch-time), daily rollups, funnel, revenue split, refund ratio, liability + breakage on the admin Overview; experiment registry with stable hash assignment. ClickHouse pipeline is the scale-out step. |
+| §14 notifications | **Built** (in-app router, drop banner, deep links, provisional-auth path, self-scheduled nudge). APNs server push = deploy-time. |
+| §15/§34 compliance | **Tools built**: IT-Rules grievance queue with 24 h/15 d SLA timers and breach alerts; DPDP export + erasure (PII scrub, ledger retained); rating changes with who/when/why accountability. **Open human item: appoint the named grievance officer before beta.** |
+| §21 web surfaces | **Built.** Landing + series pages, hls.js watch app, UPI store wired to the live ledger; the admin dashboard exceeded its mockup — see §21.5 note below. |
+| §27 trust & fraud | **Rails built**: dual approval + self-approve block, per-agent daily caps, rate limits, step-up auth, risk flags, device records, IP allowlist, hash-verified audit. App Attest/PAT enforcement = deploy-time. |
+| §29 QA | **Exceeded.** 550 unit tests across surfaces (backend 179 @ 100%, admin 218, site 76, KathaKit 77 @ 100%), all coverage-gated (98 lines / 95 branches); OpenAPI drift gates both sides; Playwright + XCUITest e2e. |
+| §22 AI platform · §16 roadmap ops · §24 growth | Scaffold / not started — unchanged from v0.3 plan. |
+
+**§21.5 note:** the built back office covers every module listed there and, beyond the mockup: OIDC sign-in with a provisioned-operators directory, a business analytics board, percentage rollouts, an experiment registry, catalog drafting/pricing/rights levers, DPDP tools, webhook alerting and a tamper-evident audit chain. The 112-finding admin review that drove this is tracked finding-by-finding in the review artifact.

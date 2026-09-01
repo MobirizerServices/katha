@@ -1,61 +1,80 @@
 # Katha
 
-India-first micro-drama streaming platform — native iOS (SwiftUI) · FastAPI backend · Next.js web · React admin · LangGraph AI platform. Coin-unlock monetization (first 10 episodes free, then unlock with coins). See `docs/` for the full PDD, SAD and design mockups.
+India-first micro-drama streaming platform — native iOS (SwiftUI) · FastAPI backend · Next.js web · React admin. Coin-unlock monetization: the first 10 episodes of every series are free, then 30 coins ≈ ₹4.5 per episode, 25% series-bundle discount, +10% bonus on web (UPI) purchases. All money flows through one append-only ledger; clients render server state and never compute a price.
 
-## Status (bootstrap — v0.1)
+`docs/` holds the PDD, SAD, design mockups, content bible and ops guides — see the doc map below.
 
-This repo is bootstrapped with a **verified backend money-core** and scaffolds for every surface. What actually runs and is tested today:
+## Status (2 September 2026)
 
-| Area | State | Verify |
+Five surfaces built, tested, coverage-gated and verified end-to-end. The 112-finding admin review is fully implemented (`docs/` + the review artifact track it per finding).
+
+| Surface | What runs | Tests · coverage (gate) |
 |---|---|---|
-| `backend/packages/ledger` — append-only coin ledger (PDD §12.7) | **Working, 14 tests pass** | `make test-backend` |
-| `backend/services/core-api` — catalog, playback auth, wallet, IAP, web orders, unlock | **Working, 10 API tests pass, boots on uvicorn** | `make api` then `curl :8799/health` |
-| `contracts/openapi/core-api.json` — 12 paths | **Generated from the app** | `make openapi` |
-| `ios/KathaKit` — pure coin-math (optimistic UI) | **Working, 5 Swift tests pass** | `make test-ios` |
-| `web/site` (Next.js), `web/admin` (React) | Scaffold — designs in `docs/*.html` | `make web` |
-| `admin-api`, `ai-service`, `workers`, `alembic`, `infra/terraform` | Scaffold (health stubs / READMEs) | — |
+| `backend` — core-api :8799 + admin-api :8800 over one shared ledger DB | catalog/playback auth/wallet/IAP/web orders/unlocks · events pipeline · grievances · full back-office API (analytics, approvals, refunds, DPDP, catalog levers, experiments) | **179 · 100%** (≥98) |
+| `web/admin` — React 19 + Vite back office | OIDC sign-in (dev IdP or Google Workspace), business analytics board, users/money desk, catalog lifecycle + drafts, rollouts & experiments, hash-chained audit, grievance queue | **218 · 98.9 / 95.6 / 97.2** (98/95/96) + **2 Playwright e2e** |
+| `web/site` — Next.js 15 public site + web watch app | landing + series pages, hls.js player, UPI coin store wired to the live ledger | **76 · 98.9 / 95.1 / 97.9** (98/95/96) |
+| `ios/KathaKit` + `ios/KathaApp` | all 23 design-board screens: feed, player (capture shield, auto-unlock), paywall, wallet, check-in, notifications, parental PIN | **77 · 100%** (≥98) + **12-flow XCUITest suite** (green on simulator *and* a physical iPhone 16) |
+| `contracts/` | OpenAPI: core-api **24 paths**, admin-api **51 paths** — drift-gated in CI on both server and client | generator: `tools/gen_admin_types.py` |
 
-The money loop is real end-to-end: buy a pack → coins credited → unlock E11 → playback returns a signed URL — all through the pure ledger, idempotent, bonus-spent-first, with the +10% web bonus and 25% bundle discount matching the mockups.
+Proven live, not just in tests: guest → buy pack → unlock E11 → HLS plays (iOS device + web browser); admin adjusts a wallet → visible in the app without restart; a series drafted in the panel → published → served → its paywall charges the drafted price; OIDC sign-in with server-side roles; the audit chain flags tampering.
 
 ## Quick start
 
 ```bash
-make setup      # venv + backend deps (needs uv)
-make test       # backend (24 tests) + iOS (5 tests)
-make api        # core-api on :8799 — serves the 6 crawled seed series
-make openapi    # regenerate the OpenAPI contract
+make setup        # venv + backend deps (needs uv)
+make test         # every surface, every coverage gate (backend + web + iOS)
+make api          # core-api on :8799 (serves the 14-series owned catalog + media)
+make admin        # admin-api on :8800 (OIDC dev IdP; shared ledger DB with core-api)
+make test-e2e     # Playwright money-path suite (system Chrome, throwaway servers)
+make seed-media   # regenerate the placeholder HLS dev catalog (gitignored)
 ```
+
+Admin panel: `cd web/admin && npx vite --port 5174` → http://localhost:5174 → sign in as `ops@katha.dev` (bootstrap admin; provision others in Roles & access). Web app: `cd web/site && npm run dev` → :3000. iOS: `make ios-run` (or open the generated Xcode project; regenerate with `ruby ios/generate_xcodeproj.rb` after adding source files).
+
+Cross-service dev runs share one SQLite ledger: start both APIs with
+`KATHA_PERSIST=1 KATHA_DB_URL=sqlite+aiosqlite:////tmp/katha_shared.db` (the Make targets do).
 
 ## Layout
 
 ```
 katha/
-├── backend/                    # Python 3.12 · FastAPI · modular monolith, 4 deployables, one Postgres (ADR-002)
+├── backend/
 │   ├── packages/
-│   │   ├── ledger/             # append-only coin ledger — pure, dependency-free, 100%-tested (the money spine)
-│   │   ├── domain/             # Pydantic schemas + catalog/pricing (source for OpenAPI → clients)
-│   │   └── infra/              # db/cache/queue/storage/cdn adapters (stubs in v0.1)
+│   │   ├── ledger/       # append-only coin ledger — pure, dependency-free (the money spine)
+│   │   ├── domain/       # schemas, catalog/pricing, feature flags + % rollouts, real-time utils
+│   │   └── infra/        # SQLite/SQLAlchemy persistence: shared store, events, devices,
+│   │                     #   hash-chained audit, KV control plane, persistent ledger
 │   ├── services/
-│   │   ├── core-api/           # public mobile + web API  ← working slice
-│   │   ├── admin-api/          # back-office API (RBAC + audit, OIDC)   [scaffold]
-│   │   ├── ai-service/         # LangGraph graphs + model gateway       [scaffold]
-│   │   └── workers/            # Celery families: media/money/comms/feed/ai/housekeeping [scaffold]
-│   └── alembic/                # single migration history
-├── contracts/                  # OpenAPI 3.1 specs + event JSON-Schema registry — SOURCE OF TRUTH for clients
-│   ├── openapi/core-api.json   # generated from the app in CI (drift-gated)
-│   └── events/                 # event schemas (e.g. paywall_view)
+│   │   ├── core-api/     # public API: catalog (+ panel overrides/drafts), playback auth,
+│   │   │                 #   wallet/IAP/UPI, engagement, grievance intake, /v1/config
+│   │   └── admin-api/    # back office: OIDC RP (+ dev IdP), RBAC directory, analytics,
+│   │                     #   dual-approval money desk, DPDP tools, experiments, audit
+│   └── pytest.ini        # one command, one coverage gate (--cov-fail-under=98)
+├── contracts/openapi/    # committed API contracts; drift breaks CI on both sides
 ├── ios/
-│   └── KathaKit/               # pure Swift value logic (SwiftPM) — the app's feature modules build on this
+│   ├── KathaKit/         # pure Swift coin-math + typed client (SwiftPM, coverage.sh gate)
+│   ├── KathaApp/         # the SwiftUI app (project generated by generate_xcodeproj.rb)
+│   └── KathaAppUITests/  # XCUITest e2e — every screen incl. the real unlock tap
 ├── web/
-│   ├── site/                   # Next.js 15 — public site + logged-in web watch app (two modes, SAD §5.5)
-│   └── admin/                  # React 19 + Vite admin dashboard (talks only to admin-api)
-├── infra/terraform/            # AWS ap-south-1 (ECS, RDS, Redis, SQS, S3+CloudFront, Secrets)  [scaffold]
-├── tools/                      # dev/build scripts (e.g. placeholder-media generator)
-├── docs/                       # PDD, SAD, ADRs, design mockups, pilot brief, seed catalog
-├── media/                      # generated HLS dev catalog — GITIGNORED (regenerate: make seed-media)
-├── Makefile · docker-compose.yml · .github/workflows/ci.yml
+│   ├── site/             # Next.js 15 — public pages + web watch app + UPI store
+│   └── admin/            # React 19 + Vite back office (+ e2e/ Playwright suite)
+├── tools/                # catalog builder, cover/HLS placeholder generators, contract codegen
+├── docs/                 # see the doc map
+└── media/                # generated HLS dev catalog — GITIGNORED (make seed-media)
 ```
 
-**Conventions.** Contracts-first: Swift/TS clients are generated from `contracts/` (gitignored, regenerated in CI). All business rules (price, entitlement, ranking) live server-side; clients render state. Money is an append-only ledger; balances are projections. The generated `media/` HLS catalog and all secrets are never committed. Android (Phase 5) slots in as `android/` beside `ios/`, a new client of the same `contracts/`.
+## Doc map
 
-> The canonical structure was designed via a multi-agent workflow (proposals → synthesis → completeness critique); this README reflects the built tree.
+| Doc | What it is |
+|---|---|
+| `docs/MicroDrama_iOS_App_PDD_v0.3.md` | Product design & requirements (34 sections + build-status appendix) |
+| `docs/Katha_Software_Architecture_Document_v0.1.md` | Architecture: C4 views, ledger design, flows, as-built addendum |
+| `docs/Katha_Admin_OIDC_Setup_v0.1.md` | Admin sign-in: dev IdP today, Google Workspace as an env swap |
+| `docs/Katha_Prod_Security_Posture_v0.1.md` | Secrets inventory/rotation, VPN + IP-allowlist posture |
+| `docs/Katha_Content_Bible_v0.1.md` | The owned launch slate: 14 originals, story machine, E1–E12 outlines |
+| `docs/Katha_Content_Sourcing_Playbook_v0.1.md` · `Katha_Copy_Deck_v0.1.md` · `Katha_Pilot_Episode_Brief_v0.1.md` | Content ops, all user-facing strings, pilot brief |
+| `docs/Katha_Repo_Structure_v0.1.md` | Canonical repo layout and conventions |
+| `docs/*.html` | Design mockups (iOS, website, web app, admin) — historical reference; the built surfaces have superseded them |
+| `docs/katha-catalog.json` | Machine-readable owned catalog (source for the backend seed + media tools) |
+
+**Conventions.** Contracts-first (committed OpenAPI, drift-gated). All business rules live server-side. Money is an append-only ledger; balances are projections; every admin mutation is audited into a hash-verified chain. Placeholder media only — never third-party video. `media/` and secrets are never committed.

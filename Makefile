@@ -1,13 +1,16 @@
 # Katha monorepo — dev orchestration. Requires: uv (Python), node/npm (web), swift (iOS).
 PYBIN := backend/.venv/bin/python
-PP := backend/packages/ledger:backend/packages/domain:backend/services/core-api
+PP := backend/packages/ledger:backend/packages/domain:backend/packages/infra:backend/services/core-api
 
-.PHONY: help setup test test-backend test-ios api openapi seed-media web fmt clean
+.PHONY: help setup test test-backend test-ios test-e2e api admin openapi gen-contracts seed-media web fmt clean
 
 help:
 	@echo "setup        create venv + install backend deps"
 	@echo "test         run all verifiable tests (backend + iOS)"
-	@echo "api          run core-api locally on :8799"
+	@echo "api          run core-api locally on :8799 (persist mode, shared DB)"
+	@echo "admin        run admin-api on :8800 (OIDC dev IdP, shared DB)"
+	@echo "test-e2e     Playwright money-path suite (system Chrome)"
+	@echo "gen-contracts regenerate OpenAPI contracts + the client path inventory"
 	@echo "openapi      regenerate contracts/openapi/core-api.json from the app"
 	@echo "seed-media   regenerate the placeholder HLS dev catalog (gitignored)"
 	@echo "test-ios     swift test the KathaKit package"
@@ -16,21 +19,21 @@ setup:
 	cd backend && uv venv --python 3.12 .venv
 	cd backend && uv pip install --python .venv/bin/python \
 		"fastapi>=0.115" "uvicorn[standard]" "pydantic>=2" httpx \
-		sqlalchemy aiosqlite pyjwt pytest pytest-cov
+		sqlalchemy aiosqlite "pyjwt>=2.9" "cryptography>=43" pytest pytest-cov
 
-# All surfaces, each with an enforced >=95% coverage gate.
+# All surfaces, each with an enforced coverage gate (98 lines / 95 branches).
 test: test-backend test-web test-ios
 
-# Backend tests WITH the coverage gate (fails under 95%). Config in backend/pytest.ini.
+# Backend tests WITH the coverage gate (fails under 98%). Config in backend/pytest.ini.
 test-backend:
 	cd backend && .venv/bin/python -m pytest
 
-# Web coverage gates (Vitest thresholds in each vitest.config.ts; exit non-zero < 95%).
+# Web coverage gates (Vitest thresholds in each vitest.config.ts).
 test-web:
 	cd web/site && npm run coverage
 	cd web/admin && npm run coverage
 
-# iOS coverage gate (swift test --enable-code-coverage + llvm-cov; fails < 95%).
+# iOS coverage gate (swift test --enable-code-coverage + llvm-cov; fails < 98%).
 test-ios:
 	cd ios/KathaKit && ./coverage.sh
 
@@ -46,8 +49,27 @@ ios-run:
 
 cov: test    # alias — every surface's run prints and gates its coverage
 
+SHARED_ENV := KATHA_PERSIST=1 KATHA_DB_URL=sqlite+aiosqlite:////tmp/katha_shared.db
+
 api:
-	cd backend && PYTHONPATH=$(PP:backend/%=%) .venv/bin/python -m uvicorn app.main:app --reload --port 8799
+	cd backend && $(SHARED_ENV) PYTHONPATH=$(PP:backend/%=%) \
+		.venv/bin/python -m uvicorn app.main:app --port 8799
+	# NOTE: no --reload — restart after backend edits (matches how it is run in dev)
+
+admin:
+	cd backend && $(SHARED_ENV) KATHA_ADMIN_AUTH=oidc \
+		PYTHONPATH="packages/domain:packages/ledger:packages/infra:services/admin-api:services/core-api" \
+		.venv/bin/python -m uvicorn admin_app.main:app --port 8800
+
+# Browser e2e for the admin money paths (#108): boots throwaway servers on
+# isolated ports; uses the system Chrome, no browser download.
+test-e2e:
+	cd web/admin && npm run test:e2e
+
+# Regenerate BOTH committed contracts + the client path inventory (#107).
+# CI drift gates fail until this is run after any route change.
+gen-contracts: openapi
+	backend/.venv/bin/python tools/gen_admin_types.py
 
 openapi:
 	cd backend && PYTHONPATH=$(PP:backend/%=%) .venv/bin/python -c \

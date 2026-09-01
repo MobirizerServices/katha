@@ -1,6 +1,14 @@
 # Katha — Canonical Monorepo Structure (design reference)
 
-> Produced by a multi-agent design workflow (4 independent proposals → synthesis → adversarial completeness critique → finalized tree). This is the **target** structure; the current repo is a working bootstrap that follows it in spirit. Adopt refinements incrementally.
+> Produced by a multi-agent design workflow (4 independent proposals → synthesis → adversarial completeness critique → finalized tree). This is the **target** structure; the built repo follows it in spirit — the real tree lives in the root `README.md`. Adopt remaining refinements incrementally.
+
+## Adoption status (2 September 2026)
+
+**Adopted and running:** the surface split (backend packages/services, contracts/, ios/ with a pure kit + generated app project, web/site + web/admin, tools/, docs/); contracts-first with committed OpenAPI **and two-sided drift gates** (`tools/gen_admin_types.py` + a backend contract test + a client path-inventory test — a stronger form of the codegen rule); the universal Makefile (`setup/test/api/admin/test-e2e/gen-contracts/seed-media`); per-surface coverage gates (98 lines / 95 branches) instead of the plain `test` target; the regenerable dev media catalog (still at `media/`, gitignored — the `.dev-media/` rename and `git rm --cached` cutover are moot since media was never committed).
+
+**Deliberately different in the dev build:** one shared SQLite ledger DB with an `admin_kv` control-plane table stands in for postgres/redis (SAD ADR-016 — same seams, engine swap at deploy); no docker-compose infra needed yet; admin e2e lives at `web/admin/e2e/` (Playwright) rather than a root `e2e/`.
+
+**Not yet adopted:** `mise.toml`, `CONTRIBUTING.md`/`CODEOWNERS`, `.env.example`, pre-commit config, the `seed/` top-level move (seed JSON lives in `docs/` + the core-api data dir), ai-service/workers beyond scaffolds, `infra/terraform` build-out. One caution learned the hard way: **never gitignore bare `*.ts`** for HLS segments — it silently swallows TypeScript; scope media ignores to the media directory.
 
 ## Folder structure
 

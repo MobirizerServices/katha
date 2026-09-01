@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **System** | India-first micro-drama platform: iOS app (SwiftUI), web (Next.js), admin (React), Python/FastAPI backend, LangGraph AI platform |
-| **Version / Status** | v0.1 — draft for engineering review |
-| **Date** | 31 August 2026 |
+| **Version / Status** | v0.2 — v0.1 design + the as-built record of the working system (§15) |
+| **Date** | 2 September 2026 (v0.1: 31 August 2026) |
 | **Source of requirements** | PDD v0.3 (product, monetization, compliance, roadmap). This document does not restate requirements; it defines how the system satisfies them. |
 | **Owners** | Engineering lead (doc owner) · Backend lead · iOS lead · Web lead · AI/ML lead · SRE |
 
@@ -16,7 +16,7 @@ This is the engineering-facing description of the system: its boundaries, the pi
 
 Scope: everything that ships in v1 (PDD §5.1) plus the structural hooks for P1 features (web coin store, AI dubbing, recommendations, App Clip, widgets). Android is out of scope, but the backend is designed so that an Android client is a new consumer of the same contracts, not a new backend.
 
-Companion documents (to be produced next): OpenAPI contracts (core-api, admin-api, ai-service), Data Model & Migration Plan, iOS Technical Design, Service Design Notes, Infrastructure & Environments, Security & Threat Model, AI Platform Design, Event Tracking Plan, Test Strategy, ADR set, Sprint 0 plan.
+Companion documents that now exist: OpenAPI contracts (`contracts/openapi/` — core-api 24 paths, admin-api 51 paths, drift-gated in CI), admin sign-in guide (`Katha_Admin_OIDC_Setup_v0.1.md`), production security posture (`Katha_Prod_Security_Posture_v0.1.md`), repo structure (`Katha_Repo_Structure_v0.1.md`). Still to produce: iOS Technical Design, full Infrastructure & Environments, AI Platform Design, formal Threat Model. §15 records where the working system (the dev build shipped 1–2 Sep 2026) implements, simplifies or defers this design.
 
 ---
 
@@ -459,18 +459,18 @@ Hourly `precompute-candidates` writes ranked candidates per (language, segment) 
 
 ### 8.1 Identity, authentication and sessions
 - **Viewers**: guest identity (device install id → `user` row) upgraded to phone OTP or Sign in with Apple; guest data merged on login. Access JWT 15 minutes (RS256, `kid` rotation), refresh token 30 days stored in Keychain, refresh rotation with reuse detection; server-side revocation list in Redis. Device records with remote logout.
-- **Admin**: Google Workspace OIDC (PKCE) with enforced 2FA at the IdP; 8-hour sessions; re-authentication for sensitive actions; roles mapped from IdP groups to `admin_role`.
+- **Admin**: Google Workspace OIDC (PKCE) with enforced 2FA at the IdP; re-authentication for sensitive actions. *As built (§15.2):* admin-api is itself the OIDC relying party (code + PKCE, RS256/JWKS verification, nonce binding, optional `hd` check) with a built-in dev IdP when no issuer is configured; sessions are stateless HMAC-signed HttpOnly cookies (12 h, SameSite=Lax, CSRF header on mutations); roles resolve on **every request** from a provisioned-operators directory (instant revocation) rather than IdP groups; money actions demand a session younger than 15 min (step-up).
 - **Services**: short-lived service tokens (or mTLS inside the VPC) for core-api/admin-api/workers → ai-service; webhooks verified by signature (Apple JWS, Razorpay HMAC).
 - **Client integrity**: App Attest on auth, unlock, IAP and rewards endpoints; DeviceCheck bits for first-purchase-offer state; Private Access Tokens on the web.
 
 ### 8.2 Authorization
-Viewer authorization is entitlement-based (free flag, `entitlement` rows, parental lock PIN for rated content). Admin authorization is RBAC (Admin, Content Ops, QC/Moderator, Finance, Support, Analyst, Read-only) enforced in admin-api dependencies per route and per action, with dual-approval workflows for money actions above thresholds.
+Viewer authorization is entitlement-based (free flag, `entitlement` rows, parental lock PIN for rated content). Admin authorization is RBAC (Admin, Content Ops, QC/Moderator, Finance, Support, Analyst, Read-only) enforced in admin-api dependencies per route and per action, with dual-approval workflows for money actions above thresholds. *As built:* the permission matrix is served from the same table the routes enforce (`/access/matrix`, so docs cannot drift); self-approval is rejected server-side; per-agent daily adjustment caps and per-actor rate limits back the dual-approval rule; granting the admin role needs a typed confirmation, the last admin cannot be removed, and "sign out all devices" bumps a per-user token version that invalidates every earlier viewer JWT.
 
 ### 8.3 Configuration and feature flags
-`GET /v1/config` returns versioned config (flags, experiment variants, SKUs, pricing defaults, `min_app_version`, ranking weights). Stored in Postgres, cached in Redis, edited in the admin Config module with audit. Kill switches exist for: check-in, referral, offers, web store, AI curation, trailer autoplay, App Attest enforcement (emergency only).
+`GET /v1/config` returns versioned config (flags, experiment variants, SKUs, pricing defaults, `min_app_version`, ranking weights). Stored in Postgres, cached in Redis, edited in the admin Config module with audit. Kill switches exist for: check-in, referral, offers, web store, AI curation, trailer autoplay, App Attest enforcement (emergency only). *As built:* the control plane is a shared KV table (`admin_kv`) both services read — flags carry owner/review-by metadata, guarded flags need a typed confirmation, and every flag supports **percentage rollout** with stable per-user hash bucketing; a thin experiment registry assigns variants the same way and serves them in `config.experiments`; pack prices, per-series pricing, ratings, lifecycle status, episode retitles and `min_app_version` all flow through the same KV and reach clients on core-api's next request.
 
 ### 8.4 Idempotency, errors and rate limiting
-Mutating money endpoints require an `Idempotency-Key` header (or derive one); responses are stored 24 h in Redis keyed by (user, key). Errors follow RFC 9457 problem details with stable `type` codes the iOS app maps to localized copy. Rate limits are enforced at the edge (WAF) and in core-api (Redis token buckets per user, IP and endpoint class).
+Mutating money endpoints require an `Idempotency-Key` header (or derive one); responses are stored 24 h in Redis keyed by (user, key). Errors follow RFC 9457 problem details with stable `type` codes the iOS app maps to localized copy. Rate limits are enforced at the edge (WAF) and in core-api (Redis token buckets per user, IP and endpoint class). *As built:* idempotency is enforced inside the ledger itself (globally-unique keys; replays return the original row); admin-api applies per-actor sliding-window rate limits and per-agent daily coin caps in-app, plus an optional IP allowlist that refuses before auth runs.
 
 ### 8.5 Observability
 OpenTelemetry SDKs in every service (FastAPI, SQLAlchemy, Celery instrumentation) exporting traces, metrics and structured logs with `request_id`, `user_id` (pseudonymous) and `trace_id`; iOS attaches `X-Request-ID` and reports QoE telemetry (start time, stalls, bitrate switches, errors) as events; dashboards per service on golden signals plus business KPIs; alerts only on SLO impact; Sentry for exceptions in iOS, web and Python; public status page.
@@ -613,6 +613,11 @@ ECS autoscaling on request rate (core-api) and queue depth (workers); RDS Multi-
 | ADR-013 | Analytics SaaS vs self-hosted (Mixpanel/Amplitude vs PostHog) | Open |
 | ADR-014 | LLM/ASR/TTS provider matrix and data-residency posture | Open — Phase 0 evals |
 
+| ADR-015 | Admin-api is its own OIDC relying party with stateless signed-cookie sessions and a built-in dev IdP; Google Workspace is pure configuration | Accepted — built |
+| ADR-016 | Dev-parity persistence: both services share one SQLite ledger DB (`KATHA_PERSIST=1`), with the `admin_kv` table as the config control plane; Postgres/Redis replace the engine at deploy time, not the seams | Accepted — built |
+| ADR-017 | Product events are emitted server-side by core-api at observable moments (no client SDK in v1); analytics derive from the event table + the ledger | Accepted — built |
+| ADR-018 | Committed OpenAPI contracts with two-sided drift gates (server test + client path-inventory test) instead of generated client SDKs in v1 | Accepted — built |
+
 Each ADR is a one-page record (context, decision, consequences, alternatives) in `docs/adr/`.
 
 ---
@@ -669,3 +674,28 @@ Tables `snake_case` singular; ids UUIDv7; money in integer minor units; timestam
 - **v0.1.1 (31 Aug 2026):** review fixes — ASVS target raised to Level 2 (§1.1, §8.6); events flow corrected in the container diagram (clients → /v1/events → SQS → inserter → ClickHouse); ClickHouse pinned to a managed offering; admin access layer (Cloudflare Access/VPN) stated in the deployment view; optimistic-unlock reconciliation added to §7.2; scheduler dead-man's-switch added to §9.3; ADR-001/005 flagged as pending PDD §19 confirmation; ADR-012 expanded to cover the playback-auth scheme and multi-CDN failover design; multi-CDN auth risk added to §14.
 
 *End of SAD v0.1. Next documents in the engineering starter pack: OpenAPI contracts → Data Model & Migration Plan → iOS Technical Design → Service Design Notes → Infrastructure & Environments → Security & Threat Model → AI Platform Design → Event Tracking Plan → Test Strategy → ADRs → Sprint 0 plan.*
+
+---
+
+## 15. As-built addendum (v0.2 — the working system, 2 September 2026)
+
+This section records what the running dev build implements. Where it differs from §§1–14, the difference is deliberate: dev-parity substitutions (SQLite for Postgres, in-process for Redis/SQS) keep every *seam* identical so the deploy-time swap changes engines, not architecture.
+
+### 15.1 What runs
+Two FastAPI services over **one shared ledger DB** — core-api (:8799, 24 contract paths) and admin-api (:8800, 51 paths) — plus the Next.js site, the React back office and the SwiftUI app. Verified money loop on every surface: guest → buy pack (IAP stub / UPI stub with the +10% web bonus) → bonus-first unlock → HLS playback with real expiring URLs; an admin wallet adjustment is visible to the app **without restart** (the persistent ledger folds foreign rows by idempotency key on read).
+
+### 15.2 Admin platform (the 112-finding review, all implemented)
+- **Auth**: OIDC RP in admin-api (code+PKCE; RS256 via issuer JWKS; iss/aud/exp/nonce/email_verified/`hd` checks). Built-in dev IdP with the identical verification path; `KATHA_OIDC_ISSUER=https://accounts.google.com` switches to Workspace with zero code change. Stateless HMAC sessions (12 h) + flow-state cookies → multi-instance needs no session store. Roles from the `adminuser:` directory per request; provisioning UI with typed-confirm admin grants and last-admin protection. Step-up: money actions refuse sessions older than 15 min.
+- **Money desk**: server-side user search (SQL filter/sort/page), risk flags, refunds via ledger clawback, DPDP export/erase, dual approval with balance context, daily caps, rate limits.
+- **Governance**: every mutation lands in a **hash-chained audit** (sha256 link per row, actor IP/UA); the chain is re-verified on every read and a raw-SQL tamper flips it to unverified. Annotations attach *beside* rows, never inside. Auth events (login/denial/logout/grant/revoke) share the chain.
+- **Catalog levers**: draft series created in the panel reach the public API only when published; per-series pricing overrides change both the paywall ask and the ledger charge; episode retitles; rights/licence tracking with expiry warnings; live-counts derived from media on disk.
+- **Compliance**: grievance intake on core-api → SLA-timed queue (24 h ack / 15 d resolve) with breach items on the attention rail, mirrored once to a Slack-compatible webhook.
+
+### 15.3 Events and analytics (v1 of §6.6/§13)
+core-api emits server-side events (`paywall_view`, `play_start`, `play_progress` with clamped watch-time deltas, `purchase` with channel, `unlock`, `checkin`, `grievance`) into a shared `event` table — best-effort, never blocking a money path. The admin analytics rollup computes daily buckets, Today/7d/30d windows with period deltas, the paywall→purchase→unlock funnel, revenue split by channel, refund ratio, coin-liability trend and 90-day breakage. ClickHouse/SQS remain the scale-out path (ADR-009); the emission points and event shapes are already fixed.
+
+### 15.4 Contracts and quality gates
+Committed OpenAPI for both services; `tools/gen_admin_types.py` regenerates the admin contract **and** a client-side path inventory; CI fails on drift from either side (a backend test compares the live app to the committed contract; a frontend test parses the client and rejects calls to unknown paths). Coverage gates enforced per surface: backend **100%** (179 tests, gate 98), web/admin **98.9/95.6/97.2** (218 tests, gates 98/95/96) plus a Playwright money-path e2e in real Chrome, web/site **98.9/95.1/97.9** (76 tests), KathaKit **100%** (77 tests, gate 98) plus a 12-flow XCUITest suite green on simulator and a physical iPhone 16.
+
+### 15.5 Deferred to deploy time
+Postgres + Redis + SQS/ClickHouse engine swaps; KMS/secret-manager and VPN/IP-allowlist activation (documented in `Katha_Prod_Security_Posture_v0.1.md`); real Apple/Razorpay verification behind the existing stubs; CDN signing (ADR-012); the ai-service and workers remain scaffolds.
