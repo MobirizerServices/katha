@@ -21,6 +21,12 @@ struct SeriesView: View {
         }
         .background(Katha.Color.bg)
         .navigationBarTitleDisplayMode(.inline)
+        // At the view level, not inside the LazyVGrid, so every episode tap navigates.
+        .navigationDestination(for: EpisodeRoute.self) { route in
+            PlayerView(slug: route.slug, number: route.number,
+                       bundleDiscountPct: detail?.bundleDiscountPct ?? 25,
+                       remainingLocked: detail.map { $0.episodeCount - $0.freeEpisodeCount } ?? 0)
+        }
         .task { await load() }
     }
 
@@ -77,11 +83,6 @@ struct SeriesView: View {
             }
         }
         .padding(.horizontal, Katha.Spacing.lg)
-        .navigationDestination(for: EpisodeRoute.self) { route in
-            PlayerView(slug: route.slug, number: route.number,
-                       bundleDiscountPct: d.bundleDiscountPct,
-                       remainingLocked: d.episodeCount - d.freeEpisodeCount)
-        }
     }
 
     private func load() async {

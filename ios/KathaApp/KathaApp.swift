@@ -27,7 +27,9 @@ final class AppModel {
     var loadError: String?
     var isLoading = false
 
-    init(baseURL: URL = URL(string: "http://localhost:8799")!) {
+    // 127.0.0.1 (not "localhost"): core-api binds IPv4 only, and "localhost"
+    // resolves to IPv6 ::1 first on the simulator → a refused connection first.
+    init(baseURL: URL = URL(string: "http://127.0.0.1:8799")!) {
         self.api = KathaAPIClient(baseURL: baseURL, authToken: "dev-user")
     }
 

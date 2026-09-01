@@ -10,6 +10,11 @@ struct FeedView: View {
             content
                 .background(Katha.Color.bg)
                 .navigationTitle("Katha")
+                // Registered at the stack level (NOT inside the LazyVStack, where
+                // SwiftUI would ignore it) so every poster tap can navigate.
+                .navigationDestination(for: String.self) { slug in
+                    SeriesView(slug: slug)
+                }
                 .toolbarBackground(Katha.Color.bg, for: .navigationBar)
         }
         .task { if model.feed.rows.isEmpty { await model.loadHome() } }
@@ -108,9 +113,6 @@ private struct FeedRow: View {
                 }
                 .padding(.horizontal, Katha.Spacing.lg)
             }
-        }
-        .navigationDestination(for: String.self) { slug in
-            SeriesView(slug: slug)
         }
     }
 }
