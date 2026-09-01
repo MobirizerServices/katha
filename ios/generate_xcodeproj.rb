@@ -45,9 +45,16 @@ target.build_configurations.each do |cfg|
   s['SWIFT_VERSION'] = '5.0'
   s['MARKETING_VERSION'] = '1.0.0'
   s['CURRENT_PROJECT_VERSION'] = '1'
-  s['CODE_SIGNING_ALLOWED'] = 'NO'
-  s['CODE_SIGNING_REQUIRED'] = 'NO'
-  s['CODE_SIGN_IDENTITY'] = ''
+  if ENV['KATHA_TEAM'] && !ENV['KATHA_TEAM'].empty?
+    # Real-device build: automatic signing under the given team.
+    s['CODE_SIGN_STYLE'] = 'Automatic'
+    s['DEVELOPMENT_TEAM'] = ENV['KATHA_TEAM']
+    s['CODE_SIGN_IDENTITY'] = 'Apple Development'
+  else
+    s['CODE_SIGNING_ALLOWED'] = 'NO'
+    s['CODE_SIGNING_REQUIRED'] = 'NO'
+    s['CODE_SIGN_IDENTITY'] = ''
+  end
   s['ENABLE_PREVIEWS'] = 'YES'
   s['ASSETCATALOG_COMPILER_APPICON_NAME'] = ''
   s['SWIFT_EMIT_LOC_STRINGS'] = 'NO'

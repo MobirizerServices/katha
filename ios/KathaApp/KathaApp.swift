@@ -115,10 +115,15 @@ final class AppModel {
                 UserDefaults.standard.removeObject(forKey: key)
             }
         }
-        // 127.0.0.1 (not "localhost"): core-api binds IPv4 only, and "localhost"
-        // resolves to IPv6 ::1 first on the simulator → a refused connection first.
+        // Base URL resolution: test env override → Info.plist KathaAPIBase (set
+        // to the dev Mac's LAN IP for real-device builds — 127.0.0.1 would be
+        // the phone itself) → simulator default. core-api binds IPv4, so never
+        // "localhost" (the simulator resolves ::1 first and gets refused).
+        let plistBase = (Bundle.main.object(forInfoDictionaryKey: "KathaAPIBase") as? String)
+            .flatMap(URL.init(string:))
         let base = baseURL
             ?? env["KATHA_API_BASE"].flatMap(URL.init(string:))
+            ?? plistBase
             ?? URL(string: "http://127.0.0.1:8799")!
         self.api = KathaAPIClient(baseURL: base)
 
