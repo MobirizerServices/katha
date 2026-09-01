@@ -6,6 +6,7 @@ import SiteFooter from "@/components/SiteFooter";
 import {
   getSeries,
   allSlugs,
+  coverUrl,
   FREE_EPISODES,
   EPISODE_COIN_PRICE,
   BUNDLE_DISCOUNT_PCT,
@@ -45,7 +46,16 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
   return (
     <>
       <section className="billboard">
-        <div className="art" style={{ "--c1": s.c1, "--c2": s.c2 } as CSSProperties} />
+        <div
+          className="art"
+          style={{
+            "--c1": s.c1,
+            "--c2": s.c2,
+            backgroundImage: `linear-gradient(to top, rgba(8,8,12,.82), rgba(8,8,12,.25) 55%), url(${coverUrl(s.slug, true)})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          } as CSSProperties}
+        />
         <div className="bb">
           <div className="kicker">#{s.rank} in India today</div>
           <h1>{s.title}</h1>

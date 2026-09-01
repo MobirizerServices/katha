@@ -63,6 +63,25 @@ describe("Player — free episodes play", () => {
     expect(screen.queryByText(/Unlock Episode/)).not.toBeInTheDocument();
   });
 
+  it("uses the playback endpoint's HLS master when core-api answers", async () => {
+    const canPlay = vi
+      .spyOn(window.HTMLMediaElement.prototype, "canPlayType")
+      .mockReturnValue("maybe");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        locked: false,
+        hls_master_url: "http://127.0.0.1:8799/media/ceo-sahab/e002/hls/master.m3u8",
+      }),
+    }));
+    render(<Player series={series} n={2} />);
+    const video = document.querySelector("video") as HTMLVideoElement;
+    await vi.waitFor(() =>
+      expect(video.src).toContain("/media/ceo-sahab/e002/hls/master.m3u8"));
+    vi.unstubAllGlobals();
+    canPlay.mockRestore();
+  });
+
   it("attaches native HLS and reveals the video on loadeddata when the browser can play m3u8", async () => {
     // Force the native-HLS branch (Safari-style) instead of hls.js.
     const canPlay = vi

@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWallet } from "./WalletProvider";
+import { api } from "@/lib/api";
 import {
   Series,
   isFreeEpisode,
@@ -15,8 +16,8 @@ import {
   fmt,
 } from "@/lib/catalog";
 
-// Best-effort demo HLS stream. If it fails to load (offline, blocked), the
-// gradient placeholder behind the <video> stays visible — playback is a stub.
+// Fallback demo stream for when core-api is unreachable; the real source comes
+// from the playback endpoint (locally generated HLS served under /media).
 const DEMO_HLS = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
 
 export default function Player({ series, n }: { series: Series; n: number }) {
@@ -45,20 +46,33 @@ export default function Player({ series, n }: { series: Series; n: number }) {
 
     (async () => {
       try {
-        if (video.canPlayType("application/vnd.apple.mpegurl")) {
-          video.src = DEMO_HLS;
-          video.addEventListener("loadeddata", () => !cancelled && setVideoOk(true), { once: true });
-          return;
+        // Authoritative source: the playback endpoint returns the signed HLS
+        // master for entitled viewers (locally: the generated /media stream).
+        let src = DEMO_HLS;
+        try {
+          const pb = await api.playback(series.slug, n);
+          if (pb && pb.hls_master_url) src = pb.hls_master_url as string;
+        } catch {
+          /* offline or guest-locked — fall back to the demo stream */
         }
+        if (cancelled) return;
+        const reveal = () => !cancelled && setVideoOk(true);
+        // Prefer hls.js wherever MSE exists: Chrome answers "maybe" to the
+        // native canPlayType probe but cannot actually demux HLS.
         const mod = await import("hls.js");
         const Hls = mod.default;
         if (cancelled) return;
         if (Hls.isSupported()) {
           const inst = new Hls({ maxBufferLength: 10 });
           hls = inst;
-          inst.loadSource(DEMO_HLS);
+          inst.loadSource(src);
           inst.attachMedia(video);
-          inst.on(Hls.Events.MANIFEST_PARSED, () => !cancelled && setVideoOk(true));
+          // Reveal on real frames (not MANIFEST_PARSED): if the media stack
+          // can't open MSE the gradient poster simply stays.
+          video.addEventListener("loadeddata", reveal, { once: true });
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          video.src = src;                       // Safari: native HLS
+          video.addEventListener("loadeddata", reveal, { once: true });
         }
       } catch {
         /* keep gradient placeholder */

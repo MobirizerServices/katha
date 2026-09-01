@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { coverUrl } from "@/lib/catalog";
 import SiteFooter from "@/components/SiteFooter";
 import {
   SERIES,
@@ -140,7 +141,15 @@ export default function Home() {
           <div className="cards">
             {featured.map((s) => (
               <Link key={s.slug} className="pcard" href={`/series/${s.slug}`}>
-                <div className="poster" style={{ "--c1": s.c1, "--c2": s.c2 } as CSSProperties}>
+                <div
+                  className="poster"
+                  style={{
+                    "--c1": s.c1,
+                    "--c2": s.c2,
+                    backgroundImage: `linear-gradient(to top, rgba(0,0,0,.7), transparent 55%), url(${coverUrl(s.slug)})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  } as CSSProperties}>
                   <span className="badge">Free · {FREE_EPISODES} eps</span>
                   <span className="t">{s.title}</span>
                 </div>
@@ -153,8 +162,7 @@ export default function Home() {
             ))}
           </div>
           <p className="note">
-            New series every week in every language. Key art shown here is placeholder gradients for studio
-            artwork.
+            New series every week in every language. Key art is generated placeholder artwork until studio finals land.
           </p>
         </div>
       </section>
