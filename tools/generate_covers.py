@@ -1,60 +1,229 @@
 #!/usr/bin/env python3
-"""Generate placeholder cover art for every series in docs/katha-catalog.json.
+"""Generate placeholder key art for every Katha series — v2, art-directed.
 
-Output (mirrors the PDD 7.1 art requirements):
-  media/{slug}/cover_9x16.jpg   1080x1920  portrait key art (app, paywall)
-  media/{slug}/cover_16x9.jpg   1920x1080  landscape (web hero, admin)
+Four assets per series, consumed across the surfaces:
+  media/{slug}/cover_9x16.jpg    1080x1920  poster/thumb (iOS cards, paywall, web)
+  media/{slug}/cover_16x9.jpg    1920x1080  banner/billboard (feed hero, admin, web)
+  media/{slug}/cover_1x1.jpg     1200x1200  square thumb (search, rich pushes, social)
+  media/{slug}/og_1200x630.jpg   1200x630   link-preview banner (web og:image)
 
-These are DESIGN PLACEHOLDERS for dev and demo, not shippable key art: real
-covers are shot/illustrated per the Sourcing Playbook step 7. Titles render in
-Latin transliteration only - the local Pillow has no Raqm/HarfBuzz, so
-Devanagari/Tamil/Telugu shaping would come out wrong. Native-script key art is
-a Design deliverable.
+v2 upgrades over the flat gradients: a genre-keyed procedural motif layer
+(blooms for romance, shards for revenge/thrillers, skylines for the CEO
+sagas, arches for period/myth, arcs for sports), film grain, vignette and a
+legibility scrim under the type lockup. Palettes stay anchored to each
+series' `cover_hue` so the app's gradient fallbacks still harmonise.
+
+Sources: docs/katha-catalog.json + any panel-created drafts found in the
+shared dev DB (admin_kv `series:` rows). Titles render in Latin
+transliteration only (local Pillow lacks Raqm; Indic shaping would be wrong).
+
+These are DESIGN PLACEHOLDERS, watermarked as such — real key art is
+shot/illustrated per the Sourcing Playbook step 7.
 
 Run:  python3 tools/generate_covers.py
 """
+import hashlib
 import json
+import math
+import os
+import random
+import sqlite3
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 CATALOG = ROOT / "docs" / "katha-catalog.json"
 MEDIA = ROOT / "media"
+DEV_DB = "/tmp/katha_shared.db"
 
 BOLD = "/System/Library/Fonts/Avenir Next Condensed.ttc"
 BODY = "/System/Library/Fonts/Avenir Next.ttc"
 
 LANG_LABEL = {"hi": "HINDI", "ta": "TAMIL", "te": "TELUGU"}
+GOLD = (245, 192, 66)
 
 
 def font(path, size, index=0):
-    return ImageFont.truetype(path, size, index=index)
+    return ImageFont.truetype(path, int(size), index=index)
 
 
 def hue_to_rgb(hexstr):
-    v = int(hexstr.replace("0x", ""), 16)
+    v = int(str(hexstr).replace("0x", "").replace("#", ""), 16)
     return (v >> 16 & 255, v >> 8 & 255, v & 255)
 
 
-def gradient(size, base):
-    """Vertical gradient: base lightened at the top, near-black at the bottom."""
+def mix(a, b, t):
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def rotate_hue(rgb, deg):
+    import colorsys
+    h, l, s = colorsys.rgb_to_hls(*[c / 255 for c in rgb])
+    h = (h + deg / 360) % 1
+    return tuple(int(c * 255) for c in colorsys.hls_to_rgb(h, l, s))
+
+
+def palette(base):
+    """base hue → (deep ground, mid, accent, warm highlight)."""
+    deep = tuple(int(c * 0.22) for c in base)
+    mid = tuple(min(255, int(c * 1.15 + 30)) for c in base)
+    accent = rotate_hue(tuple(min(255, int(c * 1.35 + 30)) for c in base), 24)
+    high = mix(accent, (255, 236, 200), 0.45)
+    return deep, mid, accent, high
+
+
+def diag_gradient(size, c_top, c_bot):
     w, h = size
-    img = Image.new("RGB", (1, h))
-    px = img.load()
-    top = tuple(min(255, int(c * 1.9 + 34)) for c in base)
-    bot = tuple(int(c * 0.34) for c in base)
-    for y in range(h):
-        t = (y / (h - 1)) ** 0.85
-        px[0, y] = tuple(int(top[i] + (bot[i] - top[i]) * t) for i in range(3))
+    img = Image.new("RGB", (2, 2))
+    img.putpixel((0, 0), c_top)
+    img.putpixel((1, 0), mix(c_top, c_bot, 0.45))
+    img.putpixel((0, 1), mix(c_top, c_bot, 0.6))
+    img.putpixel((1, 1), c_bot)
     return img.resize((w, h), Image.BILINEAR)
 
 
-def wrap(draw, text, fnt, max_w):
+def grain(size, rng, alpha=16):
+    tile = Image.frombytes("L", (256, 256), os.urandom(256 * 256))
+    layer = Image.new("L", size)
+    for x in range(0, size[0], 256):
+        for y in range(0, size[1], 256):
+            layer.paste(tile, (x, y))
+    return Image.merge("RGBA", (layer, layer, layer,
+                                layer.point(lambda v: alpha)))
+
+
+def vignette(size, strength=105):
+    w, h = size
+    m = Image.new("L", (w // 4, h // 4), 0)
+    d = ImageDraw.Draw(m)
+    d.ellipse((-w // 8, -h // 8, w // 4 + w // 8, h // 4 + h // 8), fill=255)
+    m = m.resize(size).filter(ImageFilter.GaussianBlur(min(size) // 6))
+    dark = Image.new("RGBA", size, (0, 0, 0, strength))
+    dark.putalpha(m.point(lambda v: int(strength * (1 - v / 255))))
+    return dark
+
+
+# --- genre motifs ------------------------------------------------------------
+
+def motif_blooms(d, size, rng, pal):
+    """Romance / family: overlapping translucent blooms + a flowing ribbon."""
+    w, h = size
+    _, mid, accent, high = pal
+    for _ in range(9):
+        r = rng.randint(int(min(w, h) * 0.12), int(min(w, h) * 0.34))
+        x, y = rng.randint(0, w), rng.randint(0, int(h * 0.75))
+        col = rng.choice([mid, accent, high])
+        d.ellipse((x - r, y - r, x + r, y + r), fill=col + (rng.randint(60, 120),))
+    pts = []
+    y0 = h * rng.uniform(0.25, 0.45)
+    for i in range(0, w + 40, 40):
+        pts.append((i, y0 + math.sin(i / w * math.tau * 1.3) * h * 0.06))
+    for off, a in ((0, 150), (14, 90)):
+        d.line([(x, y + off) for x, y in pts], fill=high + (a,), width=6)
+
+
+def motif_shards(d, size, rng, pal):
+    """Revenge / thriller / crime: hard diagonal shards and a light beam."""
+    w, h = size
+    deep, mid, accent, high = pal
+    for _ in range(7):
+        x = rng.randint(-w // 3, w)
+        top_w = rng.randint(int(w * 0.05), int(w * 0.22))
+        skew = rng.randint(int(w * 0.15), int(w * 0.5))
+        col = rng.choice([mid, accent, tuple(int(c * 0.6) for c in accent)])
+        d.polygon([(x, 0), (x + top_w, 0), (x + top_w + skew, h), (x + skew, h)],
+                  fill=col + (rng.randint(70, 130),))
+    bx = rng.randint(int(w * 0.5), int(w * 0.85))
+    d.polygon([(bx, 0), (bx + int(w * 0.05), 0), (bx - int(w * 0.18), h),
+               (bx - int(w * 0.24), h)], fill=high + (80,))
+
+
+def motif_skyline(d, size, rng, pal):
+    """CEO / billionaire: night skyline bars with lit-window specks."""
+    w, h = size
+    deep, mid, accent, high = pal
+    x = -rng.randint(0, 60)
+    while x < w:
+        bw = rng.randint(int(w * 0.05), int(w * 0.13))
+        bh = rng.randint(int(h * 0.25), int(h * 0.62))
+        col = mix(deep, mid, rng.uniform(0.25, 0.7))
+        d.rectangle((x, h - bh, x + bw, h), fill=col + (220,))
+        for _ in range(bh * bw // 12000):
+            wx = rng.randint(x + 6, max(x + 7, x + bw - 8))
+            wy = rng.randint(h - bh + 8, h - 12)
+            d.rectangle((wx, wy, wx + 6, wy + 9), fill=high + (rng.randint(150, 240),))
+        x += bw + rng.randint(8, 30)
+
+
+def motif_arches(d, size, rng, pal):
+    """Period / myth / fantasy: concentric arches, haveli geometry."""
+    w, h = size
+    _, mid, accent, high = pal
+    cx = rng.randint(int(w * 0.3), int(w * 0.7))
+    base_r = int(min(w, h) * 0.55)
+    for i in range(6):
+        r = base_r - i * int(base_r * 0.14)
+        col = [mid, accent, high][i % 3]
+        d.arc((cx - r, int(h * 0.42) - r, cx + r, int(h * 0.42) + r),
+              180, 360, fill=col + (140 + i * 18,), width=max(10, r // 16))
+    for _ in range(24):
+        x, y = rng.randint(0, w), rng.randint(0, int(h * 0.5))
+        d.ellipse((x, y, x + 4, y + 4), fill=high + (rng.randint(120, 220),))
+
+
+def motif_arcs(d, size, rng, pal):
+    """Sports / action: sweeping speed arcs."""
+    w, h = size
+    _, mid, accent, high = pal
+    for i in range(8):
+        r = int(max(w, h) * (0.35 + i * 0.11))
+        col = [mid, accent, high][i % 3]
+        d.arc((w - r * 2 + rng.randint(-60, 60), h - r + rng.randint(-80, 80),
+               w + rng.randint(-40, 40), h + r),
+              200, 330, fill=col + (110,), width=rng.randint(14, 34))
+
+
+MOTIFS = [
+    (("romance", "second chance", "marriage"), motif_blooms),
+    (("revenge", "thriller", "crime", "betrayal"), motif_shards),
+    (("billionaire", "ceo", "workplace", "business"), motif_skyline),
+    (("period", "myth", "fantasy", "family"), motif_arches),
+    (("sports", "action", "campus"), motif_arcs),
+]
+
+
+def pick_motif(slug, genres, tropes):
+    """The slug's own theme outranks the genre: ceo-sahab is a romance, but
+    its world is the boardroom — the skyline says so at a glance."""
+    for hay in (slug.replace("-", " ").lower(),
+                " ".join(genres + tropes).lower()):
+        for keys, fn in MOTIFS:
+            if any(k in hay for k in keys):
+                return fn
+    return motif_blooms
+
+
+# --- composition -------------------------------------------------------------
+
+def chip(d, xy, text, fnt, fg=(255, 255, 255), bg=None, pad=(18, 10)):
+    x, y = xy
+    w = d.textlength(text, font=fnt)
+    box = (x, y, x + w + pad[0] * 2, y + fnt.size + pad[1] * 2 + 4)
+    if bg:
+        d.rounded_rectangle(box, radius=(box[3] - box[1]) // 2, fill=bg)
+    else:
+        d.rounded_rectangle(box, radius=(box[3] - box[1]) // 2,
+                            outline=(255, 255, 255, 130), width=2)
+    d.text((x + pad[0], y + pad[1]), text, font=fnt, fill=fg)
+    return box[2] - box[0]
+
+
+def wrap(d, text, fnt, max_w):
     words, lines, cur = text.split(), [], ""
     for word in words:
         trial = f"{cur} {word}".strip()
-        if draw.textlength(trial, font=fnt) <= max_w or not cur:
+        if d.textlength(trial, font=fnt) <= max_w or not cur:
             cur = trial
         else:
             lines.append(cur)
@@ -64,127 +233,157 @@ def wrap(draw, text, fnt, max_w):
     return lines
 
 
-def chip(draw, xy, text, fnt, fg=(255, 255, 255), bg=None, pad=(18, 10)):
-    x, y = xy
-    w = draw.textlength(text, font=fnt)
-    h = fnt.size
-    box = (x, y, x + w + pad[0] * 2, y + h + pad[1] * 2 + 4)
-    if bg:
-        draw.rounded_rectangle(box, radius=(box[3] - box[1]) // 2, fill=bg)
-    else:
-        draw.rounded_rectangle(box, radius=(box[3] - box[1]) // 2,
-                               outline=(255, 255, 255, 120), width=2)
-    draw.text((x + pad[0], y + pad[1]), text, font=fnt, fill=fg)
-    return box[2] - box[0]
-
-
-def draw_cover(s, size, portrait):
+def draw_cover(s, size, layout):
+    """layout: 'portrait' | 'banner' | 'square' | 'og'."""
     w, h = size
-    base = hue_to_rgb(s["cover_hue"])
-    img = gradient(size, base).convert("RGB")
+    rng = random.Random(int(hashlib.sha256(s["slug"].encode()).hexdigest()[:8], 16))
+    pal = palette(hue_to_rgb(s["cover_hue"]))
+    deep, mid, accent, high = pal
+
+    img = diag_gradient(size, mix(mid, deep, 0.35), deep).convert("RGBA")
+    motif = Image.new("RGBA", size, (0, 0, 0, 0))
+    pick_motif(s["slug"], s["genres"], s.get("tropes", []))(ImageDraw.Draw(motif), size, rng, pal)
+    img = Image.alpha_composite(img, motif.filter(ImageFilter.GaussianBlur(1)))
+
+    # legibility scrim behind the lockup
+    scrim = Image.new("RGBA", size, (0, 0, 0, 0))
+    sd = ImageDraw.Draw(scrim)
+    if layout == "banner":
+        for x in range(int(w * 0.62)):
+            sd.line((x, 0, x, h), fill=(0, 0, 0, int(165 * (1 - x / (w * 0.62)))))
+    else:
+        for y in range(int(h * 0.55), h):
+            t = (y - h * 0.55) / (h * 0.45)
+            sd.line((0, y, w, y), fill=(0, 0, 0, int(185 * t)))
+    img = Image.alpha_composite(img, scrim)
+    img = Image.alpha_composite(img, vignette(size))
+    img = Image.alpha_composite(img, grain(size, rng))
     d = ImageDraw.Draw(img, "RGBA")
 
-    # a soft off-centre glow so the flat gradient reads as art direction
-    glow = Image.new("RGBA", size, (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glow)
-    cx, cy = (int(w * 0.72), int(h * 0.3)) if portrait else (int(w * 0.78), int(h * 0.35))
-    r = int(max(w, h) * 0.42)
-    for i in range(28):
-        a = int(5 + i * 0.7)
-        rr = int(r * (1 - i / 30))
-        gd.ellipse((cx - rr, cy - rr, cx + rr, cy + rr),
-                   fill=(255, 245, 220, a))
-    img = Image.alpha_composite(img.convert("RGBA"), glow).convert("RGB")
-    d = ImageDraw.Draw(img, "RGBA")
-
-    scale = w / 1080 if portrait else h / 1080
+    scale = (w / 1080) if layout == "portrait" else (h / 1080 if layout == "banner"
+             else w / 1200)
     m = int(72 * scale)
 
-    # wordmark
-    f_mark = font(BOLD, int(38 * scale), 1)
-    d.text((m, m), "KATHA", font=f_mark, fill=(255, 255, 255, 200))
-    d.line((m, m + int(52 * scale), m + int(96 * scale), m + int(52 * scale)),
-           fill=(245, 192, 66), width=max(2, int(4 * scale)))
+    # eyebrow + wordmark
+    f_eyebrow = font(BODY, 26 * scale, 1)
+    d.text((m, m), "KATHA  ORIGINAL", font=f_eyebrow, fill=high + (235,))
+    d.line((m, m + int(44 * scale), m + int(120 * scale), m + int(44 * scale)),
+           fill=GOLD, width=max(2, int(4 * scale)))
 
-    # the tagline sits high, big and ghosted - it is the hook, and it stops
-    # the top two-thirds of a placeholder reading as dead space
-    f_tag = font(BOLD, int((72 if portrait else 60) * scale), 1)
-    tag_lines = wrap(d, s["tagline"], f_tag, w - m * 2 if portrait else int(w * 0.55))
-    ty = int(h * (0.22 if portrait else 0.24))
-    for line in tag_lines:
-        d.text((m, ty), line, font=f_tag, fill=(255, 255, 255, 90))
-        ty += int(f_tag.size * 1.12)
-    d.line((m, ty + int(24 * scale), m + int(140 * scale), ty + int(24 * scale)),
-           fill=(245, 192, 66, 140), width=max(2, int(3 * scale)))
-
-    # title block, bottom-anchored
-    f_title = font(BOLD, int((116 if portrait else 96) * scale), 1)
-    f_mean = font(BODY, int(34 * scale), 0)
-    f_syn = font(BODY, int(30 * scale), 0)
-    f_chip = font(BODY, int(26 * scale), 1)
-
-    max_w = w - m * 2 if portrait else int(w * 0.62)
-    lines = wrap(d, s["title"], f_title, max_w)
-    lh = int(f_title.size * 1.02)
-
-    syn = s["synopsis"]
-    syn = syn if len(syn) < 150 else syn[:147].rsplit(" ", 1)[0] + "..."
-    syn_lines = wrap(d, syn, f_syn, max_w)[:3]
-
-    block_h = len(lines) * lh + int(56 * scale) + len(syn_lines) * int(f_syn.size * 1.45)
-    y = h - m - block_h - int(70 * scale)
-
-    for line in lines:
-        d.text((m + 3, y + 3), line, font=f_title, fill=(0, 0, 0, 110))
-        d.text((m, y), line, font=f_title, fill=(255, 255, 255))
-        y += lh
-
-    if s["title_meaning"]:
-        d.text((m, y + int(8 * scale)), s["title_meaning"].upper(),
-               font=f_mean, fill=(245, 192, 66))
-        y += int(48 * scale)
-    y += int(20 * scale)
-
-    for line in syn_lines:
-        d.text((m, y), line, font=f_syn, fill=(255, 255, 255, 200))
-        y += int(f_syn.size * 1.45)
-
-    # chips
-    cy2 = h - m - int(52 * scale)
-    x = m
-    x += chip(d, (x, cy2), LANG_LABEL[s["primary_language"]], f_chip,
-              fg=(20, 20, 25), bg=(255, 255, 255, 235)) + int(14 * scale)
-    x += chip(d, (x, cy2), s["genres"][0].upper(), f_chip) + int(14 * scale)
-    x += chip(d, (x, cy2), f"{s['episode_count']} EPISODES", f_chip) + int(14 * scale)
-    chip(d, (x, cy2), "10 FREE", f_chip, fg=(18, 40, 26), bg=(47, 191, 113, 240))
-
-    # rating, top right
-    f_rate = font(BODY, int(28 * scale), 1)
-    rw = d.textlength(s["content_rating"], font=f_rate)
+    # rating pill, top right
+    f_rate = font(BODY, 28 * scale, 1)
+    rate = s["content_rating"]
+    rw = d.textlength(rate, font=f_rate)
     d.rounded_rectangle((w - m - rw - int(28 * scale), m - int(4 * scale),
                          w - m, m + int(44 * scale)),
                         radius=int(8 * scale), outline=(255, 255, 255, 150), width=2)
-    d.text((w - m - rw - int(14 * scale), m + int(6 * scale)),
-           s["content_rating"], font=f_rate, fill=(255, 255, 255, 220))
+    d.text((w - m - rw - int(14 * scale), m + int(6 * scale)), rate,
+           font=f_rate, fill=(255, 255, 255, 225))
 
-    # placeholder watermark - must never be mistaken for final key art
-    f_wm = font(BODY, int(22 * scale), 0)
-    d.text((m, h - int(34 * scale)), "PLACEHOLDER KEY ART - DEV BUILD",
-           font=f_wm, fill=(255, 255, 255, 90))
-    return img
+    # hook line (the tagline) — skip on square/og where space is tight
+    if layout in ("portrait", "banner") and s.get("tagline"):
+        f_tag = font(BOLD, (66 if layout == "portrait" else 56) * scale, 1)
+        max_tag = (w - m * 2) if layout == "portrait" else int(w * 0.5)
+        ty = int(h * 0.2)
+        for line in wrap(d, s["tagline"], f_tag, max_tag)[:3]:
+            d.text((m, ty), line, font=f_tag, fill=(255, 255, 255, 105))
+            ty += int(f_tag.size * 1.1)
+        d.line((m, ty + int(20 * scale), m + int(150 * scale), ty + int(20 * scale)),
+               fill=GOLD + (170,), width=max(2, int(3 * scale)))
+
+    # title lockup, bottom-anchored
+    tsize = {"portrait": 124, "banner": 104, "square": 96, "og": 84}[layout]
+    f_title = font(BOLD, tsize * scale, 1)
+    f_mean = font(BODY, 32 * scale, 0)
+    f_chip = font(BODY, 25 * scale, 1)
+    max_w = (w - m * 2) if layout != "banner" else int(w * 0.56)
+    lines = wrap(d, s["title"], f_title, max_w)[:3]
+    lh = int(f_title.size * 1.0)
+
+    block = len(lines) * lh + int(120 * scale)
+    if s.get("title_meaning"):
+        block += int(48 * scale)
+    y = h - m - block
+
+    for line in lines:
+        d.text((m + 3, y + 4), line, font=f_title, fill=(0, 0, 0, 130))
+        d.text((m, y), line, font=f_title, fill=(255, 255, 255))
+        y += lh
+    if s.get("title_meaning"):
+        d.text((m, y + int(6 * scale)), s["title_meaning"].upper(),
+               font=f_mean, fill=GOLD)
+        y += int(48 * scale)
+
+    # chips row
+    cy = h - m - int(50 * scale)
+    x = m
+    x += chip(d, (x, cy), LANG_LABEL.get(s["primary_language"], "HINDI"),
+              f_chip, fg=(20, 20, 25), bg=(255, 255, 255, 235)) + int(12 * scale)
+    x += chip(d, (x, cy), f"{s['episode_count']} EPISODES", f_chip) + int(12 * scale)
+    if layout != "og":
+        chip(d, (x, cy), f"{s.get('free_episodes', 10)} FREE", f_chip,
+             fg=(18, 40, 26), bg=(47, 191, 113, 240))
+
+    f_wm = font(BODY, 20 * scale, 0)
+    d.text((w - m - d.textlength("PLACEHOLDER KEY ART — DEV", font=f_wm),
+            h - int(30 * scale)), "PLACEHOLDER KEY ART — DEV",
+           font=f_wm, fill=(255, 255, 255, 80))
+    return img.convert("RGB")
+
+
+# --- sources -----------------------------------------------------------------
+
+def kv_draft_series():
+    """Panel-created drafts from the shared dev DB, if it exists."""
+    if not Path(DEV_DB).exists():
+        return []
+    out = []
+    try:
+        db = sqlite3.connect(DEV_DB)
+        rows = db.execute(
+            "SELECT key, value FROM admin_kv WHERE key LIKE 'series:%'").fetchall()
+    except sqlite3.Error:
+        return []
+    for key, raw in rows:
+        try:
+            v = json.loads(raw)
+        except ValueError:
+            continue
+        slug = key.split(":", 1)[1]
+        out.append({
+            "slug": slug, "title": v.get("title", slug),
+            "genres": v.get("genres") or ["Drama"], "tropes": v.get("tropes", []),
+            "primary_language": v.get("language", "hi"),
+            "content_rating": v.get("rating", "U/A 13+"),
+            "episode_count": v.get("episode_count", 0),
+            "free_episodes": v.get("free_episodes", 10),
+            "tagline": v.get("synopsis") or "A new Katha original.",
+            "title_meaning": "",
+            "cover_hue": "0x" + hashlib.sha256(slug.encode()).hexdigest()[:6],
+        })
+    return out
+
+
+ASSETS = [
+    ("cover_9x16.jpg", (1080, 1920), "portrait"),
+    ("cover_16x9.jpg", (1920, 1080), "banner"),
+    ("cover_1x1.jpg", (1200, 1200), "square"),
+    ("og_1200x630.jpg", (1200, 630), "og"),
+]
 
 
 def main():
-    catalog = json.loads(CATALOG.read_text())
+    series = json.loads(CATALOG.read_text())["series"] + kv_draft_series()
     n = 0
-    for s in catalog["series"]:
+    for s in series:
+        s.setdefault("free_episodes", 10)
         out = MEDIA / s["slug"]
         out.mkdir(parents=True, exist_ok=True)
-        draw_cover(s, (1080, 1920), True).save(out / "cover_9x16.jpg", quality=88, optimize=True)
-        draw_cover(s, (1920, 1080), False).save(out / "cover_16x9.jpg", quality=88, optimize=True)
-        n += 2
-        print(f"  {s['slug']}: cover_9x16.jpg + cover_16x9.jpg")
-    print(f"Done: {n} covers in {MEDIA}")
+        for name, size, layout in ASSETS:
+            draw_cover(s, size, layout).save(out / name, quality=88, optimize=True)
+            n += 1
+        print(f"  {s['slug']}: {', '.join(a[0] for a in ASSETS)}")
+    print(f"Done: {n} assets for {len(series)} series in {MEDIA}")
 
 
 if __name__ == "__main__":
