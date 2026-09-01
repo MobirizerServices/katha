@@ -39,7 +39,11 @@ final class ScreenshotTour: XCTestCase {
 
     func test01_TourOnboarding() {
         let app = launchApp(onboarded: false)
-        snap("1.1-splash")                                   // best-effort: 1s window
+        // Wait for SwiftUI's first paint (the device is slower than the
+        // simulator) so the splash capture shows the real screen, then shoot
+        // within its ~1.2s display window.
+        _ = app.staticTexts["Katha"].waitForExistence(timeout: 3)
+        snap("1.1-splash")
         wait(app, text: "Which languages do you watch in?")
         snap("1.2-language-picker")
         button(app, containing: "Hindi").tap()
