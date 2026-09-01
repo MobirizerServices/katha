@@ -185,8 +185,7 @@ final class ScreenshotTour: XCTestCase {
         sleep(3)                                             // accrue progress
         drop.navigationBars.buttons.firstMatch.tap()         // back → progress reported
         let nudged = launchApp(reset: false, extra: ["KATHA_NUDGE_SECONDS": "4"])
-        _ = nudged.staticTexts["Daily check-in"].waitForExistence(timeout: 20)
-        _ = nudged.buttons["Watch now"].waitForExistence(timeout: 15)
-        snap("3.6-drop-banner")
+        _ = nudged.buttons["Watch now"].waitForExistence(timeout: 25)
+        snap("3.6-drop-banner")           // immediately — the banner lives 6 s
     }
 }

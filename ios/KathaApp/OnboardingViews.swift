@@ -185,7 +185,7 @@ struct FlowChips: View {
     @Binding var picked: Set<String>
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], spacing: 10) {
+        FlowLayout(spacing: 8, lineSpacing: 10) {
             ForEach(chips, id: \.self) { chip in
                 let on = picked.contains(chip)
                 Button {
@@ -194,10 +194,10 @@ struct FlowChips: View {
                     Text(chip)
                         .font(.system(size: 13))
                         .lineLimit(1)
+                        .fixedSize()                     // chips hug their label — never truncate
                         .foregroundStyle(on ? Katha.Color.text : Katha.Color.text2)
                         .padding(.horizontal, 12)
                         .frame(height: 32)
-                        .frame(maxWidth: .infinity)
                         .background(on ? Katha.Color.accent.opacity(0.14) : Katha.Color.surface)
                         .overlay(
                             Capsule().strokeBorder(on ? Katha.Color.accent : Katha.Color.raised,

@@ -49,12 +49,18 @@ struct SeriesView: View {
                 CoverImage(url: d.coverWideUrl)
                     .frame(height: 230)
                     .overlay {
-                        LinearGradient(colors: [.clear, Katha.Color.bg.opacity(0.9)],
-                                       startPoint: .center, endPoint: .bottom)
+                        // Scrim strong enough that the title reads over any key art
+                        // (dev placeholder covers carry baked-in text of their own).
+                        LinearGradient(stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: Katha.Color.bg.opacity(0.55), location: 0.62),
+                            .init(color: Katha.Color.bg.opacity(0.98), location: 1),
+                        ], startPoint: .top, endPoint: .bottom)
                     }
                 Text(d.title)
                     .font(.system(size: 26, weight: .bold))
                     .foregroundStyle(Katha.Color.text)
+                    .shadow(color: .black.opacity(0.6), radius: 6, y: 1)
                     .padding(Katha.Spacing.lg)
             }
 
