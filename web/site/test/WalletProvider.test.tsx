@@ -193,7 +193,7 @@ describe("purchase — optimistic credit then reconcile", () => {
     expect(ctx.bought).toBe(1300);
     expect(ctx.bonus).toBe(130);
     expect(ctx.balance).toBe(1430);
-    expect(webOrder).toHaveBeenCalledWith("coins_popular_in");
+    expect(webOrder).toHaveBeenCalledWith("coins_popular_in", "");
 
     await act(async () => {
       d.resolve({ balance_bought: 1300, balance_bonus: 200 });
@@ -402,5 +402,15 @@ describe("reconcile + typed-phone stragglers", () => {
     await userEvent.click(within(dialog).getByText("Verify"));
     await waitFor(() => expect(ctx.signed).toBe(true));
     expect(otpLogin).toHaveBeenCalledWith("+91 90000 11111", expect.anything());
+  });
+});
+
+describe("invoice email pass-through", () => {
+  it("purchase forwards the checkout email to the web order", async () => {
+    await mountReady({ balance_bought: 0, balance_bonus: 0 });
+    webOrder.mockResolvedValue({ balance_bought: 1300, balance_bonus: 130, total: 1430 });
+    act(() => { ctx.purchase(1300, 199, "coins_popular_in", "meera@example.com"); });
+    await waitFor(() =>
+      expect(webOrder).toHaveBeenCalledWith("coins_popular_in", "meera@example.com"));
   });
 });

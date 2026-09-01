@@ -113,7 +113,7 @@ describe("authenticated endpoints attach the bearer", () => {
     const [url, init] = callArgs(0);
     expect(url).toBe(`${BASE}/v1/web/orders`);
     expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({ sku: "coins_popular_in" });
+    expect(JSON.parse(init.body as string)).toEqual({ sku: "coins_popular_in", email: "" });
     expect(headerOf(init, "Authorization")).toBe("Bearer session-tok");
   });
 

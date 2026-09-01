@@ -58,8 +58,10 @@ export const api = {
   },
 
   // Web coin purchase — credits the pack + the +10% web bonus in the real ledger.
-  webOrder(sku: string): Promise<WalletDTO> {
-    return call<WalletDTO>("/v1/web/orders", { method: "POST", body: JSON.stringify({ sku }) });
+  webOrder(sku: string, email = ""): Promise<WalletDTO> {
+    return call<WalletDTO>("/v1/web/orders", {
+      method: "POST", body: JSON.stringify({ sku, email }),
+    });
   },
 
   unlockEpisode(slug: string, n: number, key: string): Promise<{ wallet: WalletDTO; spent_bonus: number; spent_bought: number }> {

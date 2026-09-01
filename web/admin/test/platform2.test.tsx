@@ -744,3 +744,32 @@ describe("comms: Outbox view + drop pushes", () => {
     expect(JSON.parse(String(post?.init?.body))).toEqual({ episode: 60 });
   });
 });
+
+describe("invoice register (finance)", () => {
+  it("renders rows and GST totals inside the Outbox view", async () => {
+    const { Outbox } = await import("../src/views/Outbox");
+    stub({
+      ...SIGNALS,
+      "/attention": () => ({ items: [] }),
+      "/invoices": () => ({
+        totals: { count: 2, gross_minor: 29800, gst_minor: 4546 },
+        rows: [
+          { id: "KATHA-INV-2627-000001", user_id: "u1", sku: "coins_web_popular_in",
+            coins: 1300, bonus_coins: 130, total_minor: 19900,
+            taxable_minor: 16864, gst_minor: 3036, gst_rate_pct: 18,
+            created_at: "2026-09-01T10:00:00+00:00" },
+          { id: "KATHA-INV-2627-000002", user_id: "u2", sku: "coins_starter_in",
+            coins: 600, bonus_coins: 0, total_minor: 9900,
+            taxable_minor: 8390, gst_minor: 1510, gst_rate_pct: 18,
+            created_at: "2026-09-01T11:00:00+00:00" }],
+      }),
+      "/outbox": () => ({ rows: [], transports: { email: false, push: false } }),
+    });
+    renderWithStore(<Outbox />);
+    await screen.findByText("KATHA-INV-2627-000001");
+    expect(screen.getByText(/gross ₹298.00/)).toBeInTheDocument();
+    expect(screen.getByText(/GST ₹45.46/)).toBeInTheDocument();
+    expect(screen.getByText("₹30.36")).toBeInTheDocument();
+    expect(screen.getByText("1,300 +130 coins")).toBeInTheDocument();
+  });
+});

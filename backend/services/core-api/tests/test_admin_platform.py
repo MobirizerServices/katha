@@ -1036,3 +1036,107 @@ def test_push_tokens_per_user_filter(shared):
     shared.push_register("pu-1", token="t1", platform="ios", now=T0)
     shared.push_register("pu-2", token="t2", platform="ios", now=T0)
     assert [t["token"] for t in shared.push_tokens("pu-1")] == ["t1"]
+
+
+def test_guest_merge_on_login(shared):
+    core = _core()
+    # a guest earns coins and unlocks an episode
+    g = core.post("/v1/auth/guest").json()
+    gtok, gid = g["access_token"], g["user"]["user_id"]
+    core.post("/v1/iap/verify", headers={"Authorization": f"Bearer {gtok}"},
+              json={"sku": "coins_starter_in", "jws": "merge-sig"})
+    core.post("/v1/series/kaanch-ka-mahal/episodes/11/unlock",
+              headers={"Authorization": f"Bearer {gtok}"},
+              json={"idempotency_key": "mg-1"})
+    core.put("/v1/progress", headers={"Authorization": f"Bearer {gtok}"},
+             json={"items": [{"slug": "kaanch-ka-mahal", "number": 11,
+                              "position_ms": 30000, "duration_ms": 120000}]})
+    # OTP login WITH the guest bearer → everything follows the member
+    m = core.post("/v1/auth/otp/verify",
+                  headers={"Authorization": f"Bearer {gtok}"},
+                  json={"phone": "+911112223334", "code": "1234"}).json()
+    mtok = m["access_token"]
+    w = core.get("/v1/wallet", headers={"Authorization": f"Bearer {mtok}"}).json()
+    assert w["balance_bought"] == 570 and w["total"] == 570
+    # entitlement moved: E11 plays without paying again
+    p = core.post("/v1/series/kaanch-ka-mahal/episodes/11/playback",
+                  headers={"Authorization": f"Bearer {mtok}"}).json()
+    assert p["locked"] is False
+    # continue-watching moved too
+    cont = core.get("/v1/me/continue",
+                    headers={"Authorization": f"Bearer {mtok}"}).json()
+    assert any(i["episode_id"] == "kaanch-ka-mahal:e11" for i in cont["items"])
+    # the guest wallet is zeroed and the merge is idempotent on re-login
+    gw = core.get("/v1/wallet", headers={"Authorization": f"Bearer {gtok}"}).json()
+    assert gw["total"] == 0
+    core.post("/v1/auth/otp/verify", headers={"Authorization": f"Bearer {gtok}"},
+              json={"phone": "+911112223334", "code": "1234"})
+    w2 = core.get("/v1/wallet", headers={"Authorization": f"Bearer {mtok}"}).json()
+    assert w2["total"] == 570
+    # a member-to-member login never merges
+    assert core_store.merge_guest("usr_somebody", "usr_other") is None
+
+
+def test_cover_urls_are_versioned_and_bust_on_regeneration(shared, tmp_path, monkeypatch):
+    monkeypatch.setenv("KATHA_MEDIA_DIR", str(tmp_path))
+    import app.overrides as ov
+    (tmp_path / "kaanch-ka-mahal").mkdir()
+    f = tmp_path / "kaanch-ka-mahal" / "cover_9x16.jpg"
+    f.write_bytes(b"art-1")
+    import os
+    os.utime(f, (1000, 1000))
+    ov._COVER_V.clear()
+    core = _core()
+    url1 = core.get("/v1/series/kaanch-ka-mahal").json()["cover_url"]
+    assert "?v=3e8" in url1                      # hex(1000)
+    os.utime(f, (2000, 2000))                    # "regenerated" art
+    ov._COVER_V.clear()                          # (60s cache in prod)
+    url2 = core.get("/v1/series/kaanch-ka-mahal").json()["cover_url"]
+    assert "?v=7d0" in url2 and url1 != url2
+    # a draft series gets real cover URLs too
+    a = _admin()
+    a.post("/admin/v1/catalog/series", headers=ADMIN_H,
+           json={"slug": "art-draft", "title": "Art Draft", "episode_count": 2})
+    a.post("/admin/v1/catalog/series/art-draft/status", headers=ADMIN_H,
+           json={"status": "live"})
+    d = core.get("/v1/series/art-draft").json()
+    assert "/media/art-draft/cover_9x16.jpg?v=" in d["cover_url"]
+    ov._COVER_V.clear()
+
+
+def test_erasure_scrubs_devices_and_push_tokens(shared):
+    shared.upsert_profile("scrub-u", phone="+919", kind="phone", language="hi",
+                          created_at=T0)
+    shared.push_register("scrub-u", token="tok-scrub", platform="ios", now=T0)
+    shared.device_touch("scrub-u", ua="KathaApp/1.0", ip="1.1.1.1", ts=T0)
+    assert shared.erase_user("scrub-u", T0) is True
+    assert shared.push_tokens("scrub-u") == []
+    assert shared.devices("scrub-u") == []
+
+
+def test_invoice_register_totals(shared):
+    core = _core()
+    for u, sku in (("reg-a", "coins_web_popular_in"), ("reg-b", "coins_starter_in")):
+        core.post("/v1/web/orders", headers={"Authorization": f"Bearer {u}"},
+                  json={"sku": sku, "email": f"{u}@x.dev"})
+    a = _admin()
+    assert a.get("/admin/v1/invoices",
+                 headers={"X-Actor-Id": "s", "X-Role": "support"}).status_code == 403
+    reg = a.get("/admin/v1/invoices", headers=FIN_H).json()
+    assert reg["totals"]["count"] == 2
+    assert reg["totals"]["gross_minor"] == 19900 + 9900
+    assert reg["totals"]["gst_minor"] == 3036 + 1510
+
+
+def test_guest_merge_carries_bonus_coins(shared):
+    core = _core()
+    g = core.post("/v1/auth/guest").json()
+    gtok = g["access_token"]
+    core.post("/v1/web/orders", headers={"Authorization": f"Bearer {gtok}"},
+              json={"sku": "coins_web_popular_in"})       # 1300 bought + 130 bonus
+    m = core.post("/v1/auth/otp/verify",
+                  headers={"Authorization": f"Bearer {gtok}"},
+                  json={"phone": "+911112224445", "code": "1234"}).json()
+    w = core.get("/v1/wallet",
+                 headers={"Authorization": f"Bearer {m['access_token']}"}).json()
+    assert w["balance_bought"] == 1300 and w["balance_bonus"] == 130

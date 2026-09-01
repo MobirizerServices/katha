@@ -58,7 +58,13 @@ coverage/
 .nyc_output/
 *.profdata
 *.profraw
+.coverage
+*.tsbuildinfo
 
 # Generated Xcode app project (regenerate: cd ios && ruby generate_xcodeproj.rb) + build output
 ios/KathaApp.xcodeproj/
 ios/build/
+ios/build-device/
+
+# Device screen-review captures (session artifacts, regenerable)
+review/

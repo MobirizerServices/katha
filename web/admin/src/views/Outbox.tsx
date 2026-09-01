@@ -1,6 +1,68 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
-import { Empty, IsoTime, PageHeader, Sev, Skeleton } from "../ui";
+import { Empty, IsoTime, PageHeader, Sev, Skeleton, fmtN } from "../ui";
+
+type InvoiceRow = {
+  id: string; user_id: string; sku: string; coins: number; bonus_coins: number;
+  total_minor: number; taxable_minor: number; gst_minor: number;
+  gst_rate_pct: number; created_at: string;
+};
+
+function paise(minor: number): string {
+  return `₹${Math.floor(minor / 100)}.${String(minor % 100).padStart(2, "0")}`;
+}
+
+/** The GST register: every web/UPI sale with its tax split — what finance
+ * files from. Apple invoices IAP itself. */
+function InvoiceRegister() {
+  const [data, setData] = useState<{
+    rows: InvoiceRow[];
+    totals: { count: number; gross_minor: number; gst_minor: number };
+  } | null>(null);
+
+  useEffect(() => { void api.invoices().then(setData); }, []);
+  if (data === null) return <Skeleton rows={3} />;
+
+  return (
+    <div className="panel" style={{ marginTop: 14 }}>
+      <header>
+        <h3>Tax invoices (web/UPI)</h3>
+        <span className="muted">
+          {fmtN(data.totals.count)} invoices · gross {paise(data.totals.gross_minor)} ·
+          GST {paise(data.totals.gst_minor)}
+        </span>
+      </header>
+      {data.rows.length === 0 ? (
+        <p className="muted tiny" style={{ padding: "12px 14px" }}>
+          Web coin sales are invoiced automatically — the register fills with the
+          first UPI purchase.
+        </p>
+      ) : (
+        <table className="table">
+          <thead>
+            <tr><th>Invoice</th><th>Buyer</th><th>Pack</th>
+                <th style={{ textAlign: "right" }}>Taxable</th>
+                <th style={{ textAlign: "right" }}>GST</th>
+                <th style={{ textAlign: "right" }}>Total</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            {data.rows.map((r) => (
+              <tr key={r.id}>
+                <td className="mono">{r.id}</td>
+                <td className="mono">{r.user_id}</td>
+                <td>{fmtN(r.coins)}{r.bonus_coins ? ` +${fmtN(r.bonus_coins)}` : ""} coins</td>
+                <td style={{ textAlign: "right" }} className="mono">{paise(r.taxable_minor)}</td>
+                <td style={{ textAlign: "right" }} className="mono">{paise(r.gst_minor)}</td>
+                <td style={{ textAlign: "right" }} className="mono">{paise(r.total_minor)}</td>
+                <td><IsoTime iso={r.created_at} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
 
 type Row = {
   id: number; kind: string; recipient: string; subject: string;
@@ -85,6 +147,7 @@ export function Outbox() {
           </table>
         </div>
       )}
+      <InvoiceRegister />
     </>
   );
 }

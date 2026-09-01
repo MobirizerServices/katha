@@ -43,6 +43,7 @@ export const ADMIN_API_PATHS = [
   "POST /admin/v1/grievances/{gid}/ack",
   "POST /admin/v1/grievances/{gid}/resolve",
   "GET /admin/v1/health/full",
+  "GET /admin/v1/invoices",
   "GET /admin/v1/metrics",
   "POST /admin/v1/metrics/ui",
   "GET /admin/v1/outbox",

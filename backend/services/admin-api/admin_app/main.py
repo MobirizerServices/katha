@@ -1353,6 +1353,18 @@ def _grievance_email(gid: str, verdict: str, message: str) -> None:
         now=now_iso())
 
 
+@router.get("/invoices", tags=["ops"])
+def invoices(actor: Actor = Depends(require(Role.FINANCE, Role.ANALYST, Role.RO))):
+    """The GST invoice register (web/UPI sales) — what finance files from."""
+    if SHARED is None:
+        return {"rows": [], "totals": {"count": 0, "gross_minor": 0, "gst_minor": 0}}
+    rows = SHARED.invoices_all()
+    return {"rows": rows,
+            "totals": {"count": len(rows),
+                       "gross_minor": sum(r["total_minor"] for r in rows),
+                       "gst_minor": sum(r["gst_minor"] for r in rows)}}
+
+
 @router.get("/outbox", tags=["ops"])
 def outbox(kind: str = "", limit: int = 100,
            actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,

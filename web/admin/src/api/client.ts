@@ -315,6 +315,15 @@ export const api = {
   async listExperiments(): Promise<{ experiments: Experiment[] }> {
     return get("/experiments", { experiments: [] });
   },
+  async invoices(): Promise<{
+    rows: { id: string; user_id: string; sku: string; coins: number;
+            bonus_coins: number; total_minor: number; taxable_minor: number;
+            gst_minor: number; gst_rate_pct: number; created_at: string }[];
+    totals: { count: number; gross_minor: number; gst_minor: number };
+  }> {
+    return get("/invoices", { rows: [],
+                              totals: { count: 0, gross_minor: 0, gst_minor: 0 } });
+  },
   async outbox(kind = ""): Promise<{
     rows: { id: number; kind: string; recipient: string; subject: string;
             body: string; status: string; detail: string; created_at: string }[];

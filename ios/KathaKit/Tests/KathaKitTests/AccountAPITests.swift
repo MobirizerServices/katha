@@ -330,4 +330,22 @@ extension AccountAPITests {
         XCTAssertEqual(inv.bonusCoins, 130)
         XCTAssertEqual(inv.sellerGstin, "27ABCDE1234F1Z5")
     }
+
+    func testFileGrievancePostsAndDecodesAck() async throws {
+        reply(#"{"id":"G-4F2A91","status":"open","promise":"acknowledged within 24 hours"}"#)
+        let ack = try await makeClient(authToken: "tok")
+            .fileGrievance(contact: "meera@example.com", subject: "Playback stops", body: "E4 halts")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/v1/grievance")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.httpMethod, "POST")
+        let stream = try XCTUnwrap(MockURLProtocol.lastRequest?.httpBodyStream)
+        stream.open()
+        var buf = [UInt8](repeating: 0, count: 1024)
+        let n = stream.read(&buf, maxLength: 1024)
+        let body = String(bytes: buf[0..<max(n, 0)], encoding: .utf8) ?? ""
+        XCTAssertTrue(body.contains(#""contact":"meera@example.com""#))
+        XCTAssertTrue(body.contains(#""subject":"Playback stops""#))
+        XCTAssertEqual(ack.id, "G-4F2A91")
+        XCTAssertEqual(ack.status, "open")
+        XCTAssertTrue(ack.promise.contains("24 hours"))
+    }
 }

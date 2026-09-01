@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SiteFooter from "@/components/SiteFooter";
 import {
+  API_BASE,
   getSeries,
   allSlugs,
   coverUrl,
@@ -31,7 +32,13 @@ export async function generateMetadata({
   return {
     title: s.title,
     description: s.synopsis,
-    openGraph: { title: s.title, description: s.synopsis, type: "video.tv_show" },
+    openGraph: {
+      title: s.title,
+      description: s.synopsis,
+      type: "video.tv_show",
+      images: [{ url: `${API_BASE}/media/${slug}/og_1200x630.jpg`,
+                 width: 1200, height: 630, alt: s.title }],
+    },
   };
 }
 

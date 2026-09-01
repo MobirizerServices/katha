@@ -73,6 +73,9 @@ class Ledger:
     def is_entitled(self, user_id: str, episode_id: str) -> bool:
         return (user_id, episode_id) in self._entitlements
 
+    def entitlements(self, user_id: str) -> list[Entitlement]:
+        return [e for (u, _), e in self._entitlements.items() if u == user_id]
+
     def transactions(self, user_id: str) -> list[Transaction]:
         return [t for t in self._log if t.user_id == user_id]
 

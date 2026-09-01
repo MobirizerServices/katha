@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 
 from katha_domain.schemas import (
     AppleAuthBody,
@@ -34,6 +34,17 @@ def _token(user_id: str) -> AuthToken:
     return AuthToken(access_token=issue_token(user_id), user=_profile_response(user_id))
 
 
+def _merge_guest_from(authorization: str | None, *, into: str) -> None:
+    """A login sent with a guest bearer folds that guest into the member."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return
+    from ..auth import decode_token
+    token = authorization.split(" ", 1)[1].strip()
+    payload = decode_token(token)
+    guest = payload["sub"] if payload else token
+    store.merge_guest(guest, into)
+
+
 @router.post("/auth/otp/request", response_model=OtpRequestResponse)
 def otp_request(body: OtpRequestBody) -> OtpRequestResponse:
     if not body.phone.strip():
@@ -42,7 +53,8 @@ def otp_request(body: OtpRequestBody) -> OtpRequestResponse:
 
 
 @router.post("/auth/otp/verify", response_model=AuthToken)
-def otp_verify(body: OtpVerifyBody) -> AuthToken:
+def otp_verify(body: OtpVerifyBody,
+               authorization: str | None = Header(default=None)) -> AuthToken:
     code = body.code.strip()
     if not (code.isdigit() and len(code) == 4):
         raise HTTPException(status_code=400, detail="invalid code (dev: any 4 digits)")
@@ -50,11 +62,13 @@ def otp_verify(body: OtpVerifyBody) -> AuthToken:
     u = store.get_or_create_user(user_id, kind="phone", phone=body.phone)
     u.kind, u.phone = "phone", body.phone
     store.persist_profile(user_id)   # persist the phone identity to the shared store
+    _merge_guest_from(authorization, into=user_id)
     return _token(user_id)
 
 
 @router.post("/auth/apple", response_model=AuthToken)
-def apple_auth(body: AppleAuthBody) -> AuthToken:
+def apple_auth(body: AppleAuthBody,
+               authorization: str | None = Header(default=None)) -> AuthToken:
     if not body.identity_token.strip():
         raise HTTPException(status_code=400, detail="identity_token required")
     # Dev stub: derive a stable id from the token; prod verifies with Apple's keys.
@@ -63,6 +77,7 @@ def apple_auth(body: AppleAuthBody) -> AuthToken:
     u.kind = "apple"
     if body.full_name and not u.display_name:
         u.display_name = body.full_name
+    _merge_guest_from(authorization, into=user_id)
     return _token(user_id)
 
 

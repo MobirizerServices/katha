@@ -335,3 +335,11 @@ public struct Invoice: Codable, Hashable, Identifiable, Sendable {
 public struct InvoiceList: Codable, Hashable, Sendable {
     public let invoices: [Invoice]
 }
+
+
+/// Acknowledgement for a filed grievance (IT Rules: 24 h ack / 15 d resolve).
+public struct GrievanceAck: Codable, Hashable, Sendable {
+    public let id: String
+    public let status: String
+    public let promise: String
+}

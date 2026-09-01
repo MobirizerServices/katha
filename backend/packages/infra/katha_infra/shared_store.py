@@ -440,6 +440,9 @@ class SharedStore:
         return self.db.run(self._erase_user(user_id, ts))
 
     async def _erase_user(self, user_id: str, ts: str) -> bool:
+        from sqlalchemy import delete
+
+        from .models import DeviceRow, PushTokenRow
         async with self.db.session_factory() as s:
             p = await s.get(UserProfileRow, user_id)
             if p is None:
@@ -447,6 +450,10 @@ class SharedStore:
             p.phone = ""            # PII scrubbed; the money ledger is retained
             p.kind = "erased"
             p.last_seen = ts
+            # device identifiers and push tokens are PII-adjacent: gone too
+            await s.execute(delete(PushTokenRow)
+                            .where(PushTokenRow.user_id == user_id))
+            await s.execute(delete(DeviceRow).where(DeviceRow.user_id == user_id))
             await s.commit()
             return True
 
@@ -733,6 +740,21 @@ class SharedStore:
                  "gst_minor": r.gst_minor, "gst_rate_pct": r.gst_rate_pct,
                  "seller_gstin": r.seller_gstin, "created_at": r.created_at}
                 for r in rows]
+
+    def invoices_all(self, limit: int = 200) -> list[dict]:
+        return self.db.run(self._invoices_all(limit))
+
+    async def _invoices_all(self, limit) -> list[dict]:
+        from .models import InvoiceRow
+        async with self.db.session_factory() as s:
+            rows = (await s.execute(select(InvoiceRow)
+                    .order_by(InvoiceRow.created_at.desc())
+                    .limit(limit))).scalars().all()
+        return [{"id": r.id, "user_id": r.user_id, "sku": r.sku,
+                 "coins": r.coins, "bonus_coins": r.bonus_coins,
+                 "total_minor": r.total_minor, "taxable_minor": r.taxable_minor,
+                 "gst_minor": r.gst_minor, "gst_rate_pct": r.gst_rate_pct,
+                 "created_at": r.created_at} for r in rows]
 
     def invoice_by_order(self, order_ref: str) -> dict | None:
         return self.db.run(self._invoice_by_order(order_ref))

@@ -91,8 +91,8 @@ export default function CoinsPage() {
           pack={paying}
           base={baseCoins(paying)}
           onClose={() => setPaying(null)}
-          onPaid={() => {
-            w.purchase(baseCoins(paying), paying.priceInr, paying.sku);
+          onPaid={(email) => {
+            w.purchase(baseCoins(paying), paying.priceInr, paying.sku, email);
             setPaying(null);
           }}
         />
@@ -110,13 +110,14 @@ function PayModal({
   pack: CoinPack;
   base: number;
   onClose: () => void;
-  onPaid: () => void;
+  onPaid: (email: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [email, setEmail] = useState("");
   const bonus = webBonusCoins(base);
   const pay = () => {
     setBusy(true);
-    setTimeout(onPaid, 1200); // simulate UPI confirmation
+    setTimeout(() => onPaid(email.trim()), 1200); // simulate UPI confirmation
   };
   return (
     <>
@@ -134,6 +135,19 @@ function PayModal({
             <b style={{ color: "var(--coin)" }}>{fmt(bonus)} web bonus</b> = {fmt(webTotalCoins(base))} coins.
             GST invoice by email.
           </p>
+          {!busy && (
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email for the GST invoice (optional)"
+              aria-label="Invoice email"
+              style={{ width: "100%", boxSizing: "border-box", marginBottom: 12,
+                       background: "var(--bg)", color: "var(--text)",
+                       border: "1px solid var(--line)", borderRadius: 8,
+                       padding: "10px 12px" }}
+            />
+          )}
           {busy ? (
             <p className="d" style={{ textAlign: "center", padding: "12px 0" }}>
               Waiting for UPI confirmation… Approve the request in your UPI app.

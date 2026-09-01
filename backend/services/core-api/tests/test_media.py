@@ -21,15 +21,15 @@ def test_series_carry_absolute_cover_urls():
     assert r.status_code == 200
     first = r.json()[0]
     assert first["cover_url"].startswith("http")
-    assert first["cover_url"].endswith(f"/media/{first['slug']}/cover_9x16.jpg")
-    assert first["cover_wide_url"].endswith(f"/media/{first['slug']}/cover_16x9.jpg")
+    assert f"/media/{first['slug']}/cover_9x16.jpg?v=" in first["cover_url"]
+    assert f"/media/{first['slug']}/cover_16x9.jpg?v=" in first["cover_wide_url"]
 
 
 def test_cover_urls_honour_media_base_env(monkeypatch):
     monkeypatch.setenv("KATHA_MEDIA_BASE", "https://cdn.example.com/")  # trailing / stripped
     r = client.get("/v1/home")
     s = r.json()["rows"][0]["series"][0]
-    assert s["cover_url"] == f"https://cdn.example.com/media/{s['slug']}/cover_9x16.jpg"
+    assert s["cover_url"].startswith(f"https://cdn.example.com/media/{s['slug']}/cover_9x16.jpg?v=")
 
 
 def test_media_route_serves_files(monkeypatch, tmp_path):

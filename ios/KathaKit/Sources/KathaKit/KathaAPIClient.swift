@@ -156,6 +156,13 @@ public actor KathaAPIClient {
         try await get("/v1/me/invoices")
     }
 
+    /// File an IT-Rules grievance; returns the ticket id + the SLA promise.
+    public func fileGrievance(contact: String, subject: String,
+                              body: String) async throws -> GrievanceAck {
+        try await send("/v1/grievance", method: "POST",
+                       body: ["contact": contact, "subject": subject, "body": body])
+    }
+
     public func packs(storefront: String = "IN") async throws -> [CoinPack] {
         try await get("/v1/iap/packs", query: ["storefront": storefront])
     }

@@ -2654,6 +2654,70 @@
         ]
       }
     },
+    "/admin/v1/invoices": {
+      "get": {
+        "description": "The GST invoice register (web/UPI sales) \u2014 what finance files from.",
+        "operationId": "invoices_admin_v1_invoices_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-actor-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Invoices",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
     "/admin/v1/metrics": {
       "get": {
         "operationId": "metrics_admin_v1_metrics_get",

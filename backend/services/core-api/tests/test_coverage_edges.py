@@ -262,3 +262,9 @@ def test_comms_endpoints_without_persistence():
                       headers=ADMIN, json={"episode": 2}).status_code == 503
     # grievance email helper is a silent no-op without the shared store
     admin_main._grievance_email("G-X", "acknowledged", "msg")
+
+
+def test_invoice_register_and_merge_without_persistence():
+    assert admin.get("/admin/v1/invoices", headers=ADMIN).json()["totals"]["count"] == 0
+    # merging into oneself is a no-op
+    assert core_store.merge_guest("guest-dev", "guest-dev") is None

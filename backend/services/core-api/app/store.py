@@ -192,6 +192,45 @@ class Store:
         if refresh is not None:
             refresh()
 
+    def merge_guest(self, guest_id: str, member_id: str) -> dict | None:
+        """Fold a guest's coins, entitlements and watch state into the member
+        account at login (SAD §8.1). Idempotent via merge ledger keys; the
+        guest wallet is zeroed with a clawback so nothing double-spends."""
+        from katha_ledger import TxType
+        if guest_id == member_id or not (
+                guest_id.startswith("gst_") or guest_id == "guest-dev"):
+            return None
+        self.refresh_ledger()
+        bal = self.ledger.balance(guest_id)
+        ents = [e for e in self.ledger.entitlements(guest_id)
+                if not self.ledger.is_entitled(member_id, e.episode_id)]
+        key = f"merge:{guest_id}:{member_id}"
+        if bal.balance_bought:
+            self.ledger.credit(member_id, TxType.PURCHASE, coins=bal.balance_bought,
+                               reference_type="guest_merge", reference_id=guest_id,
+                               idempotency_key=f"{key}:bought", created_at=now_iso())
+        if bal.balance_bonus:
+            self.ledger.credit(member_id, TxType.BONUS, coins=bal.balance_bonus,
+                               reference_type="guest_merge", reference_id=guest_id,
+                               idempotency_key=f"{key}:bonus", created_at=now_iso())
+        if bal.total:
+            self.ledger.refund_clawback(guest_id, coins=bal.total,
+                                        reference_type="guest_merge",
+                                        reference_id=member_id,
+                                        idempotency_key=f"{key}:out",
+                                        created_at=now_iso())
+        for e in ents:
+            self.ledger.grant_free(member_id, e.episode_id, created_at=now_iso())
+        # watch state: the member keeps their own; gaps fill from the guest
+        g, m = self.engagement.pop(guest_id, None), self._eng(member_id)
+        if g is not None:
+            for eid, item in g.progress.items():
+                m.progress.setdefault(eid, item)
+            m.order += [e for e in g.order if e not in m.order]
+            m.my_list += [s for s in g.my_list if s not in m.my_list]
+        self.emit(member_id, "guest_merge", ref=guest_id, value=bal.total)
+        return {"coins": bal.total, "episodes": len(ents)}
+
     def ensure_free(self, user_id: str, slug: str, number: int) -> bool:
         """Grant + report free entitlement for the first N episodes of a series."""
         from .overrides import get_series

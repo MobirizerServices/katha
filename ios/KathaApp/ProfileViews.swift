@@ -308,6 +308,11 @@ struct PinPad: View {
 
 struct HelpView: View {
     @Environment(AppModel.self) private var model
+    @State private var gContact = ""
+    @State private var gSubject = ""
+    @State private var gAck: GrievanceAck?
+    @State private var gBusy = false
+    @State private var gError = false
     private var faqs: [(q: String, a: String)] {
         [
         ("How do coins work?",
@@ -332,6 +337,41 @@ struct HelpView: View {
                     }
                 }
             }
+            Section {
+                TextField("Your email or phone", text: $gContact)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.emailAddress)
+                TextField("What went wrong?", text: $gSubject)
+                if let ack = gAck {
+                    Text("Filed as \(ack.id). We'll acknowledge within 24 hours and resolve within 15 days.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Katha.Color.success)
+                } else {
+                    Button(gBusy ? "Filing…" : "File grievance") {
+                        gBusy = true
+                        gError = false
+                        Task {
+                            gAck = try? await model.api.fileGrievance(
+                                contact: gContact.trimmingCharacters(in: .whitespaces),
+                                subject: gSubject.trimmingCharacters(in: .whitespaces),
+                                body: "")
+                            gBusy = false
+                            if gAck == nil { gError = true }
+                        }
+                    }
+                    .disabled(gBusy || gContact.trimmingCharacters(in: .whitespaces).isEmpty
+                              || gSubject.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .foregroundStyle(Katha.Color.accent)
+                    if gError {
+                        Text("Couldn't file right now — email us below instead.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Katha.Color.text2)
+                    }
+                }
+            } header: { Text("File a grievance") } footer: {
+                Text("Goes straight to the grievance officer, no email needed.")
+            }
+
             Section {
                 Link("help@katha.example", destination: URL(string: "mailto:help@katha.example")!)
                 Link("grievance@katha.example", destination: URL(string: "mailto:grievance@katha.example")!)

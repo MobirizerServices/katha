@@ -46,7 +46,7 @@ export interface WalletCtx extends WalletState {
   hasUnlocked: (slug: string, n: number) => boolean;
   unlockEpisode: (slug: string, n: number, price: number) => boolean;
   unlockBundle: (slug: string, cost: number) => boolean;
-  purchase: (base: number, priceInr: number, sku: string) => void;
+  purchase: (base: number, priceInr: number, sku: string, email?: string) => void;
   toast: (msg: string) => void;
 }
 
@@ -218,7 +218,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [refreshWallet, toast]);
 
   const purchase = useCallback(
-    (base: number, priceInr: number, sku: string) => {
+    (base: number, priceInr: number, sku: string, email = "") => {
       // Optimistic credit, then reconcile from the real web-order (ledger + web bonus).
       const bonus = webBonusCoins(base);
       setState((s) => ({
@@ -228,7 +228,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         firstPack: sku === "coins_starter_in" ? false : s.firstPack,
       }));
       toast((base + bonus).toLocaleString("en-IN") + " coins added · invoice emailed");
-      api.webOrder(sku)
+      api.webOrder(sku, email)
         .then((w) => setState((s) => ({ ...s, bought: w.balance_bought, bonus: w.balance_bonus })))
         .catch(() => refreshWallet());
     },

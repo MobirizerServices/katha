@@ -82,11 +82,43 @@ def draft_slugs() -> list[str]:
     return sorted(store.kv_prefix("series:").keys())
 
 
+_COVER_V: dict[str, str] = {}
+
+
+def cover_version(slug: str) -> str:
+    """Cache-buster derived from the poster file's mtime — regenerated art
+    gets a new URL, so clients never serve stale covers (cached 60s)."""
+    import os
+    import time
+    hit = _COVER_V.get(slug)
+    now = time.monotonic()
+    if hit and now - float(hit.split("|")[1]) < 60:
+        return hit.split("|")[0]
+    from .media import media_dir
+    try:
+        v = format(int(os.stat(media_dir() / slug / "cover_9x16.jpg").st_mtime), "x")
+    except OSError:
+        v = "0"
+    _COVER_V[slug] = f"{v}|{now}"
+    return v
+
+
+def stamp_covers(s):
+    """Attach versioned cover URLs (drafts get theirs here too — the art
+    generator produces covers for panel-created series)."""
+    v = cover_version(s.slug)
+    base = catalog.media_base()
+    return s.model_copy(update={
+        "cover_url": f"{base}/media/{s.slug}/cover_9x16.jpg?v={v}",
+        "cover_wide_url": f"{base}/media/{s.slug}/cover_16x9.jpg?v={v}",
+    })
+
+
 def get_series(slug: str) -> SeriesDetail | None:
     """The one lookup every money path uses: seed or panel-drafted series,
-    with panel pricing applied."""
+    with panel pricing applied and versioned cover URLs."""
     s = catalog.get_series(slug) or draft_series(slug)
-    return apply_pricing(s) if s is not None else None
+    return stamp_covers(apply_pricing(s)) if s is not None else None
 
 
 def all_summaries() -> list[SeriesSummary]:
@@ -100,4 +132,4 @@ def all_summaries() -> list[SeriesSummary]:
         if d is not None:
             out.append(SeriesSummary(**{k: getattr(d, k)
                                         for k in SeriesSummary.model_fields}))
-    return out
+    return [stamp_covers(s) for s in out]
