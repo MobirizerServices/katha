@@ -1,0 +1,67 @@
+#!/usr/bin/env ruby
+# Generates ios/KathaApp.xcodeproj — an iOS app target for the KathaApp SwiftUI
+# sources, depending on the local KathaKit Swift package. Run from ios/.
+require 'xcodeproj'
+
+here = File.expand_path(File.dirname(__FILE__))
+proj_path = File.join(here, 'KathaApp.xcodeproj')
+File.delete(proj_path) rescue nil
+FileUtils.rm_rf(proj_path) rescue nil
+
+project = Xcodeproj::Project.new(proj_path)
+target = project.new_target(:application, 'KathaApp', :ios, '17.0')
+
+# Source files (compiled into the app module).
+group = project.new_group('KathaApp', 'KathaApp')
+Dir[File.join(here, 'KathaApp', '*.swift')].sort.each do |f|
+  ref = group.new_reference(File.basename(f))
+  target.add_file_references([ref])
+end
+
+# Local Swift package dependency on ../KathaKit (path is relative to the project dir).
+local = project.new(Xcodeproj::Project::Object::XCLocalSwiftPackageReference)
+local.relative_path = 'KathaKit'
+project.root_object.package_references ||= []
+project.root_object.package_references << local
+
+dep = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+dep.product_name = 'KathaKit'
+dep.package = local
+target.package_product_dependencies << dep
+
+build_file = project.new(Xcodeproj::Project::Object::PBXBuildFile)
+build_file.product_ref = dep
+target.frameworks_build_phase.files << build_file
+
+# Build settings for a simulator-runnable, unsigned app.
+target.build_configurations.each do |cfg|
+  s = cfg.build_settings
+  s['PRODUCT_BUNDLE_IDENTIFIER'] = 'dev.katha.app'
+  s['PRODUCT_NAME'] = '$(TARGET_NAME)'
+  s['INFOPLIST_FILE'] = 'KathaApp/Info.plist'
+  s['GENERATE_INFOPLIST_FILE'] = 'NO'
+  s['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+  s['TARGETED_DEVICE_FAMILY'] = '1'
+  s['SWIFT_VERSION'] = '5.0'
+  s['MARKETING_VERSION'] = '1.0.0'
+  s['CURRENT_PROJECT_VERSION'] = '1'
+  s['CODE_SIGNING_ALLOWED'] = 'NO'
+  s['CODE_SIGNING_REQUIRED'] = 'NO'
+  s['CODE_SIGN_IDENTITY'] = ''
+  s['ENABLE_PREVIEWS'] = 'YES'
+  s['ASSETCATALOG_COMPILER_APPICON_NAME'] = ''
+  s['SWIFT_EMIT_LOC_STRINGS'] = 'NO'
+end
+
+project.save
+puts "Wrote #{proj_path}"
+puts "Targets: #{project.targets.map(&:name).join(', ')}"
+puts "Sources: #{target.source_build_phase.files.count} files"
+puts "Package deps: #{target.package_product_dependencies.map(&:product_name).join(', ')}"
+
+# Shared scheme so xcodebuild -scheme works headlessly.
+scheme = Xcodeproj::XCScheme.new
+scheme.add_build_target(target)
+scheme.set_launch_target(target)
+scheme.save_as(proj_path, 'KathaApp', true)
+puts "Scheme: KathaApp (shared)"

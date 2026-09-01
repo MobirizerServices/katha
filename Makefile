@@ -34,6 +34,16 @@ test-web:
 test-ios:
 	cd ios/KathaKit && ./coverage.sh
 
+# Generate the app's Xcode project, build for the simulator, install and launch it.
+# Needs core-api running (make api) for the feed/wallet to load.
+ios-run:
+	cd ios && ruby generate_xcodeproj.rb
+	cd ios && xcodebuild -project KathaApp.xcodeproj -scheme KathaApp -sdk iphonesimulator \
+		-configuration Debug -derivedDataPath build -destination 'generic/platform=iOS Simulator' build
+	xcrun simctl boot "iPhone 17" || true
+	xcrun simctl install booted ios/build/Build/Products/Debug-iphonesimulator/KathaApp.app
+	xcrun simctl launch booted dev.katha.app
+
 cov: test    # alias — every surface's run prints and gates its coverage
 
 api:
