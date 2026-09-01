@@ -167,7 +167,8 @@ struct PaywallView: View {
         .presentationBackground(Katha.Color.surface)
         .task {
             if packs.isEmpty {
-                packs = (try? await model.api.packs(storefront: "IN")) ?? []
+                packs = ((try? await model.api.packs(storefront: "IN")) ?? [])
+            .filter { !$0.sku.hasPrefix("coins_web") }   // web-store SKUs never sell via Apple IAP
             }
         }
     }

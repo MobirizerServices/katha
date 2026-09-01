@@ -130,7 +130,8 @@ struct WalletView: View {
 
     private func reload() async {
         await model.refreshWallet()
-        packs = (try? await model.api.packs(storefront: "IN")) ?? []
+        packs = ((try? await model.api.packs(storefront: "IN")) ?? [])
+            .filter { !$0.sku.hasPrefix("coins_web") }   // web-store SKUs never sell via Apple IAP
         history = (try? await model.api.walletTransactions()) ?? []
     }
 
