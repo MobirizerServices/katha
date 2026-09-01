@@ -18,6 +18,12 @@ Dir[File.join(here, 'KathaApp', '*.swift')].sort.each do |f|
   target.add_file_references([ref])
 end
 
+# Brand imagery and the App Store icon. Keep the catalog as a folder reference
+# so newly added image sets are picked up whenever this project is regenerated.
+assets_path = File.join(here, 'KathaApp', 'Assets.xcassets')
+assets_ref = group.new_reference('Assets.xcassets')
+target.resources_build_phase.add_file_reference(assets_ref, true)
+
 # Local Swift package dependency on ../KathaKit (path is relative to the project dir).
 local = project.new(Xcodeproj::Project::Object::XCLocalSwiftPackageReference)
 local.relative_path = 'KathaKit'
@@ -50,13 +56,16 @@ target.build_configurations.each do |cfg|
     s['CODE_SIGN_STYLE'] = 'Automatic'
     s['DEVELOPMENT_TEAM'] = ENV['KATHA_TEAM']
     s['CODE_SIGN_IDENTITY'] = 'Apple Development'
+    # Push capability: signed device builds carry the APNs entitlement so
+    # registerForRemoteNotifications yields a real token.
+    s['CODE_SIGN_ENTITLEMENTS'] = 'KathaApp/KathaApp.entitlements'
   else
     s['CODE_SIGNING_ALLOWED'] = 'NO'
     s['CODE_SIGNING_REQUIRED'] = 'NO'
     s['CODE_SIGN_IDENTITY'] = ''
   end
   s['ENABLE_PREVIEWS'] = 'YES'
-  s['ASSETCATALOG_COMPILER_APPICON_NAME'] = ''
+  s['ASSETCATALOG_COMPILER_APPICON_NAME'] = 'AppIcon'
   s['SWIFT_EMIT_LOC_STRINGS'] = 'NO'
 end
 

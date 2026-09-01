@@ -20,6 +20,7 @@ struct ProfileView: View {
                         value: "\(model.wallet.total) coins") { WalletView() }
                     row("bookmark.fill", "My list",
                         value: "\(model.myListSeries.count)") { MyListView() }
+                    row("doc.text.fill", "Invoices") { InvoicesView() }
                     row("gearshape.fill", "Settings") { SettingsView() }
                     row("questionmark.circle.fill", "Help & grievance") { HelpView() }
                 }
@@ -419,4 +420,67 @@ struct DeleteAccountSheet: View {
     return "The first \(free) episodes of every series are free. After that, " +
            "each episode costs \(price) coins (about ₹\(rupees(price, rate: model.rupeeRate))). " +
            "Buy packs once — coins never expire."
+}
+
+
+// MARK: - Invoices (web/UPI purchases; GST breakdown from the server)
+
+struct InvoicesView: View {
+    @Environment(AppModel.self) private var model
+    @State private var invoices: [Invoice]?
+
+    var body: some View {
+        Group {
+            if let invoices {
+                if invoices.isEmpty {
+                    VStack(spacing: Katha.Spacing.sm) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 34))
+                            .foregroundStyle(Katha.Color.text2)
+                        Text("No invoices yet")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Katha.Color.text)
+                        Text("Coins bought on the Katha website (UPI) are invoiced here. App Store purchases are invoiced by Apple.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Katha.Color.text2)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List(invoices) { inv in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(inv.id)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Katha.Color.text)
+                                Spacer()
+                                Text(paise(inv.totalMinor))
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundStyle(Katha.Color.text)
+                            }
+                            Text("\(inv.coins) coins" +
+                                 (inv.bonusCoins > 0 ? " + \(inv.bonusCoins) bonus" : ""))
+                                .font(.system(size: 13))
+                                .foregroundStyle(Katha.Color.text2)
+                            Text("Taxable \(paise(inv.taxableMinor)) · GST @\(inv.gstRatePct)% \(paise(inv.gstMinor)) · \(String(inv.createdAt.prefix(10)))")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Katha.Color.text2)
+                        }
+                        .listRowBackground(Katha.Color.surface)
+                    }
+                    .scrollContentBackground(.hidden)
+                }
+            } else {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .background(Katha.Color.bg)
+        .navigationTitle("Invoices")
+        .task { invoices = (try? await model.api.myInvoices())?.invoices ?? [] }
+    }
+
+    private func paise(_ minor: Int) -> String {
+        "₹\(minor / 100).\(String(format: "%02d", minor % 100))"
+    }
 }

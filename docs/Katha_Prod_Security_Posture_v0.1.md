@@ -55,3 +55,19 @@ Quarterly: rotate the session secret, re-check the provisioned-operators list
 against the org chart, verify the audit chain export is archived (7-year money
 retention per policy), and re-run the Playwright money-path suite against
 staging (`npm run test:e2e` in web/admin).
+
+## 5. Comms transports (added 2 Sep 2026)
+
+Outbound comms are **outbox-first**: every email/push writes an `outbox` row
+before any delivery attempt (admin → Outbox shows queued/sent/failed truth).
+Transports activate purely by env:
+
+| Variable | Purpose |
+|---|---|
+| `KATHA_SMTP_URL` (`smtp://user:pass@host:587` or `smtps://…:465`) + `KATHA_EMAIL_FROM` | Invoice + grievance emails deliver over SMTP; unset = dev (queued only). Treat as secrets. |
+| `KATHA_APNS_KEY_P8` (path), `KATHA_APNS_KEY_ID`, `KATHA_APNS_TEAM_ID`, `KATHA_APNS_TOPIC`, `KATHA_APNS_ENV=prod` | Episode-drop pushes deliver to APNs over HTTP/2 with an ES256 provider token. The .p8 lives in the secret manager, never the repo. |
+| `KATHA_GSTIN` | Printed on every web-purchase tax invoice (default marks registration pending). |
+
+Invoices: GST @18% carved out of the GST-inclusive pack price, numbered
+`KATHA-INV-<FY>-NNNNNN` per financial year, emailed on the web (UPI) order and
+listed in-app (`GET /v1/me/invoices`). Apple invoices IAP purchases itself.

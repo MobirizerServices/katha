@@ -19,6 +19,7 @@ const Config = lazy(() => import("./views/Config").then((m) => ({ default: m.Con
 const Audit = lazy(() => import("./views/Audit").then((m) => ({ default: m.Audit })));
 const Grievances = lazy(() => import("./views/Grievances").then((m) => ({ default: m.Grievances })));
 const Access = lazy(() => import("./views/Access").then((m) => ({ default: m.Access })));
+const Outbox = lazy(() => import("./views/Outbox").then((m) => ({ default: m.Outbox })));
 
 function Denied({ view }: { view: string }) {
   const { role } = useStore();
@@ -318,6 +319,7 @@ export default function App() {
                 <Route path="/grievances" element={<Guard view="grievances"><Grievances /></Guard>} />
                 <Route path="/config" element={<Guard view="config"><Config /></Guard>} />
                 <Route path="/audit" element={<Guard view="audit"><Audit /></Guard>} />
+                <Route path="/outbox" element={<Guard view="outbox"><Outbox /></Guard>} />
                 <Route path="/access" element={<Guard view="access"><Access /></Guard>} />
                 <Route path="*" element={<Navigate to="/overview" replace />} />
               </Routes>

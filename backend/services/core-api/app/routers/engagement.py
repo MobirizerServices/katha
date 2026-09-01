@@ -1,7 +1,7 @@
 """Engagement: watch progress, continue-watching, My List, daily check-in reward."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 
 from katha_domain import catalog
 from katha_domain.schemas import (
@@ -112,6 +112,29 @@ class GrievanceIn(_BM):
     subject: str
     body: str = ""
     channel: str = "app"
+
+
+@router.post("/push/register")
+def push_register(body: dict = Body(...), user: str = Depends(current_user)) -> dict:
+    """APNs device-token registration — the server can then reach this
+    device for episode drops. Tokens are per (user, device), idempotent."""
+    token = (body.get("token") or "").strip()
+    if not token or len(token) > 200:
+        raise HTTPException(status_code=400, detail="bad device token")
+    if store.shared is None:
+        raise HTTPException(status_code=503, detail="push registry needs persistence")
+    store.shared.push_register(user, token=token,
+                               platform=(body.get("platform") or "ios"),
+                               now=now_iso())
+    return {"registered": True}
+
+
+@router.get("/me/invoices")
+def my_invoices(user: str = Depends(current_user)) -> dict:
+    """Invoices for this account's WEB purchases (buy on web, see in-app)."""
+    if store.shared is None:
+        return {"invoices": []}
+    return {"invoices": store.shared.invoices_for(user)}
 
 
 @router.post("/grievance")

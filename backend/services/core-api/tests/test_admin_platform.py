@@ -941,3 +941,98 @@ def test_config_serves_rate_and_checkin(shared):
     assert core.get("/v1/config").json()["coin_rupee_rate"] == 0.2
     shared.kv_set("config:coin.rupee_rate", "junk")
     assert core.get("/v1/config").json()["coin_rupee_rate"] == 0.15
+
+
+def test_web_order_creates_invoice_and_email_once(shared):
+    core = _core()
+    r = core.post("/v1/web/orders", headers={"Authorization": "Bearer inv-u"},
+                  json={"sku": "coins_web_popular_in", "email": "meera@example.com"})
+    assert r.status_code == 200
+    # replay: idempotent credit AND no duplicate invoice/email
+    core.post("/v1/web/orders", headers={"Authorization": "Bearer inv-u"},
+              json={"sku": "coins_web_popular_in", "email": "meera@example.com"})
+    invs = core.get("/v1/me/invoices",
+                    headers={"Authorization": "Bearer inv-u"}).json()["invoices"]
+    assert len(invs) == 1
+    inv = invs[0]
+    # ₹199 GST-inclusive @18%: taxable 16864 + gst 3036 = 19900
+    assert inv["total_minor"] == 19900
+    assert inv["taxable_minor"] == 16864 and inv["gst_minor"] == 3036
+    assert inv["id"].startswith("KATHA-INV-2627-")
+    assert inv["coins"] == 1300 and inv["bonus_coins"] == 130
+    # the email sits in the outbox (dev transport), queued with the number
+    mails = shared.outbox_list(kind="email")
+    assert mails[0]["recipient"] == "meera@example.com"
+    assert inv["id"] in mails[0]["subject"]
+    assert "GST @ 18%" in mails[0]["body"] and mails[0]["status"] == "queued"
+    # a second order (different sku) gets the next sequential number
+    core.post("/v1/web/orders", headers={"Authorization": "Bearer inv-u"},
+              json={"sku": "coins_starter_in"})
+    invs = core.get("/v1/me/invoices",
+                    headers={"Authorization": "Bearer inv-u"}).json()["invoices"]
+    nums = sorted(i["id"] for i in invs)
+    assert nums[0].endswith("000001") and nums[1].endswith("000002")
+
+
+def test_push_register_and_drop_notification(shared):
+    core = _core()
+    r = core.post("/v1/push/register", headers={"Authorization": "Bearer push-u"},
+                  json={"token": "devtok-abc123", "platform": "ios"})
+    assert r.json() == {"registered": True}
+    core.post("/v1/push/register", headers={"Authorization": "Bearer push-u"},
+              json={"token": "devtok-abc123"})          # idempotent re-register
+    core.post("/v1/push/register", headers={"Authorization": "Bearer push-u2"},
+              json={"token": "devtok-def456"})
+    assert core.post("/v1/push/register",
+                     headers={"Authorization": "Bearer push-u"},
+                     json={"token": ""}).status_code == 400
+    assert len(shared.push_tokens()) == 2
+
+    a = _admin()
+    r = a.post("/admin/v1/catalog/series/kaanch-ka-mahal/notify-drop",
+               headers=ADMIN_H, json={"episode": 12})
+    assert r.status_code == 200 and r.json()["devices"] == 2
+    pushes = shared.outbox_list(kind="push")
+    assert len(pushes) == 2 and pushes[0]["subject"] == "Kaanch Ka Mahal"
+    assert '"episode": 12' in pushes[0]["body"].replace("'", '"') or \
+           '"episode": 12' in pushes[0]["body"]
+    assert pushes[0]["status"] == "queued"       # no APNs creds in dev
+    # guards
+    assert a.post("/admin/v1/catalog/series/nope/notify-drop", headers=ADMIN_H,
+                  json={"episode": 1}).status_code == 404
+    assert a.post("/admin/v1/catalog/series/kaanch-ka-mahal/notify-drop",
+                  headers=ADMIN_H, json={}).status_code == 400
+    # outbox endpoint serves it all with transport truth
+    ob = a.get("/admin/v1/outbox", headers=ADMIN_H).json()
+    assert ob["transports"] == {"email": False, "push": False}
+    assert any(x["kind"] == "push" for x in ob["rows"])
+    only_push = a.get("/admin/v1/outbox?kind=push", headers=ADMIN_H).json()["rows"]
+    assert all(x["kind"] == "push" for x in only_push)
+
+
+def test_grievance_lifecycle_emails_complainant(shared):
+    core = _core()
+    gid = core.post("/v1/grievance", headers={"Authorization": "Bearer g-u"},
+                    json={"contact": "user@example.com",
+                          "subject": "double charge"}).json()["id"]
+    a = _admin()
+    a.post(f"/admin/v1/grievances/{gid}/ack", headers=ADMIN_H)
+    a.post(f"/admin/v1/grievances/{gid}/resolve", headers=ADMIN_H,
+           json={"note": "duplicate refunded"})
+    mails = [m for m in shared.outbox_list(kind="email")
+             if m["recipient"] == "user@example.com"]
+    assert len(mails) == 2
+    assert "resolved" in mails[0]["subject"] and "acknowledged" in mails[1]["subject"]
+    assert "duplicate refunded" in mails[0]["body"]
+    # a phone-only contact gets no email, and nothing crashes
+    gid2 = core.post("/v1/grievance", headers={"Authorization": "Bearer g-u"},
+                     json={"contact": "+919876543210", "subject": "s"}).json()["id"]
+    a.post(f"/admin/v1/grievances/{gid2}/ack", headers=ADMIN_H)
+    assert not any(m["recipient"] == "+919876543210"
+                   for m in shared.outbox_list(kind="email"))
+
+
+def test_push_tokens_per_user_filter(shared):
+    shared.push_register("pu-1", token="t1", platform="ios", now=T0)
+    shared.push_register("pu-2", token="t2", platform="ios", now=T0)
+    assert [t["token"] for t in shared.push_tokens("pu-1")] == ["t1"]

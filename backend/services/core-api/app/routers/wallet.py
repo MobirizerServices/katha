@@ -119,6 +119,20 @@ def web_order(req: WebOrderRequest, user: str = Depends(current_user)) -> Wallet
                             reference_id=req.sku, idempotency_key=f"webbonus:{user}:{req.sku}",
                             created_at=now_iso())
     store.emit(user, "purchase", ref=req.sku, value=pack["coins"], channel="web")
+    # GST invoice + email for the web purchase (Apple invoices IAP itself).
+    # Idempotent alongside the credit: a replayed order never double-invoices.
+    if store.shared is not None:
+        from katha_infra import comms
+        order_ref = f"web:{user}:{req.sku}"
+        if store.shared.invoice_by_order(order_ref) is None:
+            inv = comms.build_invoice(
+                store.shared, user_id=user, order_ref=order_ref, sku=req.sku,
+                coins=pack["coins"], bonus=web_bonus,
+                total_minor=pack["price_minor"], now=now_iso())
+            comms.send_email(
+                store.shared, to=req.email or f"{user}@app.katha.example",
+                subject=f"Your Katha invoice {inv['id']}",
+                body_html=comms.invoice_email_html(inv), now=now_iso())
     return _wallet_response(user)
 
 

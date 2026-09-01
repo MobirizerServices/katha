@@ -11,7 +11,7 @@ describe("nav", () => {
   it("covers every routed view exactly once", () => {
     const views = ALL_NAV_ITEMS.map((i) => i.view).sort();
     expect(views).toEqual(
-      ["access", "approvals", "audit", "catalog", "config", "grievances", "overview", "users"].sort()
+      ["access", "approvals", "audit", "catalog", "config", "grievances", "outbox", "overview", "users"].sort()
     );
   });
 

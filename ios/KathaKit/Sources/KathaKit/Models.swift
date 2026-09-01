@@ -303,3 +303,35 @@ public struct AppConfig: Codable, Hashable, Sendable {
         return false
     }
 }
+
+/// GST invoice for a WEB (UPI) coin purchase — buy on the web, see it in-app.
+public struct Invoice: Codable, Hashable, Identifiable, Sendable {
+    public let id: String
+    public let orderRef: String
+    public let sku: String
+    public let coins: Int
+    public let bonusCoins: Int
+    public let totalMinor: Int
+    public let taxableMinor: Int
+    public let gstMinor: Int
+    public let gstRatePct: Int
+    public let sellerGstin: String
+    public let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case orderRef = "order_ref"
+        case sku, coins
+        case bonusCoins = "bonus_coins"
+        case totalMinor = "total_minor"
+        case taxableMinor = "taxable_minor"
+        case gstMinor = "gst_minor"
+        case gstRatePct = "gst_rate_pct"
+        case sellerGstin = "seller_gstin"
+        case createdAt = "created_at"
+    }
+}
+
+public struct InvoiceList: Codable, Hashable, Sendable {
+    public let invoices: [Invoice]
+}

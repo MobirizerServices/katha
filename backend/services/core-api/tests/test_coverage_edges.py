@@ -249,3 +249,16 @@ def test_true_last_lines(tmp_path):
                   created_at="2026-09-01T00:00:00+00:00")
     reader.refresh()
     assert reader.is_entitled("r-u", "kaanch-ka-mahal:e11")
+
+
+def test_comms_endpoints_without_persistence():
+    assert core.post("/v1/push/register", headers={"Authorization": "Bearer u"},
+                     json={"token": "t"}).status_code == 503
+    assert core.get("/v1/me/invoices",
+                    headers={"Authorization": "Bearer u"}).json() == {"invoices": []}
+    ob = admin.get("/admin/v1/outbox", headers=ADMIN).json()
+    assert ob == {"rows": [], "transports": {"email": False, "push": False}}
+    assert admin.post("/admin/v1/catalog/series/kaanch-ka-mahal/notify-drop",
+                      headers=ADMIN, json={"episode": 2}).status_code == 503
+    # grievance email helper is a silent no-op without the shared store
+    admin_main._grievance_email("G-X", "acknowledged", "msg")

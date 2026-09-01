@@ -38,6 +38,7 @@ export const NAV: NavGroup[] = [
     title: "Platform",
     items: [
       { view: "audit", path: "/audit", label: "Audit log", icon: "▤" },
+      { view: "outbox", path: "/outbox", label: "Outbox", icon: "✉" },
       { view: "access", path: "/access", label: "Roles & access", icon: "⚿" },
     ],
   },

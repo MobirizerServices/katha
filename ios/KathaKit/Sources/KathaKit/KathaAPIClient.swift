@@ -144,6 +144,18 @@ public actor KathaAPIClient {
         try await get("/v1/config")
     }
 
+    /// Register this device's APNs token so the server can push episode drops.
+    public func registerPush(token: String, platform: String = "ios") async throws {
+        struct Ack: Codable { let registered: Bool }
+        let _: Ack = try await send("/v1/push/register", method: "POST",
+                                    body: ["token": token, "platform": platform])
+    }
+
+    /// Invoices for this account's web (UPI) purchases.
+    public func myInvoices() async throws -> InvoiceList {
+        try await get("/v1/me/invoices")
+    }
+
     public func packs(storefront: String = "IN") async throws -> [CoinPack] {
         try await get("/v1/iap/packs", query: ["storefront": storefront])
     }

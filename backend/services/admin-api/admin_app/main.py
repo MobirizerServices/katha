@@ -999,6 +999,9 @@ def grievance_ack(gid: str, request: Request = None,
             gid, status="ack", ack_at=now_iso(), assignee=actor.id) is None:
         raise HTTPException(status_code=404, detail="grievance not found")
     audit(actor, "grievance.ack", gid, {}, request)
+    _grievance_email(gid, "acknowledged",
+                     "We have received your grievance and a named officer is "
+                     "reviewing it. You will hear back within 15 days.")
     return {"id": gid, "status": "ack"}
 
 
@@ -1013,6 +1016,7 @@ def grievance_resolve(gid: str, request: Request = None, body: dict = Body(defau
             add_note={"by": actor.id, "at": now_iso(), "note": note}) is None:
         raise HTTPException(status_code=404, detail="grievance not found")
     audit(actor, "grievance.resolve", gid, {"note": note}, request)
+    _grievance_email(gid, "resolved", note)
     return {"id": gid, "status": "resolved"}
 
 
@@ -1328,6 +1332,65 @@ def audit_annotate(row_id: int, request: Request = None, body: dict = Body(...),
     SHARED.kv_set(f"auditnote:{row_id}", _json.dumps(record))
     audit(actor, "audit.note", str(row_id), {"note": note}, request)
     return {"id": row_id, "note": record}
+
+
+
+# ---- outbound comms: outbox ledger, drop pushes, grievance emails -----------
+def _grievance_email(gid: str, verdict: str, message: str) -> None:
+    """Email the complainant on ack/resolve (IT Rules communication trail)."""
+    if SHARED is None:
+        return
+    from katha_infra import comms
+    g = next((x for x in SHARED.grievance_list() if x["id"] == gid), None)
+    if g is None or "@" not in g["contact"]:
+        return
+    comms.send_email(
+        SHARED, to=g["contact"],
+        subject=f"Your Katha grievance {gid} — {verdict}",
+        body_html=(f"<p>Grievance <b>{gid}</b> ({g['subject']}) has been "
+                   f"<b>{verdict}</b>.</p><p>{message}</p>"
+                   "<p>— Katha grievance desk</p>"),
+        now=now_iso())
+
+
+@router.get("/outbox", tags=["ops"])
+def outbox(kind: str = "", limit: int = 100,
+           actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,
+                                          Role.ANALYST, Role.RO))):
+    """Every email and push the system produced — queued (dev, no transport
+    configured), sent, or failed with the reason. The truth about comms."""
+    if SHARED is None:
+        return {"rows": [], "transports": {"email": False, "push": False}}
+    from katha_infra import comms
+    return {"rows": SHARED.outbox_list(kind=kind, limit=max(1, min(limit, 500))),
+            "transports": {"email": comms.email_configured(),
+                           "push": comms.push_configured()}}
+
+
+@router.post("/catalog/series/{slug}/notify-drop", tags=["catalog"])
+def notify_drop(slug: str, request: Request = None, body: dict = Body(...),
+                actor: Actor = Depends(require(Role.CONTENT))):
+    """Episode-drop push to every registered device (PDD §14). Outbox-first;
+    APNs delivers when KATHA_APNS_* is configured."""
+    if not _series_exists(slug):
+        raise HTTPException(status_code=404, detail="series not found")
+    episode = int(body.get("episode") or 0)
+    if episode < 1:
+        raise HTTPException(status_code=400, detail="episode required")
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+    from app.overrides import get_series
+    from katha_infra import comms
+    series = get_series(slug)
+    title = series.title if series else slug
+    tokens = SHARED.push_tokens()
+    for t in tokens:
+        comms.send_push(SHARED, device_token=t["token"], title=title,
+                        body=f"Episode {episode} just dropped — continue the story.",
+                        route={"slug": slug, "episode": episode}, now=now_iso())
+    audit(actor, "series.notify_drop", slug,
+          {"episode": episode, "devices": len(tokens)}, request)
+    return {"slug": slug, "episode": episode, "devices": len(tokens)}
 
 app.include_router(router)
 

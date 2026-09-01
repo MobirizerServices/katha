@@ -297,3 +297,37 @@ extension AccountAPITests {
         XCTAssertFalse(AppConfig.isOutdated(current: "1.0.0", minimum: "1.0.0"))
     }
 }
+
+extension AccountAPITests {
+    func testRegisterPushPostsTokenAndPlatform() async throws {
+        reply(#"{"registered": true}"#)
+        try await makeClient(authToken: "tok").registerPush(token: "devtok-abc")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/v1/push/register")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.httpMethod, "POST")
+        let stream = try XCTUnwrap(MockURLProtocol.lastRequest?.httpBodyStream)
+        stream.open()
+        var buf = [UInt8](repeating: 0, count: 1024)
+        let n = stream.read(&buf, maxLength: 1024)
+        let body = String(bytes: buf[0..<max(n, 0)], encoding: .utf8) ?? ""
+        XCTAssertTrue(body.contains(#""token":"devtok-abc""#))
+        XCTAssertTrue(body.contains(#""platform":"ios""#))
+    }
+
+    func testMyInvoicesDecodesGSTBreakdown() async throws {
+        reply("""
+        {"invoices":[{"id":"KATHA-INV-2627-000001","order_ref":"web:u:sku",
+          "sku":"coins_web_popular_in","coins":1300,"bonus_coins":130,
+          "total_minor":19900,"taxable_minor":16864,"gst_minor":3036,
+          "gst_rate_pct":18,"seller_gstin":"27ABCDE1234F1Z5",
+          "created_at":"2026-09-01T00:00:00+00:00"}]}
+        """)
+        let list = try await makeClient(authToken: "tok").myInvoices()
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/v1/me/invoices")
+        let inv = try XCTUnwrap(list.invoices.first)
+        XCTAssertEqual(inv.id, "KATHA-INV-2627-000001")
+        XCTAssertEqual(inv.totalMinor, 19900)
+        XCTAssertEqual(inv.taxableMinor + inv.gstMinor, inv.totalMinor)
+        XCTAssertEqual(inv.bonusCoins, 130)
+        XCTAssertEqual(inv.sellerGstin, "27ABCDE1234F1Z5")
+    }
+}

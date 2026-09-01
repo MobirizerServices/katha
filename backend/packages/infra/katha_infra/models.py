@@ -155,3 +155,56 @@ class GrievanceRow(Base):
     ack_at: Mapped[str] = mapped_column(String, nullable=False, default="")
     resolved_at: Mapped[str] = mapped_column(String, nullable=False, default="")
     notes: Mapped[str] = mapped_column(String, nullable=False, default="[]")
+
+
+class PushTokenRow(Base):
+    """One APNs device token per (user, device). Registered by the app after
+    notification permission; the sender fans out per user or broadcast."""
+
+    __tablename__ = "push_token"
+    __table_args__ = (UniqueConstraint("user_id", "token", name="uq_user_token"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    token: Mapped[str] = mapped_column(String, nullable=False)
+    platform: Mapped[str] = mapped_column(String, nullable=False, default="ios")
+    registered_at: Mapped[str] = mapped_column(String, nullable=False)
+    last_seen: Mapped[str] = mapped_column(String, nullable=False, default="")
+
+
+class InvoiceRow(Base):
+    """GST invoice for a WEB (UPI) coin purchase — Apple invoices IAP itself.
+    Numbered sequentially per financial year; amounts in paise."""
+
+    __tablename__ = "invoice"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)   # KATHA-INV-2627-000001
+    user_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    order_ref: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    sku: Mapped[str] = mapped_column(String, nullable=False)
+    coins: Mapped[int] = mapped_column(Integer, nullable=False)
+    bonus_coins: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_minor: Mapped[int] = mapped_column(Integer, nullable=False)
+    taxable_minor: Mapped[int] = mapped_column(Integer, nullable=False)
+    gst_minor: Mapped[int] = mapped_column(Integer, nullable=False)
+    gst_rate_pct: Mapped[int] = mapped_column(Integer, nullable=False, default=18)
+    seller_gstin: Mapped[str] = mapped_column(String, nullable=False, default="")
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class OutboxRow(Base):
+    """Every outbound communication (email + push), whatever the transport.
+    In dev the transports write ONLY here (nothing leaves the machine); in
+    production the same row is written first, then delivered — so the admin
+    Outbox view is always the truth about what was sent."""
+
+    __tablename__ = "outbox"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String, index=True, nullable=False)  # email | push
+    recipient: Mapped[str] = mapped_column(String, nullable=False)
+    subject: Mapped[str] = mapped_column(String, nullable=False, default="")
+    body: Mapped[str] = mapped_column(String, nullable=False, default="")
+    status: Mapped[str] = mapped_column(String, index=True, nullable=False)  # queued|sent|failed
+    detail: Mapped[str] = mapped_column(String, nullable=False, default="")
+    created_at: Mapped[str] = mapped_column(String, nullable=False)

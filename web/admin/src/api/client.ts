@@ -315,6 +315,16 @@ export const api = {
   async listExperiments(): Promise<{ experiments: Experiment[] }> {
     return get("/experiments", { experiments: [] });
   },
+  async outbox(kind = ""): Promise<{
+    rows: { id: number; kind: string; recipient: string; subject: string;
+            body: string; status: string; detail: string; created_at: string }[];
+    transports: { email: boolean; push: boolean };
+  }> {
+    const p = new URLSearchParams();
+    if (kind) p.set("kind", kind);
+    return get(`/outbox?${p}`,
+               { rows: [], transports: { email: false, push: false } });
+  },
   async listDevices(userId: string):
       Promise<{ devices: { ua: string; ip: string; first_seen: string;
                            last_seen: string }[] }> {
@@ -390,4 +400,6 @@ export const mutate = {
   uiPing: (view: string) => send("/metrics/ui", "POST", { view }),
   annotateAudit: (id: number, note: string) =>
     send(`/audit/${id}/note`, "PATCH", { note }),
+  notifyDrop: (slug: string, episode: number) =>
+    send(`/catalog/series/${slug}/notify-drop`, "POST", { episode }),
 };

@@ -627,3 +627,121 @@ class SharedStore:
                                          & fun["paywall_view"][w])}
                        for w in ("1d", "7d", "30d")},
         }
+
+    # ---- push tokens ---------------------------------------------------------
+    def push_register(self, user_id: str, *, token: str, platform: str,
+                      now: str) -> None:
+        self.db.run(self._push_register(user_id, token, platform, now))
+
+    async def _push_register(self, user_id, token, platform, now) -> None:
+        from .models import PushTokenRow
+        async with self.db.session_factory() as s:
+            row = (await s.execute(select(PushTokenRow)
+                   .where(PushTokenRow.user_id == user_id,
+                          PushTokenRow.token == token))).scalars().first()
+            if row is None:
+                s.add(PushTokenRow(user_id=user_id, token=token,
+                                   platform=platform, registered_at=now,
+                                   last_seen=now))
+            else:
+                row.last_seen = now
+            await s.commit()
+
+    def push_tokens(self, user_id: str | None = None) -> list[dict]:
+        return self.db.run(self._push_tokens(user_id))
+
+    async def _push_tokens(self, user_id) -> list[dict]:
+        from .models import PushTokenRow
+        async with self.db.session_factory() as s:
+            stmt = select(PushTokenRow)
+            if user_id:
+                stmt = stmt.where(PushTokenRow.user_id == user_id)
+            rows = (await s.execute(stmt)).scalars().all()
+        return [{"user_id": r.user_id, "token": r.token, "platform": r.platform,
+                 "registered_at": r.registered_at} for r in rows]
+
+    # ---- outbox (comms ledger) ----------------------------------------------
+    def outbox_append(self, *, kind: str, recipient: str, subject: str,
+                      body: str, now: str) -> int:
+        return self.db.run(self._outbox_append(kind, recipient, subject, body, now))
+
+    async def _outbox_append(self, kind, recipient, subject, body, now) -> int:
+        from .models import OutboxRow
+        async with self.db.session_factory() as s:
+            row = OutboxRow(kind=kind, recipient=recipient, subject=subject,
+                            body=body, status="queued", created_at=now)
+            s.add(row)
+            await s.commit()
+            await s.refresh(row)
+            return row.id
+
+    def outbox_mark(self, row_id: int, status: str, detail: str = "") -> None:
+        self.db.run(self._outbox_mark(row_id, status, detail))
+
+    async def _outbox_mark(self, row_id, status, detail) -> None:
+        from .models import OutboxRow
+        async with self.db.session_factory() as s:
+            row = await s.get(OutboxRow, row_id)
+            if row is not None:
+                row.status, row.detail = status, detail
+                await s.commit()
+
+    def outbox_list(self, *, kind: str = "", limit: int = 100) -> list[dict]:
+        return self.db.run(self._outbox_list(kind, limit))
+
+    async def _outbox_list(self, kind, limit) -> list[dict]:
+        from .models import OutboxRow
+        async with self.db.session_factory() as s:
+            stmt = select(OutboxRow).order_by(OutboxRow.id.desc()).limit(limit)
+            if kind:
+                stmt = stmt.where(OutboxRow.kind == kind)
+            rows = (await s.execute(stmt)).scalars().all()
+        return [{"id": r.id, "kind": r.kind, "recipient": r.recipient,
+                 "subject": r.subject, "body": r.body, "status": r.status,
+                 "detail": r.detail, "created_at": r.created_at} for r in rows]
+
+    # ---- invoices ------------------------------------------------------------
+    def next_invoice_number(self, year: str) -> str:
+        """Sequential per financial-year prefix, via the KV counter."""
+        fy = f"{year[2:]}{int(year) % 100 + 1:02d}"          # 2026 → "2627"
+        key = f"invoiceseq:{fy}"
+        n = int(self.kv_get(key) or 0) + 1
+        self.kv_set(key, str(n))
+        return f"KATHA-INV-{fy}-{n:06d}"
+
+    def invoice_create(self, **fields) -> None:
+        self.db.run(self._invoice_create(fields))
+
+    async def _invoice_create(self, fields) -> None:
+        from .models import InvoiceRow
+        async with self.db.session_factory() as s:
+            s.add(InvoiceRow(**fields))
+            await s.commit()
+
+    def invoices_for(self, user_id: str) -> list[dict]:
+        return self.db.run(self._invoices_for(user_id))
+
+    async def _invoices_for(self, user_id) -> list[dict]:
+        from .models import InvoiceRow
+        async with self.db.session_factory() as s:
+            rows = (await s.execute(
+                select(InvoiceRow).where(InvoiceRow.user_id == user_id)
+                .order_by(InvoiceRow.created_at.desc()))).scalars().all()
+        return [{"id": r.id, "order_ref": r.order_ref, "sku": r.sku,
+                 "coins": r.coins, "bonus_coins": r.bonus_coins,
+                 "total_minor": r.total_minor, "taxable_minor": r.taxable_minor,
+                 "gst_minor": r.gst_minor, "gst_rate_pct": r.gst_rate_pct,
+                 "seller_gstin": r.seller_gstin, "created_at": r.created_at}
+                for r in rows]
+
+    def invoice_by_order(self, order_ref: str) -> dict | None:
+        return self.db.run(self._invoice_by_order(order_ref))
+
+    async def _invoice_by_order(self, order_ref) -> dict | None:
+        from .models import InvoiceRow
+        async with self.db.session_factory() as s:
+            r = (await s.execute(select(InvoiceRow)
+                 .where(InvoiceRow.order_ref == order_ref))).scalars().first()
+        if r is None:
+            return None
+        return {"id": r.id, "order_ref": r.order_ref}

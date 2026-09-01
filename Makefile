@@ -59,7 +59,7 @@ api:
 
 admin:
 	cd backend && $(SHARED_ENV) KATHA_ADMIN_AUTH=oidc \
-		PYTHONPATH="packages/domain:packages/ledger:packages/infra:services/admin-api:services/core-api" \
+		PYTHONPATH="packages/domain:packages/ledger:packages/infra:services/core-api:services/admin-api" \
 		.venv/bin/python -m uvicorn admin_app.main:app --port 8800
 
 # Browser e2e for the admin money paths (#108): boots throwaway servers on

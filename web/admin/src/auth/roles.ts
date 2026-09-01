@@ -36,9 +36,9 @@ const ROLE_VIEWS: Record<Role, "*" | string[]> = {
   admin: "*",
   content: ["overview", "catalog", "config", "audit", "approvals", "access"],
   qc: ["overview", "catalog", "audit", "access"],
-  support: ["overview", "users", "audit", "approvals", "grievances", "access"],
-  finance: ["overview", "users", "config", "audit", "approvals", "access"],
-  analyst: ["overview", "config", "access"],
+  support: ["overview", "users", "audit", "approvals", "grievances", "access", "outbox"],
+  finance: ["overview", "users", "config", "audit", "approvals", "access", "outbox"],
+  analyst: ["overview", "config", "access", "audit", "outbox"],
   ro: ["overview", "catalog", "audit", "access"],
 };
 

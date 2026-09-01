@@ -32,6 +32,8 @@ export function CatalogDetail() {
   const [rightsFields, setRightsFields] = useState({ owner: "", license_until: "" });
   const [retitle, setRetitle] = useState<number | null>(null);
   const [newTitle, setNewTitle] = useState("");
+  const [dropOpen, setDropOpen] = useState(false);
+  const [dropEp, setDropEp] = useState(1);
 
   const load = useCallback(() => {
     void api.seriesDetail(slug).then(setD);
@@ -75,6 +77,14 @@ export function CatalogDetail() {
     showToast("Rights recorded — expiring licences hit the attention rail");
     setRightsOpen(false);
     load();
+  }
+
+  async function sendDrop() {
+    const res = await mutate.notifyDrop(slug, dropEp);
+    if ("offline" in res) return showToast("Offline — nothing sent", "error");
+    if (res.error) return showToast(`Not sent: ${res.error}`, "error");
+    showToast(`Episode ${dropEp} drop pushed to ${res.devices} device(s) — see Outbox`);
+    setDropOpen(false);
   }
 
   async function saveTitle() {
@@ -138,6 +148,11 @@ export function CatalogDetail() {
               <button className="btn danger" disabled={!qcRole || !online || d.status === "archived"}
                       onClick={() => setTakedown(true)}>
                 Take down…
+              </button>
+              <button className="btn s" disabled={!contentRole || !online || d.status !== "live"}
+                      title={d.status !== "live" ? "Only live series notify" : ""}
+                      onClick={() => { setDropEp(d.episodeCount); setDropOpen(true); }}>
+                Notify drop…
               </button>
             </div>
             <dl className="kv" style={{ marginTop: 14 }}>
@@ -337,6 +352,28 @@ export function CatalogDetail() {
                    onChange={(e) => setRightsFields({ ...rightsFields,
                                                       license_until: e.target.value })}
                    placeholder="2027-03-31" />
+          </label>
+        </Modal>
+      ) : null}
+
+      {dropOpen ? (
+        <Modal title={`Episode drop · ${d.title}`} onClose={() => setDropOpen(false)}
+               footer={
+                 <>
+                   <button className="btn s" onClick={() => setDropOpen(false)}>Cancel</button>
+                   <button className="btn p" onClick={() => void sendDrop()}>
+                     Send push
+                   </button>
+                 </>
+               }>
+          <p className="tiny">
+            Pushes "Episode N just dropped" to every registered device (APNs when
+            configured; queued to the Outbox in dev). Deep-links into the episode.
+          </p>
+          <label>
+            Episode number
+            <input type="number" min={1} value={dropEp} aria-label="Drop episode"
+                   onChange={(e) => setDropEp(Number(e.target.value))} />
           </label>
         </Modal>
       ) : null}

@@ -1369,6 +1369,91 @@
         ]
       }
     },
+    "/admin/v1/catalog/series/{slug}/notify-drop": {
+      "post": {
+        "description": "Episode-drop push to every registered device (PDD \u00a714). Outbox-first;\nAPNs delivers when KATHA_APNS_* is configured.",
+        "operationId": "notify_drop_admin_v1_catalog_series__slug__notify_drop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Notify Drop",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/admin/v1/catalog/series/{slug}/pricing": {
       "patch": {
         "description": "Per-series price/free-window override reaching playback AND the ledger\ncharge on core-api's next request. Guarded by a typed confirm.",
@@ -2658,6 +2743,90 @@
           }
         },
         "summary": "Ui Ping",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/admin/v1/outbox": {
+      "get": {
+        "description": "Every email and push the system produced \u2014 queued (dev, no transport\nconfigured), sent, or failed with the reason. The truth about comms.",
+        "operationId": "outbox_admin_v1_outbox_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Outbox",
         "tags": [
           "ops"
         ]

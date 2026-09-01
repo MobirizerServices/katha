@@ -91,6 +91,7 @@ class IapVerifyRequest(BaseModel):
 
 class WebOrderRequest(BaseModel):
     sku: str
+    email: str = ""      # invoice delivery (web checkout collects it)
 
 
 class ProblemDetail(BaseModel):

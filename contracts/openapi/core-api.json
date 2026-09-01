@@ -738,6 +738,122 @@
         }
       }
     },
+    "/v1/push/register": {
+      "post": {
+        "tags": [
+          "engagement"
+        ],
+        "summary": "Push Register",
+        "description": "APNs device-token registration \u2014 the server can then reach this\ndevice for episode drops. Tokens are per (user, device), idempotent.",
+        "operationId": "push_register_v1_push_register_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Push Register V1 Push Register Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/invoices": {
+      "get": {
+        "tags": [
+          "engagement"
+        ],
+        "summary": "My Invoices",
+        "description": "Invoices for this account's WEB purchases (buy on web, see in-app).",
+        "operationId": "my_invoices_v1_me_invoices_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response My Invoices V1 Me Invoices Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/grievance": {
       "post": {
         "tags": [
@@ -2099,6 +2215,11 @@
           "sku": {
             "type": "string",
             "title": "Sku"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "default": ""
           }
         },
         "type": "object",

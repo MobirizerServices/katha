@@ -679,3 +679,68 @@ describe("ledger deep-links (#025) & audit annotations (#070)", () => {
       .toEqual({ note: "superseded — double-fire era" });
   });
 });
+
+describe("comms: Outbox view + drop pushes", () => {
+  it("lists the outbox with transport truth and expands a row", async () => {
+    const { Outbox } = await import("../src/views/Outbox");
+    stub({
+      ...SIGNALS,
+      "/outbox": () => ({
+        transports: { email: false, push: true },
+        rows: [
+          { id: 2, kind: "push", recipient: "devtok-abc…", subject: "Kaanch Ka Mahal",
+            body: '{"aps":{}}', status: "sent", detail: "",
+            created_at: "2026-09-01T10:00:00+00:00" },
+          { id: 1, kind: "email", recipient: "meera@example.com",
+            subject: "Your Katha invoice KATHA-INV-2627-000001",
+            body: "<div>invoice</div>", status: "failed", detail: "relay refused",
+            created_at: "2026-09-01T09:00:00+00:00" }],
+      }),
+    });
+    renderWithStore(<Outbox />);
+    await screen.findByText("meera@example.com");
+    expect(screen.getByText(/push APNs/)).toBeInTheDocument();
+    expect(screen.getByText("sent")).toBeInTheDocument();
+    expect(screen.getByText("failed")).toBeInTheDocument();
+    expect(screen.getByText("relay refused")).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/invoice KATHA-INV/));
+    await screen.findByText("<div>invoice</div>");
+    fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "push" } });
+    await waitFor(() => expect(screen.getByLabelText("Kind")).toHaveValue("push"));
+  });
+
+  it("Notify drop… posts the episode and reports device count", async () => {
+    const calls = stub({
+      "/notify-drop": () => ({ slug: "kaanch-ka-mahal", episode: 60, devices: 3 }),
+      ...SIGNALS,
+      "/attention": () => ({ items: [] }),
+      "/approvals": () => [],
+      "/audit": () => ({ rows: [], chain_ok: true, total: 0 }),
+      "/config/flags": () => [],
+      "/catalog/series/kaanch-ka-mahal": () => ({
+        slug: "kaanch-ka-mahal", title: "Kaanch Ka Mahal", synopsis: "s",
+        genres: ["Drama"], language: "Hindi", episodeCount: 60, freeEpisodes: 10,
+        coinPrice: 30, bundleDiscountPct: 25, status: "live", rating: "U/A 13+",
+        ratingHistory: {}, updatedAt: "", coverUrl: "x", pricingOverridden: false,
+        rights: { owner: "Katha Originals", license_until: "" },
+        media: { covers_ok: true, episodes_with_media: 60, episodes_missing: 0 },
+        episodes: [{ number: 1, title: "One", isFree: true, hasMedia: true }],
+        previewWeb: "http://x/w",
+      }),
+    });
+    renderWithStore(
+      <Routes><Route path="/catalog/:slug" element={<CatalogDetail />} /></Routes>,
+      { route: "/catalog/kaanch-ka-mahal" });
+    await screen.findByText("Kaanch Ka Mahal");
+    await online();
+    fireEvent.click(screen.getByText("Notify drop…"));
+    const dlg = await screen.findByRole("dialog");
+    fireEvent.change(within(dlg).getByLabelText("Drop episode"),
+                     { target: { value: "60" } });
+    fireEvent.click(within(dlg).getByText("Send push"));
+    await waitFor(() => expect(getStore().toasts.some((t) =>
+      t.text.includes("pushed to 3 device(s)"))).toBe(true));
+    const post = calls.find((c) => c.url.includes("/notify-drop"));
+    expect(JSON.parse(String(post?.init?.body))).toEqual({ episode: 60 });
+  });
+});

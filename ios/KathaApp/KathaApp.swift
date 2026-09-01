@@ -5,8 +5,31 @@ import KathaKit
 // App entry + shared app state. The SwiftUI layer wraps KathaKit's pure view
 // models and the KathaAPIClient actor. Requires Xcode/simulator to build & run.
 
+/// Receives the APNs device token (SwiftUI apps still need a UIKit delegate
+/// for remote-notification registration callbacks) and forwards it to the
+/// server so episode-drop pushes can reach this device.
+final class PushDelegate: NSObject, UIApplicationDelegate {
+    // Static: SwiftUI's adaptor instantiates its own delegate instance, so the
+    // hook must not live on a particular object.
+    nonisolated(unsafe) static var onToken: ((String) -> Void)?
+
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
+        PushDelegate.onToken?(hex)
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        // Simulator / missing push capability: local features keep working.
+        print("APNs registration unavailable: \(error.localizedDescription)")
+    }
+}
+
+
 @main
 struct KathaApp: App {
+    @UIApplicationDelegateAdaptor(PushDelegate.self) private var pushDelegate
     @State private var model = AppModel()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -191,7 +214,15 @@ final class AppModel {
         // Provisional: granted without a prompt, delivers quietly until the user
         // promotes it (the toggle in Settings asks for full alerts).
         UNUserNotificationCenter.current().requestAuthorization(
-            options: [.alert, .sound, .badge, .provisional]) { _, _ in }
+            options: [.alert, .sound, .badge, .provisional]) { granted, _ in
+            guard granted else { return }
+            Task { @MainActor in
+                PushDelegate.onToken = { [weak self] hex in
+                    Task { try? await self?.api.registerPush(token: hex) }
+                }
+                UIApplication.shared.registerForRemoteNotifications()
+            }
+        }
     }
 
     /// Upgrade quiet/provisional delivery to full alerts (Settings toggle).
