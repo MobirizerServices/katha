@@ -6,11 +6,11 @@
 # for Sources/KathaKit via llvm-cov, prints the summary, and EXITS NON-ZERO if
 # coverage is below the threshold. Mirrors the backend's --cov-fail-under=95.
 #
-# Usage:  ./coverage.sh [threshold]     (default threshold: 95)
+# Usage:  ./coverage.sh [threshold]     (default threshold: 98)
 #
 set -euo pipefail
 
-THRESHOLD="${1:-95}"
+THRESHOLD="${1:-98}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 

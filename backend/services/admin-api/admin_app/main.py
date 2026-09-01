@@ -42,7 +42,7 @@ app.add_middleware(
 # In persist mode, admin-api reads/writes the SAME ledger DB core-api writes,
 # fresh per request — so a purchase in the app/web is visible in the back office.
 SHARED = None
-if os.environ.get("KATHA_PERSIST") == "1":
+if os.environ.get("KATHA_PERSIST") == "1":          # pragma: no cover — import-time
     from katha_infra import SharedStore
     SHARED = SharedStore()
 

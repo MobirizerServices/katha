@@ -24,10 +24,10 @@ export default defineConfig({
         "src/api/types.ts", // pure TypeScript interfaces/types, no runtime code
       ],
       thresholds: {
-        lines: 95,
-        statements: 95,
-        functions: 95,
-        branches: 90,
+        lines: 98,
+        statements: 98,
+        functions: 96,
+        branches: 95,
       },
     },
   },

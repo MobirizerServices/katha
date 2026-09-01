@@ -28,13 +28,13 @@ export default defineConfig({
       thresholds: {
         // Primary gate (matches backend --cov-fail-under=95). Below any of
         // these, `vitest run --coverage` exits non-zero.
-        lines: 95,
-        statements: 95,
-        functions: 95,
+        lines: 98,
+        statements: 98,
+        functions: 96,
         // Branch floor kept below the measured 85% so the honest gate is
-        // stable; the untested branches are the hls.js-only playback paths
+        // the few residual branch misses are hls.js-only playback paths
         // and defensive localStorage try/catch fallbacks that jsdom can't hit.
-        branches: 80,
+        branches: 95,
       },
     },
   },

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import React from "react";
-import { render, screen, act, waitFor } from "@testing-library/react";
+import { render, screen, act, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { WalletProvider, useWallet, type WalletCtx } from "@/components/WalletProvider";
 
@@ -297,5 +297,110 @@ describe("useWallet guard", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => render(<Bad />)).toThrow(/useWallet must be used within WalletProvider/);
     spy.mockRestore();
+  });
+});
+
+describe("failure directions & edge branches", () => {
+  it("hydrates even when localStorage itself throws", async () => {
+    const spy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    wallet.mockResolvedValue({ balance_bought: 1, balance_bonus: 0, total: 1 });
+    renderWallet();
+    await waitFor(() => expect(ctx.ready).toBe(true));
+    expect(ctx.balance).toBe(1);
+    spy.mockRestore();
+  });
+
+  it("persists best-effort: a throwing setItem never breaks state", async () => {
+    await mountReady({ balance_bought: 40, balance_bonus: 0 });
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota");
+    });
+    unlockEpisode.mockRejectedValue(new Error("down"));
+    wallet.mockResolvedValue({ balance_bought: 40, balance_bonus: 0, total: 40 });
+    act(() => { ctx.unlockEpisode("ceo-sahab", 11, 30); });
+    // server refused → optimistic spend restored + toast; a second failure
+    // while the first toast is live exercises the timer-clear branch
+    await waitFor(() => expect(ctx.balance).toBe(40));
+    act(() => { ctx.unlockEpisode("ceo-sahab", 12, 30); });
+    await waitFor(() => expect(ctx.balance).toBe(40));
+    spy.mockRestore();
+  });
+
+  it("refuses to spend beyond the balance", async () => {
+    await mountReady({ balance_bought: 10, balance_bonus: 0 });
+    let ok = true;
+    act(() => { ok = ctx.unlockEpisode("ceo-sahab", 11, 30); });
+    expect(ok).toBe(false);
+    expect(ctx.balance).toBe(10);
+    expect(unlockEpisode).not.toHaveBeenCalled();
+  });
+
+  it("unlocked-map grows arrays and respects an 'all' bundle", async () => {
+    await mountReady({ balance_bought: 5000, balance_bonus: 0 });
+    unlockEpisode.mockResolvedValue({ wallet: { balance_bought: 4900, balance_bonus: 0 },
+                                      spent_bonus: 0, spent_bought: 30 });
+    unlockAll.mockResolvedValue({ wallet: { balance_bought: 3700, balance_bonus: 0 } });
+    wallet.mockResolvedValue({ balance_bought: 4000, balance_bonus: 0, total: 4000 });
+    act(() => { ctx.unlockEpisode("ceo-sahab", 11, 30); });
+    act(() => { ctx.unlockEpisode("ceo-sahab", 12, 30); });   // append to array
+    await waitFor(() => expect(ctx.hasUnlocked("ceo-sahab", 12)).toBe(true));
+    act(() => { ctx.unlockBundle("kaanch-ka-mahal", 1125); });
+    await waitFor(() => expect(ctx.hasUnlocked("kaanch-ka-mahal", 60)).toBe(true));
+    act(() => { ctx.unlockEpisode("kaanch-ka-mahal", 61, 30); });  // 'all' stays
+    await waitFor(() => expect(ctx.hasUnlocked("kaanch-ka-mahal", 61)).toBe(true));
+  });
+
+  it("sign-in falls back offline, honors the after-href, and OTP UX works", async () => {
+    await mountReady({ balance_bought: 0, balance_bonus: 0 });
+    // jsdom cannot navigate: capture the deferred redirect instead
+    const timers: (() => void)[] = [];
+    const realSetTimeout = window.setTimeout;
+    vi.stubGlobal("setTimeout", ((fn: () => void, ms?: number) =>
+      ms === 60 ? (timers.push(fn), 0 as never)
+                : realSetTimeout(fn, ms)) as never);
+    act(() => { ctx.openSignIn("/coins"); });
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByText("Send code"));   // phone → otp
+    const d1 = within(dialog).getByLabelText("Digit 1");
+    const d2 = within(dialog).getByLabelText("Digit 2");
+    // backspace on an empty second box moves focus back to the first
+    await userEvent.type(d1, "1");
+    d2.focus();
+    await userEvent.keyboard("{Backspace}");
+    expect(document.activeElement).toBe(d1);
+    // verify with an EMPTY phone → the placeholder number is used
+    otpLogin.mockRejectedValue(new Error("offline"));
+    await userEvent.click(within(dialog).getByText("Verify"));
+    await waitFor(() => expect(ctx.signed).toBe(true));
+    expect(otpLogin).toHaveBeenCalledWith("+91 98765 43210", expect.anything());
+    expect(timers.length).toBe(1);            // the deferred redirect was queued
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("reconcile + typed-phone stragglers", () => {
+  it("a failed purchase falls back to a server wallet refresh", async () => {
+    await mountReady({ balance_bought: 100, balance_bonus: 0 });
+    webOrder.mockRejectedValue(new Error("gateway down"));
+    wallet.mockResolvedValue({ balance_bought: 100, balance_bonus: 0, total: 100 });
+    act(() => { ctx.purchase(600, 99, "coins_starter_in"); });
+    await waitFor(() => expect(wallet).toHaveBeenCalled());
+    expect(ctx.balance).toBe(100);
+  });
+
+  it("a typed phone is used verbatim at verify", async () => {
+    await mountReady({ balance_bought: 0, balance_bonus: 0 });
+    otpLogin.mockRejectedValue(new Error("offline"));
+    act(() => { ctx.openSignIn(); });
+    const dialog = await screen.findByRole("dialog");
+    const phoneInput = within(dialog).getByPlaceholderText("+91 98765 43210");
+    await userEvent.clear(phoneInput);
+    await userEvent.type(phoneInput, "+91 90000 11111");
+    await userEvent.click(within(dialog).getByText("Send code"));
+    await userEvent.click(within(dialog).getByText("Verify"));
+    await waitFor(() => expect(ctx.signed).toBe(true));
+    expect(otpLogin).toHaveBeenCalledWith("+91 90000 11111", expect.anything());
   });
 });

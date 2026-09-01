@@ -401,3 +401,18 @@ def test_auth_me_reports_session_age(oidc_mode):
     sign_in(client, "ops@katha.dev")
     me = client.get("/admin/v1/auth/me").json()
     assert me["since"] > 0 and time.time() - me["since"] < 60
+
+
+def test_callback_with_burned_code_walks_the_error_path(oidc_mode):
+    """A code that fails redemption (already used / forged) sends the operator
+    back to the gate with the reason in the notice cookie."""
+    client = TestClient(app)
+    r = client.get("/admin/v1/auth/login", follow_redirects=False)
+    authorize = r.headers["location"]
+    state = urllib.parse.parse_qs(urllib.parse.urlparse(authorize).query)["state"][0]
+    r = client.get(f"/admin/v1/auth/callback?code=forged-code&state={state}",
+                   follow_redirects=False)
+    assert r.headers["location"] == "/"
+    note = urllib.parse.unquote(client.cookies.get(oidc.NOTE_COOKIE))
+    assert note.startswith("error:") and "expired or already used" in note
+    assert client.get("/admin/v1/auth/me").json()["authenticated"] is False

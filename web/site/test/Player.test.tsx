@@ -234,3 +234,18 @@ describe("SiteFooter", () => {
     expect(screen.getByText(/© 2026 Katha Media/)).toBeInTheDocument();
   });
 });
+
+describe("fallback branches", () => {
+  it("an out-of-range episode number falls back to episode 1", () => {
+    mockWallet = makeWallet({ hasUnlocked: vi.fn(() => true) });
+    render(<Player series={series} n={9999} />);
+    expect(screen.getAllByText(new RegExp(series.episodes[0].title))[0])
+      .toBeInTheDocument();
+  });
+
+  it("a signed-in wallet with no name gets the M avatar", () => {
+    mockWallet = makeWallet({ signed: true, name: "" });
+    render(<SiteHeader />);
+    expect(screen.getByLabelText("Profile").textContent).toBe("M");
+  });
+});

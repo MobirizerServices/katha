@@ -751,3 +751,183 @@ def test_ip_allowlist(shared, monkeypatch):
     # unset → open (dev default)
     monkeypatch.delenv("KATHA_ADMIN_IP_ALLOWLIST")
     assert a.get("/admin/v1/config/policy", headers=ADMIN_H).status_code == 200
+
+
+def test_malformed_kv_is_tolerated_everywhere(shared):
+    """Operators fat-finger config; every KV consumer shrugs instead of 500s."""
+    for key in ("rights:kaanch-ka-mahal", "rating:kaanch-ka-mahal",
+                "attnack:approvals", "auditnote:1", "price:kaanch-ka-mahal",
+                "pack:coins_starter_in", "exp:broken", "flag:rewards.checkin_enabled",
+                "series:broken-draft"):
+        shared.kv_set(key, "{not json")
+    a = _admin()
+    core = _core()
+    # catalog list + detail + core catalog all still serve
+    assert a.get("/admin/v1/catalog/series", headers=ADMIN_H).status_code == 200
+    det = a.get("/admin/v1/catalog/series/kaanch-ka-mahal", headers=ADMIN_H)
+    assert det.status_code == 200
+    assert det.json()["rights"]["owner"] == "Katha Originals"
+    assert core.get("/v1/series/kaanch-ka-mahal").status_code == 200
+    assert core.get("/v1/series").status_code == 200
+    # packs merge, flags, experiments, config all survive the garbage
+    assert a.get("/admin/v1/config/packs", headers=FIN_H).status_code == 200
+    assert a.get("/admin/v1/config/flags", headers=ADMIN_H).status_code == 200
+    assert a.get("/admin/v1/experiments", headers=ADMIN_H).json()["experiments"] == []
+    cfg = core.get("/v1/config", headers={"Authorization": "Bearer kv-u"})
+    assert cfg.status_code == 200 and cfg.json()["experiments"] == {}
+    # attention + audit shrug at broken ack/note records
+    a.post("/admin/v1/wallet/adjust", headers=ADMIN_H,
+           json={"user_id": "kv-u", "coins": 600, "reason_code": "goodwill"})
+    items = a.get("/admin/v1/attention", headers=ADMIN_H).json()["items"]
+    assert any(i["id"] == "approvals" and "ack" not in i for i in items)
+    assert a.get("/admin/v1/audit", headers=ADMIN_H).status_code == 200
+    # a rating override that IS valid JSON reaches the summaries (#041)
+    shared.kv_set("rating:kaanch-ka-mahal", json.dumps({"value": "A"}))
+    summaries = core.get("/v1/series").json()
+    km = next(s for s in summaries if s["slug"] == "kaanch-ka-mahal")
+    assert km["content_rating"] == "A"
+
+
+def test_risk_flags_and_chain_tamper_detection(shared):
+    pl = PersistentLedger(shared.db)
+    # repeat refunds
+    pl.credit("risk-u", TxType.PURCHASE, coins=600, reference_type="iap",
+              reference_id="s", idempotency_key="rk1", created_at=T0)
+    pl.refund_clawback("risk-u", coins=100, reference_type="gateway_refund",
+                       reference_id="r1", idempotency_key="rk2", created_at=T0)
+    pl.refund_clawback("risk-u", coins=100, reference_type="gateway_refund",
+                       reference_id="r2", idempotency_key="rk3", created_at=T0)
+    # negative balance via a clawback beyond the wallet
+    pl.credit("neg-u", TxType.PURCHASE, coins=50, reference_type="iap",
+              reference_id="s", idempotency_key="rk4", created_at=T0)
+    pl.refund_clawback("neg-u", coins=200, reference_type="gateway_refund",
+                       reference_id="r3", idempotency_key="rk5", created_at=T0)
+    # erased profile
+    shared.upsert_profile("gone-u", phone="+919", kind="phone", language="hi",
+                          created_at=T0)
+    shared.erase_user("gone-u", T0)
+    by_id = {u["user_id"]: u for u in shared.search_users(limit=50)["users"]}
+    assert by_id["risk-u"]["flags"] == ["repeat refunds"]
+    assert "negative balance" in by_id["neg-u"]["flags"]
+    assert "erased (DPDP)" in by_id["gone-u"]["flags"]
+
+    # tampering with any persisted audit row breaks the verified chain
+    shared.audit_append(ts=T0, actor_id="riya", actor_role="admin",
+                        action="t.a", target="x", detail="d=1")
+    shared.audit_append(ts=T0, actor_id="riya", actor_role="admin",
+                        action="t.b", target="y", detail="d=2")
+    assert shared.audit_list()["chain_ok"] is True
+    import sqlite3
+    raw = sqlite3.connect(str(shared.db.url).split("///")[1])
+    raw.execute("UPDATE audit_log SET detail='d=999' WHERE action='t.a'")
+    raw.commit()
+    assert shared.audit_list()["chain_ok"] is False
+
+
+def test_devices_update_and_analytics_branches(shared):
+    # same UA twice → the row updates, no duplicate
+    shared.device_touch("dev-u", ua="KathaApp/1.0", ip="1.1.1.1", ts=T0)
+    shared.device_touch("dev-u", ua="KathaApp/1.0", ip="2.2.2.2",
+                        ts="2026-09-01T01:00:00+00:00")
+    devs = shared.devices("dev-u")
+    assert len(devs) == 1 and devs[0]["ip"] == "2.2.2.2"
+
+    # checkin events, unlock spends, and out-of-window rows hit their branches
+    shared.event_append(ts=T0, user_id="an-u", name="checkin", value=5)
+    shared.event_append(ts="2020-01-01T00:00:00+00:00", user_id="old-u",
+                        name="purchase")                       # before the span
+    pl = PersistentLedger(shared.db)
+    pl.credit("an-u", TxType.PURCHASE, coins=90, reference_type="iap",
+              reference_id="s", idempotency_key="ab1", created_at=T0)
+    pl.unlock("an-u", episode_ids=["kaanch-ka-mahal:e11"], price_per_episode=30,
+              reference_type="episode", reference_id="kaanch-ka-mahal:e11",
+              idempotency_key="ab2", created_at=T0)
+    a = shared.analytics(now=T0, days=3)
+    today = a["daily"][-1]
+    assert today["checkins"] == 1 and today["coins_spent"] == 30
+    # the 2020 event is outside every daily bucket but never crashes the rollup
+    assert len(a["daily"]) == 3
+
+
+def test_health_down_paths_and_resolve_breach(shared, monkeypatch):
+    import urllib.request as _ur
+    def refuse(*a, **kw):
+        raise OSError("connection refused")
+    monkeypatch.setattr(_ur, "urlopen", refuse)
+    a = _admin()
+    h = a.get("/admin/v1/health/full").json()
+    assert h["checks"]["core_api"] == "down" and h["status"] == "down"
+    # a database probe failure reports down too
+    real_kv = shared.kv_get
+    def flaky(key):
+        if key == "health:probe":
+            raise RuntimeError("db gone")
+        return real_kv(key)
+    monkeypatch.setattr(shared, "kv_get", flaky)
+    assert a.get("/admin/v1/health/full").json()["checks"]["database"] == "down"
+    monkeypatch.setattr(shared, "kv_get", real_kv)
+    # unhealthy services surface on the attention rail
+    items = a.get("/admin/v1/attention", headers=ADMIN_H).json()["items"]
+    assert any(i["id"] == "health" for i in items)
+
+    # an acknowledged-but-stale grievance breaches the 15-day resolution SLA
+    shared.grievance_create(gid="G-OLD15", user_id="u", contact="a@b",
+                            channel="app", subject="slow", body="",
+                            created_at="2026-08-10T00:00:00+00:00")
+    shared.grievance_update("G-OLD15", status="ack", ack_at="2026-08-10T01:00:00+00:00")
+    items = a.get("/admin/v1/attention", headers=ADMIN_H).json()["items"]
+    assert any("15-day resolution" in i["title"] for i in items)
+    # unknown grievance ids 404 on ack
+    assert a.post("/admin/v1/grievances/G-NOPE/ack",
+                  headers=ADMIN_H).status_code == 404
+
+
+def test_last_analytics_and_overrides_lines(shared):
+    # future-dated event + out-of-span ledger row never crash the rollup
+    shared.event_append(ts="2030-01-01T00:00:00+00:00", user_id="f-u",
+                        name="purchase")
+    pl = PersistentLedger(shared.db)
+    pl.credit("old-u", TxType.PURCHASE, coins=10, reference_type="iap",
+              reference_id="s", idempotency_key="ol1",
+              created_at="2020-01-01T00:00:00+00:00")
+    a = shared.analytics(now=T0, days=2)
+    assert len(a["daily"]) == 2
+    # the 2020 purchase still counts toward cumulative outstanding
+    assert a["outstanding_trend"][0] >= 10
+
+    # a second writer's entitlement folds in on refresh (persistent_ledger #87)
+    pl.unlock("old-u", episode_ids=["kaanch-ka-mahal:e11"], price_per_episode=5,
+              reference_type="episode", reference_id="kaanch-ka-mahal:e11",
+              idempotency_key="ol2", created_at=T0)
+    pl2 = PersistentLedger(shared.db)
+    pl2.refresh()
+    assert pl2.is_entitled("old-u", "kaanch-ka-mahal:e11")
+
+    # episode-title override with a non-numeric suffix is skipped, not fatal
+    shared.kv_set("ep:kaanch-ka-mahal:abc", json.dumps({"title": "x"}))
+    core = _core()
+    assert core.get("/v1/series/kaanch-ka-mahal").status_code == 200
+    # a KV draft that shadows a seed slug never duplicates the catalog
+    shared.kv_set("series:kaanch-ka-mahal", json.dumps(
+        {"title": "Shadow", "episode_count": 2}))
+    slugs = [s["slug"] for s in core.get("/v1/series").json()]
+    assert slugs.count("kaanch-ka-mahal") == 1
+
+    # a stopped experiment assigns nobody
+    shared.kv_set("exp:paused", json.dumps(
+        {"variants": [{"name": "a", "pct": 100}], "status": "stopped"}))
+    cfg = core.get("/v1/config", headers={"Authorization": "Bearer x-u"}).json()
+    assert "paused" not in cfg["experiments"]
+
+    # user ledger drill-down through the shared store
+    a2 = _admin()
+    led = a2.get("/admin/v1/users/old-u/ledger", headers=ADMIN_H).json()
+    assert led["wallet"]["total"] == 5 and len(led["transactions"]) == 2
+
+    # attention skips resolved grievances
+    shared.grievance_create(gid="G-DONE", user_id="u", contact="a@b",
+                            channel="app", subject="done", body="",
+                            created_at="2026-08-01T00:00:00+00:00")
+    shared.grievance_update("G-DONE", status="resolved", resolved_at=T0)
+    items = a2.get("/admin/v1/attention", headers=ADMIN_H).json()["items"]
+    assert not any(i["id"] == "G-DONE" for i in items)
