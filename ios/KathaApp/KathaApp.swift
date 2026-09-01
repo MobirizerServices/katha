@@ -25,12 +25,15 @@ final class AppModel {
     var wallet = WalletStore()
     var feed = FeedViewModel()
     var loadError: String?
+    var isLoading = false
 
     init(baseURL: URL = URL(string: "http://localhost:8799")!) {
         self.api = KathaAPIClient(baseURL: baseURL, authToken: "dev-user")
     }
 
     func loadHome(lang: String = "hi") async {
+        isLoading = true
+        defer { isLoading = false }
         do {
             async let home = api.home(lang: lang)
             async let w = api.wallet()

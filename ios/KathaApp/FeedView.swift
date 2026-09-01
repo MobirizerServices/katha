@@ -7,6 +7,22 @@ struct FeedView: View {
 
     var body: some View {
         NavigationStack {
+            content
+                .background(Katha.Color.bg)
+                .navigationTitle("Katha")
+                .toolbarBackground(Katha.Color.bg, for: .navigationBar)
+        }
+        .task { if model.feed.rows.isEmpty { await model.loadHome() } }
+    }
+
+    // Three states: the feed if we have it; otherwise an error-with-retry when the
+    // load failed and there is nothing to show, or a spinner while loading.
+    @ViewBuilder private var content: some View {
+        if model.feed.rows.isEmpty && model.loadError != nil {
+            FeedErrorState(detail: model.loadError) { await model.loadHome() }
+        } else if model.feed.rows.isEmpty {
+            FeedLoadingState()
+        } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Katha.Spacing.xl) {
                     ForEach(model.feed.rows) { row in
@@ -15,11 +31,61 @@ struct FeedView: View {
                 }
                 .padding(.vertical, Katha.Spacing.lg)
             }
-            .background(Katha.Color.bg)
-            .navigationTitle("Katha")
-            .toolbarBackground(Katha.Color.bg, for: .navigationBar)
         }
-        .task { await model.loadHome() }
+    }
+}
+
+/// Backend unreachable / load failed, with a Retry that re-runs the fetch.
+private struct FeedErrorState: View {
+    let detail: String?
+    let retry: () async -> Void
+    @State private var retrying = false
+
+    var body: some View {
+        VStack(spacing: Katha.Spacing.md) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 46))
+                .foregroundStyle(Katha.Color.text2)
+            Text("Can't reach Katha")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Katha.Color.text)
+            Text("Check your connection and try again.")
+                .font(.system(size: 15))
+                .foregroundStyle(Katha.Color.text2)
+                .multilineTextAlignment(.center)
+            Button {
+                Task { retrying = true; await retry(); retrying = false }
+            } label: {
+                HStack(spacing: 8) {
+                    if retrying { ProgressView().tint(.white) }
+                    Text(retrying ? "Retrying…" : "Retry")
+                }
+                .font(.system(size: 16, weight: .semibold))
+                .frame(maxWidth: 220)
+                .padding(.vertical, 14)
+                .background(Katha.Color.accent)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
+            }
+            .disabled(retrying)
+            .padding(.top, Katha.Spacing.sm)
+        }
+        .padding(Katha.Spacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Katha.Color.bg)
+    }
+}
+
+private struct FeedLoadingState: View {
+    var body: some View {
+        VStack(spacing: Katha.Spacing.md) {
+            ProgressView().tint(Katha.Color.accent)
+            Text("Loading stories…")
+                .font(.system(size: 15))
+                .foregroundStyle(Katha.Color.text2)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Katha.Color.bg)
     }
 }
 
