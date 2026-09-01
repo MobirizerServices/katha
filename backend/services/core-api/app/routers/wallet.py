@@ -26,11 +26,13 @@ def _wallet_response(user: str) -> WalletResponse:
 
 @router.get("/wallet", response_model=WalletResponse)
 def wallet(user: str = Depends(current_user)) -> WalletResponse:
+    store.refresh_ledger()
     return _wallet_response(user)
 
 
 @router.get("/wallet/transactions")
 def wallet_transactions(user: str = Depends(current_user)) -> list[dict]:
+    store.refresh_ledger()
     """The user's own ledger history, newest first (PDD §12.5)."""
     return [
         {"id": t.id, "type": t.type.value, "amount_bought": t.amount_bought,
@@ -41,12 +43,21 @@ def wallet_transactions(user: str = Depends(current_user)) -> list[dict]:
 
 
 @router.get("/iap/packs", response_model=list[CoinPack])
-def packs(storefront: str = "IN") -> list[CoinPack]:
+def packs(storefront: str = "IN", channel: str = "app") -> list[CoinPack]:
+    """SKU list per storefront and sales channel.
+
+    Web-only SKUs (the +10%-bonus variants) must never be offered through
+    Apple IAP, so channel=app (the default) excludes them; the web store
+    passes channel=web to include them.
+    """
+    def _visible(sku: str) -> bool:
+        is_web_sku = sku.startswith("coins_web")
+        return is_web_sku if channel == "web" else (channel == "all" or not is_web_sku)
     return [
         CoinPack(sku=sku, storefront=p["storefront"], price_minor=p["price_minor"],
                  currency=p["currency"], coins=p["coins"], bonus_coins=p["bonus"])
         for sku, p in PACKS.items()
-        if storefront == "ALL" or p["storefront"] in (storefront, "WEB")
+        if (storefront == "ALL" or p["storefront"] in (storefront, "WEB")) and _visible(sku)
     ]
 
 

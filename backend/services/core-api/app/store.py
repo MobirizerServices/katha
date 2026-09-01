@@ -139,6 +139,17 @@ class Store:
         return self._eng(user_id).my_list
 
     # ---- entitlements ---------------------------------------------------
+    def refresh_ledger(self) -> None:
+        """Fold in ledger rows other services wrote to the shared DB.
+
+        No-op for the in-memory ledger; PersistentLedger implements refresh().
+        Called on wallet/playback reads so an admin adjustment is visible
+        without restarting core-api.
+        """
+        refresh = getattr(self.ledger, "refresh", None)
+        if refresh is not None:
+            refresh()
+
     def ensure_free(self, user_id: str, slug: str, number: int) -> bool:
         """Grant + report free entitlement for the first N episodes of a series."""
         series = catalog.get_series(slug)

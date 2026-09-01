@@ -65,3 +65,12 @@ class EntitlementRow(Base):
     episode_id: Mapped[str] = mapped_column(String, nullable=False)
     source: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class KVRow(Base):
+    """Small shared key-value store (feature-flag overrides, admin state)."""
+
+    __tablename__ = "admin_kv"
+
+    key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    value: Mapped[str] = mapped_column(String(1024))

@@ -47,6 +47,7 @@ class AdminStore:
     audit: list[AuditRow] = field(default_factory=list)
     approvals: dict[str, Approval] = field(default_factory=dict)
     published: set[str] = field(default_factory=set)
+    flag_overrides: dict[str, bool] = field(default_factory=dict)
     known_users: set[str] = field(default_factory=set)
 
     # ---- audit (append-only) -------------------------------------------

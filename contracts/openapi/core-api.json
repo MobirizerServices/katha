@@ -858,7 +858,6 @@
           "wallet"
         ],
         "summary": "Wallet Transactions",
-        "description": "The user's own ledger history, newest first (PDD \u00a712.5).",
         "operationId": "wallet_transactions_v1_wallet_transactions_get",
         "parameters": [
           {
@@ -913,6 +912,7 @@
           "wallet"
         ],
         "summary": "Packs",
+        "description": "SKU list per storefront and sales channel.\n\nWeb-only SKUs (the +10%-bonus variants) must never be offered through\nApple IAP, so channel=app (the default) excludes them; the web store\npasses channel=web to include them.",
         "operationId": "packs_v1_iap_packs_get",
         "parameters": [
           {
@@ -923,6 +923,16 @@
               "type": "string",
               "default": "IN",
               "title": "Storefront"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "app",
+              "title": "Channel"
             }
           }
         ],
@@ -1248,7 +1258,7 @@
           "config"
         ],
         "summary": "Config",
-        "description": "Remote config the clients read (feature flags, pricing defaults, min version).",
+        "description": "Remote config the clients read (feature flags, pricing defaults, min version).\n\nFlags = shared defaults merged with admin overrides from the shared DB \u2014\na toggle flipped in the back office reaches this endpoint on the next call.",
         "operationId": "config_v1_config_get",
         "responses": {
           "200": {

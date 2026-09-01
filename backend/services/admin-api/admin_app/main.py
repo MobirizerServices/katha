@@ -13,6 +13,7 @@ from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from katha_domain import catalog
+from katha_domain.flags import DEFAULT_FLAGS, effective_flags
 
 from .rbac import Actor, Role, require
 from .store import DUAL_APPROVAL_THRESHOLD, CLOCK, store
@@ -68,10 +69,13 @@ def health() -> dict:
 
 
 def _audit_row(row) -> dict:
+    # The back-office client shape (AuditEntry) + the ids tests key on.
     return {
-        "id": row.id, "ts": row.ts, "actor_id": row.actor_id,
-        "actor_role": row.actor_role, "action": row.action,
-        "target": row.target, "detail": row.detail,
+        "id": row.id, "ts": row.ts, "actor": row.actor_id,
+        "actor_id": row.actor_id, "actor_role": row.actor_role,
+        "action": row.action, "entity": row.target, "target": row.target,
+        "change": ", ".join(f"{k}={v}" for k, v in row.detail.items()),
+        "detail": row.detail,
     }
 
 
@@ -102,6 +106,118 @@ def _apply_adjust(user_id: str, coins: int, reason_code: str, ref_id: str) -> No
             user_id, coins=coins, reference_type=f"admin_adjust:{reason_code}",
             reference_id=ref_id, idempotency_key=ref_id, created_at=CLOCK,
         )
+
+
+_LANG_NAMES = {"hi": "Hindi", "ta": "Tamil", "te": "Telugu"}
+
+
+@router.get("/overview", tags=["overview"])
+def overview(actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE, Role.ANALYST, Role.RO))):
+    """Live KPI counters from the shared ledger; attention/pipeline stay empty in
+    the dev slice (they come from ops tooling that does not exist yet)."""
+    if SHARED is not None:
+        st = SHARED.overview_stats()
+    else:
+        users = sorted(store.known_users)
+        st = {
+            "users": len(users),
+            "coins_outstanding_bought": sum(store.ledger.balance(u).balance_bought for u in users),
+            "coins_outstanding_bonus": sum(store.ledger.balance(u).balance_bonus for u in users),
+            "episodes_unlocked": 0,
+            "coins_purchased": 0,
+        }
+    outstanding = st["coins_outstanding_bought"] + st["coins_outstanding_bonus"]
+    return {
+        "kpis": [
+            {"label": "Registered users", "value": f"{st['users']:,}"},
+            {"label": "Coins purchased (all time)", "value": f"{st['coins_purchased']:,}"},
+            {"label": "Coins outstanding", "value": f"{outstanding:,}",
+             "delta": f"{st['coins_outstanding_bonus']:,} bonus", "deltaDir": "up"},
+            {"label": "Episodes unlocked", "value": f"{st['episodes_unlocked']:,}"},
+            {"label": "Gross revenue equivalent", "value": _rupees(st["coins_purchased"])},
+            {"label": "Live series", "value": str(len(catalog.summaries()))},
+        ],
+        "attention": [],
+        "pipeline": [],
+    }
+
+
+@router.get("/catalog/series", tags=["catalog"])
+def catalog_series(actor: Actor = Depends(require(Role.CONTENT, Role.QC, Role.ANALYST, Role.RO))):
+    """The live catalog in the back-office client shape."""
+    out = []
+    for i, s in enumerate(catalog.all_series()):
+        out.append({
+            "id": s.slug, "slug": s.slug, "title": s.title, "synopsis": s.synopsis,
+            "genres": s.genres, "language": _LANG_NAMES.get(s.primary_language, s.primary_language),
+            "episodeCount": s.episode_count, "liveCount": s.episode_count,
+            "freeEpisodes": s.free_episode_count, "coinPrice": s.episode_coin_price,
+            "bundleDiscountPct": s.bundle_discount_pct,
+            "status": "live", "rating": s.content_rating,
+            "owner": "Katha Originals", "updatedAt": 0,
+        })
+    return out
+
+
+@router.get("/approvals", tags=["wallet"])
+def list_approvals(actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE, Role.ANALYST))):
+    """Pending approvals in the back-office client shape."""
+    return [
+        {
+            "id": ap.id, "kind": "Coin adjustment",
+            "detail": f"{ap.coins:+,} coins · {ap.user_id} · reason: {ap.reason_code}"
+                      + (f" · {ap.note}" if ap.note else ""),
+            "requestedBy": ap.requested_by, "when": ap.created_at,
+            "needs": "Finance or Admin", "amount": ap.coins, "userId": ap.user_id,
+        }
+        for ap in store.approvals.values() if ap.status == "pending"
+    ]
+
+
+@router.post("/approvals/{approval_id}/reject", tags=["wallet"])
+def reject(approval_id: str, body: dict = Body(default={}),
+           actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE))):
+    ap = store.approvals.get(approval_id)
+    if ap is None:
+        raise HTTPException(status_code=404, detail="approval not found")
+    if ap.status != "pending":
+        raise HTTPException(status_code=409, detail=f"already {ap.status}")
+    ap.status = "rejected"
+    store.record(actor, "wallet.adjust.rejected", ap.user_id,
+                 {"approval_id": ap.id, "coins": ap.coins,
+                  "note": (body.get("note") or "").strip()})
+    return {"status": "rejected", "approval": _approval_view(ap)}
+
+
+@router.get("/config/flags", tags=["config"])
+def config_flags(actor: Actor = Depends(require(Role.CONTENT, Role.FINANCE, Role.ANALYST, Role.RO))):
+    overrides = SHARED.flag_overrides() if SHARED is not None else store.flag_overrides
+    merged = effective_flags(overrides)
+    return [
+        {"key": k, "description": DEFAULT_FLAGS[k]["description"],
+         "enabled": merged[k], "env": "prod"}
+        for k in DEFAULT_FLAGS
+    ]
+
+
+@router.patch("/config/flags/{key}", tags=["config"])
+def set_flag(key: str, body: dict = Body(...),
+             actor: Actor = Depends(require(Role.CONTENT))):
+    """Flip a flag. Persists to the shared DB, so core-api's /v1/config serves
+    the new value on its very next request. Audited like every mutation."""
+    if key not in DEFAULT_FLAGS:
+        raise HTTPException(status_code=404, detail="unknown flag")
+    enabled = bool(body.get("enabled"))
+    overrides = SHARED.flag_overrides() if SHARED is not None else store.flag_overrides
+    current = effective_flags(overrides)[key]
+    if current == enabled:                       # no-op writes are not audited
+        return {"key": key, "enabled": enabled}
+    if SHARED is not None:
+        SHARED.set_flag(key, enabled)
+    else:
+        store.flag_overrides[key] = enabled
+    store.record(actor, "config.flag.set", key, {"enabled": enabled})
+    return {"key": key, "enabled": enabled}
 
 
 # ---- catalog ---------------------------------------------------------------

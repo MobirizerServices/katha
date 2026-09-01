@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from katha_domain import catalog
+from katha_domain.flags import effective_flags
 from .media import media_dir
 from .routers import auth as auth_router
 from .routers import catalog as catalog_router
@@ -65,17 +66,18 @@ def health() -> dict:
 
 @app.get("/v1/config", tags=["config"])
 def config() -> dict:
-    """Remote config the clients read (feature flags, pricing defaults, min version)."""
+    """Remote config the clients read (feature flags, pricing defaults, min version).
+
+    Flags = shared defaults merged with admin overrides from the shared DB —
+    a toggle flipped in the back office reaches this endpoint on the next call.
+    """
+    from .store import store as _store
     prof = catalog.pricing()
+    overrides = _store.shared.flag_overrides() if getattr(_store, "shared", None) else {}
     return {
         "min_app_version": "1.0.0",
         "free_episode_count": prof["free_episode_count"],
         "episode_coin_price": prof["episode_coin_price"],
         "bundle_discount_pct": prof["bundle_discount_pct"],
-        "flags": {
-            "rewards.checkin_enabled": True,
-            "store.web_enabled": True,
-            "offers.first_pack_2x": True,
-            "ai.recs_embeddings": False,
-        },
+        "flags": effective_flags(overrides),
     }

@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from katha_ledger import Transaction, TxType
 
 from .db import Database
-from .models import CoinTransactionRow, EntitlementRow, UserProfileRow, WalletRow
+from .models import CoinTransactionRow, KVRow, EntitlementRow, UserProfileRow, WalletRow
 from .persistent_ledger import PersistentLedger
 
 
@@ -104,3 +104,52 @@ class SharedStore:
         pl.admin_adjust(user_id, coins=coins, reference_type=f"admin_adjust:{reason_code}",
                         reference_id=ref_id, idempotency_key=ref_id, created_at=created_at)
         return self.wallet(user_id)
+
+    # ---- feature-flag overrides (admin_kv) -------------------------------
+    def flag_overrides(self) -> dict[str, bool]:
+        return self.db.run(self._flag_overrides())
+
+    async def _flag_overrides(self) -> dict[str, bool]:
+        async with self.db.session_factory() as session:
+            rows = (await session.execute(select(KVRow))).scalars().all()
+        return {
+            r.key.removeprefix("flag:"): r.value == "1"
+            for r in rows if r.key.startswith("flag:")
+        }
+
+    def set_flag(self, key: str, enabled: bool) -> None:
+        self.db.run(self._set_flag(key, enabled))
+
+    async def _set_flag(self, key: str, enabled: bool) -> None:
+        async with self.db.session_factory() as session:
+            row = await session.get(KVRow, f"flag:{key}")
+            if row is None:
+                session.add(KVRow(key=f"flag:{key}", value="1" if enabled else "0"))
+            else:
+                row.value = "1" if enabled else "0"
+            await session.commit()
+
+    # ---- live overview counters -----------------------------------------
+    def overview_stats(self) -> dict:
+        return self.db.run(self._overview_stats())
+
+    async def _overview_stats(self) -> dict:
+        async with self.db.session_factory() as session:
+            users = (await session.execute(
+                select(func.count()).select_from(UserProfileRow))).scalar() or 0
+            bought, bonus = (await session.execute(
+                select(func.coalesce(func.sum(WalletRow.balance_bought), 0),
+                       func.coalesce(func.sum(WalletRow.balance_bonus), 0)))).one()
+            unlocks = (await session.execute(
+                select(func.count()).select_from(CoinTransactionRow)
+                .where(CoinTransactionRow.type == "unlock"))).scalar() or 0
+            purchased = (await session.execute(
+                select(func.coalesce(func.sum(CoinTransactionRow.amount_bought), 0))
+                .where(CoinTransactionRow.type == "purchase"))).scalar() or 0
+        return {
+            "users": int(users),
+            "coins_outstanding_bought": int(bought),
+            "coins_outstanding_bonus": int(bonus),
+            "episodes_unlocked": int(unlocks),
+            "coins_purchased": int(purchased),
+        }

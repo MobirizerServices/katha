@@ -27,6 +27,7 @@ def _signed_url(episode_id: str) -> str:
 
 @router.post("/series/{slug}/episodes/{number}/playback")
 def playback(slug: str, number: int, response: Response, user: str = Depends(current_user)):
+    store.refresh_ledger()
     series = catalog.get_series(slug)
     if series is None or not (1 <= number <= series.episode_count):
         raise HTTPException(status_code=404, detail="episode not found")
