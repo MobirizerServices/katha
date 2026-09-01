@@ -607,3 +607,75 @@ describe("i18n scaffold (#100)", () => {
     setLocale("en");
   });
 });
+
+describe("ledger deep-links (#025) & audit annotations (#070)", () => {
+  it("pack, episode and bundle references link to their homes", async () => {
+    stub({
+      ...SIGNALS,
+      "/attention": () => ({ items: [] }),
+      "/users/u1/devices": () => ({ devices: [] }),
+      "/users/u1/ledger": () => ({ user_id: "u1",
+        wallet: { balance_bought: 600, balance_bonus: 0, total: 600 },
+        transactions: [
+          { id: "t1", type: "purchase", amount_bought: 600, amount_bonus: 0,
+            reference_type: "iap", reference_id: "coins_starter_in",
+            created_at: "2026-09-01T10:00:00+00:00" },
+          { id: "t2", type: "unlock", amount_bought: -30, amount_bonus: 0,
+            reference_type: "episode", reference_id: "kaanch-ka-mahal:e11",
+            created_at: "2026-09-01T10:01:00+00:00" },
+          { id: "t3", type: "unlock", amount_bought: -500, amount_bonus: 0,
+            reference_type: "bundle", reference_id: "ceo-sahab",
+            created_at: "2026-09-01T10:02:00+00:00" },
+          { id: "t4", type: "admin_adjust", amount_bought: 50, amount_bonus: 0,
+            reference_type: "admin_adjust:goodwill", reference_id: "adjust:x1",
+            created_at: "2026-09-01T10:03:00+00:00" }] }),
+      "/users/u1/entitlements": () => ({ entitlements: [] }),
+      "/users/u1/timeline": () => ({ events: [] }),
+      "/users?": () => ({ users: [{
+        id: "u1", phone: "+91", name: "—", languages: "hi",
+        wallet: { bought: 120, bonus: 0, unlocked: 1, ltv: "₹18" },
+        lastActive: "never", flags: [], devices: [], payer: "web/app" }],
+        total: 1 }),
+    });
+    renderWithStore(<Users />);
+    await online();
+    fireEvent.click(await screen.findByText("View ledger"));
+    await screen.findByRole("dialog");
+    const pack = await screen.findByText("coins_starter_in");
+    expect(pack.closest("a")).toHaveAttribute("href", "/config");
+    expect(screen.getByText("kaanch-ka-mahal:e11").closest("a"))
+      .toHaveAttribute("href", "/catalog/kaanch-ka-mahal");
+    expect(screen.getByText("ceo-sahab").closest("a"))
+      .toHaveAttribute("href", "/catalog/ceo-sahab");
+    // an adjust ref stays plain text
+    expect(screen.getByText("adjust:x1").closest("a")).toBeNull();
+  });
+
+  it("admins annotate an audit row; the note renders beside the chain", async () => {
+    const { Audit } = await import("../src/views/Audit");
+    let noted = false;
+    const calls = stub({
+      "/audit/7/note": () => { noted = true; return { id: 7 }; },
+      ...SIGNALS,
+      "/attention": () => ({ items: [] }),
+      "/audit": () => ({ chain_ok: true, total: 1, rows: [
+        { id: 7, ts: "2026-09-01T10:00:00+00:00", actor: "riya",
+          action: "config.flag.set", entity: "store.web_enabled",
+          change: "from=True, to=False", ip: "127.0.0.1",
+          ...(noted ? { note: { note: "superseded — double-fire era",
+                               by: "riya", at: "t" } } : {}) }] }),
+    });
+    renderWithStore(<Audit />);
+    await screen.findByText("config.flag.set");
+    await online();
+    fireEvent.click(screen.getByTitle(/Annotate/));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Annotation"),
+                     { target: { value: "superseded — double-fire era" } });
+    fireEvent.click(within(dialog).getByText("Save note"));
+    await screen.findByText(/✎ superseded — double-fire era/);
+    const patch = calls.find((c) => c.url.includes("/audit/7/note"));
+    expect(JSON.parse(String(patch?.init?.body)))
+      .toEqual({ note: "superseded — double-fire era" });
+  });
+});

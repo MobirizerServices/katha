@@ -708,3 +708,46 @@ def test_platform_error_paths(shared):
                  headers=ADMIN_H).json()["devices"] == []
     assert a.post("/admin/v1/metrics/ui", headers=ADMIN_H,
                   json={}).json() == {"ok": True}
+
+
+def test_audit_annotation_beside_the_chain(shared):
+    """#070: a note explains a row; the hash chain never changes."""
+    a = _admin()
+    a.post("/admin/v1/wallet/adjust", headers=ADMIN_H,
+           json={"user_id": "n-u", "coins": 10, "reason_code": "goodwill"})
+    rows = a.get("/admin/v1/audit", headers=ADMIN_H).json()
+    row_id = rows["rows"][0]["id"]
+    hash_before = rows["rows"][0]["hash"]
+    r = a.patch(f"/admin/v1/audit/{row_id}/note", headers=ADMIN_H,
+                json={"note": "no-op — double-fire era"})
+    assert r.status_code == 200
+    out = a.get("/admin/v1/audit", headers=ADMIN_H).json()
+    noted = next(x for x in out["rows"] if x["id"] == row_id)
+    assert noted["note"]["note"] == "no-op — double-fire era"
+    assert noted["note"]["by"] == "root@katha.dev"
+    assert noted["hash"] == hash_before and out["chain_ok"] is True
+    # the annotation act is itself audited
+    assert any(x["action"] == "audit.note" for x in out["rows"])
+    # guards: bad ids and empty notes
+    assert a.patch("/admin/v1/audit/999999/note", headers=ADMIN_H,
+                   json={"note": "x"}).status_code == 404
+    assert a.patch(f"/admin/v1/audit/{row_id}/note", headers=ADMIN_H,
+                   json={"note": ""}).status_code == 400
+    # admin-only
+    assert a.patch(f"/admin/v1/audit/{row_id}/note",
+                   headers={"X-Actor-Id": "s", "X-Role": "support"},
+                   json={"note": "x"}).status_code == 403
+
+
+def test_ip_allowlist(shared, monkeypatch):
+    """#084: with an allowlist set, unknown callers get 403 everywhere."""
+    a = _admin()
+    monkeypatch.setenv("KATHA_ADMIN_IP_ALLOWLIST", "10.0.0.0/8, 192.168.1.5")
+    r = a.get("/admin/v1/config/policy", headers=ADMIN_H)
+    assert r.status_code == 403 and "not allowed" in r.json()["detail"]
+    # exact-host entries admit the TestClient ("testclient")
+    monkeypatch.setenv("KATHA_ADMIN_IP_ALLOWLIST", "10.0.0.0/8, testclient")
+    assert a.get("/admin/v1/config/policy", headers=ADMIN_H).status_code == 200
+    # unset → open (dev default)
+    monkeypatch.delenv("KATHA_ADMIN_IP_ALLOWLIST")
+    assert a.get("/admin/v1/config/policy", headers=ADMIN_H).status_code == 200

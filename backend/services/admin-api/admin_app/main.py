@@ -61,9 +61,36 @@ def _rate_key(request: Request) -> str:
             or (request.client.host if request.client else "anon"))
 
 
+def _ip_allowed(host: str) -> bool:
+    """#084: when KATHA_ADMIN_IP_ALLOWLIST is set (comma-separated CIDRs or
+    exact hosts), only those callers reach the back office. Unset = open (dev).
+    VPN termination in front of this is the recommended prod posture — this is
+    the in-app backstop."""
+    raw = os.environ.get("KATHA_ADMIN_IP_ALLOWLIST", "").strip()
+    if not raw:
+        return True
+    import ipaddress
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        if entry == host:
+            return True
+        try:
+            if ipaddress.ip_address(host) in ipaddress.ip_network(entry, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 @app.middleware("http")
 async def _metrics_mw(request: Request, call_next):
     t0 = time.monotonic()
+    if not _ip_allowed(request.client.host if request.client else ""):
+        return JSONResponse(
+            {"detail": "this network is not allowed to reach the back office"},
+            status_code=403)
     # Per-actor rate limit on mutations (#081): scripted abuse and stuck retry
     # loops hit a wall; normal operation never comes near it.
     if (request.method not in ("GET", "HEAD", "OPTIONS")
@@ -994,10 +1021,21 @@ def grievance_resolve(gid: str, request: Request = None, body: dict = Body(defau
 def audit_log(actor: str = "", q: str = "", limit: int = 100,
               before: int | None = None,
               viewer: Actor = Depends(require(Role.FINANCE, Role.ANALYST, Role.RO))):
-    """Server-filtered, paginated, hash-chain-verified audit (#066/#068/#069)."""
+    """Server-filtered, paginated, hash-chain-verified audit (#066/#068/#069).
+    Rows may carry an annotation (#070) — a note laid BESIDE the chain, never
+    an edit: superseded/no-op rows get explained, not rewritten."""
     limit = max(1, min(limit, 500))
     if SHARED is not None:
-        return SHARED.audit_list(actor=actor, q=q, limit=limit, before_id=before)
+        out = SHARED.audit_list(actor=actor, q=q, limit=limit, before_id=before)
+        notes = SHARED.kv_prefix("auditnote:")
+        for r in out["rows"]:
+            raw = notes.get(str(r["id"]))
+            if raw:
+                try:
+                    r["note"] = _json.loads(raw)
+                except ValueError:
+                    pass
+        return out
     rows = [_audit_row(r) for r in store.audit_log()]
     if actor:
         rows = [r for r in rows if r["actor"] == actor]
@@ -1269,6 +1307,27 @@ def ui_ping(body: dict = Body(...),
         UI_METRICS[view] += 1
     return {"ok": True}
 
+
+
+
+# ---- audit annotations (#070): explain, never edit --------------------------
+@router.patch("/audit/{row_id}/note", tags=["ops"])
+def audit_annotate(row_id: int, request: Request = None, body: dict = Body(...),
+                   actor: Actor = Depends(require())):
+    """Attach a note to an audit row (e.g. "superseded by #58 — double-fire
+    era", "no-op"). The chain is untouched; the annotation itself is audited."""
+    note = (body.get("note") or "").strip()
+    if not note or len(note) > 300:
+        raise HTTPException(status_code=400, detail="note must be 1-300 chars")
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+    if not any(r["id"] == row_id
+               for r in SHARED.audit_list(limit=500)["rows"]):
+        raise HTTPException(status_code=404, detail="no such audit row")
+    record = {"note": note, "by": actor.id, "at": now_iso()}
+    SHARED.kv_set(f"auditnote:{row_id}", _json.dumps(record))
+    audit(actor, "audit.note", str(row_id), {"note": note}, request)
+    return {"id": row_id, "note": record}
 
 app.include_router(router)
 

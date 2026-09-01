@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, mutate } from "../api/client";
 import type { AdminUser, LedgerTxn, UserLedger } from "../api/types";
 import { Empty, IsoTime, Modal, PageHeader, Skeleton, fmtN } from "../ui";
@@ -143,6 +143,27 @@ function AdjustDialog({ user, onClose, onApplied }: { user: AdminUser; onClose: 
 
 type Tab = "ledger" | "entitlements" | "timeline" | "devices" | "data";
 
+/** #025: raw ledger references become doors — a pack opens Config, an
+ * episode or bundle opens its series page (closing the drawer). */
+function RefLink({ txn, onClose }: { txn: LedgerTxn; onClose: () => void }) {
+  const ref = txn.reference_id;
+  const ep = ref.match(/^([a-z0-9-]+):e\d+$/);
+  const style = { color: "inherit" };
+  if (ep) {
+    return <Link className="mono" style={style} to={`/catalog/${ep[1]}`}
+                 onClick={onClose}>{ref}</Link>;
+  }
+  if (txn.reference_type === "bundle" || txn.type === "unlock" && !ref.includes(":")) {
+    return <Link className="mono" style={style} to={`/catalog/${ref}`}
+                 onClick={onClose}>{ref}</Link>;
+  }
+  if (ref.startsWith("coins_")) {
+    return <Link className="mono" style={style} to="/config"
+                 onClick={onClose}>{ref}</Link>;
+  }
+  return <span className="mono">{ref}</span>;
+}
+
 function UserDialog({ user, onClose }: { user: AdminUser; onClose: () => void }) {
   const { role, online, showToast } = useStore();
   const [tab, setTab] = useState<Tab>("ledger");
@@ -253,7 +274,7 @@ function UserDialog({ user, onClose }: { user: AdminUser; onClose: () => void })
                   <tr key={t.id}>
                     <td><IsoTime iso={t.created_at} /></td>
                     <td>{t.type}</td>
-                    <td className="mono">{t.reference_id}</td>
+                    <td><RefLink txn={t} onClose={onClose} /></td>
                     <td style={{ textAlign: "right" }} className="mono">
                       {net > 0 ? `+${fmtN(net)}` : fmtN(net)}
                     </td>

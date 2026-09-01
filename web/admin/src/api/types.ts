@@ -74,6 +74,7 @@ export interface AuditEntry {
   ip?: string;
   user_agent?: string;
   hash?: string;
+  note?: { note: string; by: string; at: string };
 }
 
 export interface Kpi {

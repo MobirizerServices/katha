@@ -388,4 +388,6 @@ export const mutate = {
   signoutDevices: (userId: string) =>
     send(`/users/${userId}/signout-devices`, "POST"),
   uiPing: (view: string) => send("/metrics/ui", "POST", { view }),
+  annotateAudit: (id: number, note: string) =>
+    send(`/audit/${id}/note`, "PATCH", { note }),
 };

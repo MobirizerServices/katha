@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api } from "../api/client";
+import { api, mutate } from "../api/client";
 import type { AuditEntry } from "../api/types";
-import { Empty, IsoTime, PageHeader, Skeleton } from "../ui";
+import { Empty, IsoTime, PageHeader, Skeleton , Modal } from "../ui";
 import { useStore } from "../store";
 
 function renderChange(change: string) {
@@ -27,7 +27,9 @@ function toCsv(rows: AuditEntry[]): string {
 }
 
 export function Audit() {
-  const { showToast } = useStore();
+  const { showToast, role, online } = useStore();
+  const [noteFor, setNoteFor] = useState<number | null>(null);
+  const [noteText, setNoteText] = useState("");
   const [params] = useSearchParams();
   const [actor, setActor] = useState("");
   const [q, setQ] = useState(params.get("q") ?? "");
@@ -46,6 +48,16 @@ export function Audit() {
     const t = window.setTimeout(() => void load(), 250);
     return () => window.clearTimeout(t);
   }, [load]);
+
+  async function saveNote() {
+    if (noteFor === null) return;
+    const res = await mutate.annotateAudit(noteFor, noteText.trim());
+    if ("offline" in res) return showToast("Offline — note not saved", "error");
+    if (res.error) return showToast(`Note not saved: ${res.error}`, "error");
+    showToast(`Row #${noteFor} annotated — the chain itself is untouched`);
+    setNoteFor(null);
+    void load();
+  }
 
   function exportCsv() {
     if (!rows || rows.length === 0) return;
@@ -97,6 +109,7 @@ export function Audit() {
               <tr>
                 <th>#</th><th>When</th><th>Actor</th><th>Action</th>
                 <th>Entity</th><th>Change</th><th>IP</th>
+                <th aria-label="annotate"></th>
               </tr>
             </thead>
             <tbody>
@@ -109,8 +122,25 @@ export function Audit() {
                   <td>{r.actor}</td>
                   <td className="mono">{r.action}</td>
                   <td className="mono">{r.entity}</td>
-                  <td>{renderChange(r.change)}</td>
+                  <td>
+                    {renderChange(r.change)}
+                    {r.note ? (
+                      <div className="tiny muted" title={`${r.note.by} · ${r.note.at}`}>
+                        ✎ {r.note.note}
+                      </div>
+                    ) : null}
+                  </td>
                   <td className="mono muted">{r.ip || "—"}</td>
+                  <td>
+                    {role === "admin" && typeof r.id === "number" ? (
+                      <button className="btn s" disabled={!online}
+                              title="Annotate — explain a superseded or no-op row"
+                              onClick={() => { setNoteFor(r.id!);
+                                               setNoteText(r.note?.note ?? ""); }}>
+                        ✎
+                      </button>
+                    ) : null}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -125,8 +155,33 @@ export function Audit() {
       )}
       <p className="tiny muted">
         Append-only. Rows are never edited or deleted; corrections are written as new
-        entries. Each row's hash covers everything before it.
+        entries — annotations (✎) sit beside the chain, never inside it. Each
+        row's hash covers everything before it.
       </p>
+
+      {noteFor !== null ? (
+        <Modal title={`Annotate audit row #${noteFor}`} onClose={() => setNoteFor(null)}
+               footer={
+                 <>
+                   <button className="btn s" onClick={() => setNoteFor(null)}>Cancel</button>
+                   <button className="btn p" disabled={!noteText.trim()}
+                           onClick={() => void saveNote()}>
+                     Save note
+                   </button>
+                 </>
+               }>
+          <p className="tiny">
+            For superseded or no-op rows (#070): explain the row without ever
+            editing it. The annotation is itself audited.
+          </p>
+          <label>
+            Note
+            <input value={noteText} onChange={(e) => setNoteText(e.target.value)}
+                   aria-label="Annotation" placeholder="superseded — double-fire era"
+                   autoFocus />
+          </label>
+        </Modal>
+      ) : null}
     </>
   );
 }
