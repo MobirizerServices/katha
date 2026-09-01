@@ -148,6 +148,14 @@ struct SettingsView: View {
                 Text("Data saver caps streaming quality on mobile data. Auto-unlock charges coins only when an episode starts.")
             }
             Section {
+                Toggle("New episode alerts", isOn: $model.episodeAlerts)
+                    .onChange(of: model.episodeAlerts) { _, on in
+                        if on { model.promoteNotificationAuth() }
+                    }
+            } header: { Text("Notifications") } footer: {
+                Text("One alert when your next episode drops. Never between 11 pm and 8 am, at most two a day.")
+            }
+            Section {
                 Button(model.parentalPin == nil ? "Set parental lock" : "Change parental lock") {
                     showPinSetup = true
                 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 import KathaKit
 
 // App entry + shared app state. The SwiftUI layer wraps KathaKit's pure view
@@ -7,6 +8,7 @@ import KathaKit
 @main
 struct KathaApp: App {
     @State private var model = AppModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -14,6 +16,12 @@ struct KathaApp: App {
                 .environment(model)
                 .preferredColorScheme(.dark)
                 .tint(Katha.Color.accent)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Leaving the app arms the next-episode drip nudge (mockup 3.6).
+            if phase == .background {
+                Task { await model.scheduleDropNudge() }
+            }
         }
     }
 }
@@ -40,6 +48,11 @@ final class AppModel {
     // Session
     var profile: UserProfile?
     var isSignedIn: Bool { ["phone", "apple"].contains(profile?.kind ?? "") }
+
+    // Episode-drop notifications (mockup 3.6)
+    var pendingRoute: EpisodeRoute?      // set by a notification tap; MainTabView pushes it
+    var incomingDrop: DropAlert?         // foreground arrival → in-app banner
+    private var notificationRouter: NotificationRouter?
 
     // Engagement caches
     var continueItems: [ContinueItem] = []
@@ -75,6 +88,14 @@ final class AppModel {
         get { defaults.bool(forKey: "katha.datasaver") }
         set { defaults.set(newValue, forKey: "katha.datasaver") }
     }
+    /// New-episode alerts (default on; delivery starts provisional/quiet).
+    var episodeAlerts: Bool {
+        get { defaults.object(forKey: "katha.alerts") == nil ? true : defaults.bool(forKey: "katha.alerts") }
+        set {
+            defaults.set(newValue, forKey: "katha.alerts")
+            if !newValue { cancelDropNudges() }
+        }
+    }
     /// Dev-slice parental PIN (production hashes with Argon2 server-side, PDD §12.9).
     var parentalPin: String? {
         get { defaults.string(forKey: "katha.pin") }
@@ -95,6 +116,7 @@ final class AppModel {
 
     /// Establish a session: reuse the stored token, else start as a guest.
     func bootstrap() async {
+        setupNotifications()
         if let token = storedToken {
             await api.setAuthToken(token)
             if let me = try? await api.me() {
@@ -107,6 +129,59 @@ final class AppModel {
         }
         await loadHome(lang: contentLanguage)
         await loadEngagement()
+        // Dev hook: KATHA_NUDGE_SECONDS schedules the drip nudge immediately so
+        // the foreground banner is demoable without backgrounding the app.
+        if ProcessInfo.processInfo.environment["KATHA_NUDGE_SECONDS"] != nil {
+            await scheduleDropNudge()
+        }
+    }
+
+    // MARK: Episode-drop notifications (3.6)
+
+    private func setupNotifications() {
+        guard notificationRouter == nil else { return }
+        let router = NotificationRouter(model: self)
+        notificationRouter = router
+        UNUserNotificationCenter.current().delegate = router
+        // Provisional: granted without a prompt, delivers quietly until the user
+        // promotes it (the toggle in Settings asks for full alerts).
+        UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .sound, .badge, .provisional]) { _, _ in }
+    }
+
+    /// Upgrade quiet/provisional delivery to full alerts (Settings toggle).
+    func promoteNotificationAuth() {
+        UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .sound, .badge]) { _, _ in }
+    }
+
+    /// Queue the 3.6 drip nudge for the next unwatched episode of the series
+    /// the user is furthest into. Title is the episode label; the body hooks
+    /// without spoiling. Quiet hours + frequency caps are server policy.
+    func scheduleDropNudge() async {
+        guard episodeAlerts, let item = continueItems.first else { return }
+        let next = item.number + 1
+        guard let d = try? await api.seriesDetail(slug: item.slug),
+              next <= d.episodeCount else { return }
+        let epTitle = d.episodes.first { $0.number == next }?.title ?? "Episode \(next)"
+
+        let content = UNMutableNotificationContent()
+        content.title = "E\(next) · \(epTitle)"
+        content.body = "\(d.episodeCount - item.number) episodes left tonight. \(d.title) is waiting."
+        content.sound = .default
+        content.userInfo = ["katha": ["slug": d.slug, "episode": next]]
+
+        let seconds = ProcessInfo.processInfo.environment["KATHA_NUDGE_SECONDS"]
+            .flatMap(Double.init) ?? 3600            // dev default: an hour after leaving
+        let request = UNNotificationRequest(
+            identifier: "drop:\(d.slug)",            // one pending nudge per series
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false))
+        try? await UNUserNotificationCenter.current().add(request)
+    }
+
+    func cancelDropNudges() {
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 
     private func startGuest() async {
@@ -251,20 +326,35 @@ struct RootView: View {
 }
 
 struct MainTabView: View {
+    @Environment(AppModel.self) private var model
     @State private var homePath = NavigationPath()
 
     var body: some View {
-        TabView {
-            tabStack(path: $homePath) { FeedView() }
-                .tabItem { Label("Home", systemImage: "play.rectangle.fill") }
-            tabStack { BrowseView() }
-                .tabItem { Label("Browse", systemImage: "square.grid.2x2.fill") }
-            tabStack { MyListView() }
-                .tabItem { Label("My list", systemImage: "bookmark.fill") }
-            tabStack { ProfileView() }
-                .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
+        ZStack(alignment: .top) {
+            TabView {
+                tabStack(path: $homePath) { FeedView() }
+                    .tabItem { Label("Home", systemImage: "play.rectangle.fill") }
+                tabStack { BrowseView() }
+                    .tabItem { Label("Browse", systemImage: "square.grid.2x2.fill") }
+                tabStack { MyListView() }
+                    .tabItem { Label("My list", systemImage: "bookmark.fill") }
+                tabStack { ProfileView() }
+                    .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
+            }
+            .background(Katha.Color.bg)
+
+            // 3.6: a drop that lands while the app is open shows the in-app card.
+            if let drop = model.incomingDrop {
+                DropBanner(drop: drop) {
+                    model.incomingDrop = nil
+                    model.pendingRoute = EpisodeRoute(slug: drop.slug, number: drop.episode)
+                } dismiss: {
+                    model.incomingDrop = nil
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
-        .background(Katha.Color.bg)
+        .animation(.spring(duration: 0.35), value: model.incomingDrop)
         .task {
             // Dev/UI-test hook: KATHA_AUTOPLAY="slug:number" jumps straight into
             // the player (headless simctl can't tap; Xcode runs ignore it).
@@ -274,7 +364,18 @@ struct MainTabView: View {
                     homePath.append(EpisodeRoute(slug: String(parts[0]), number: n))
                 }
             }
+            consumePendingRoute()   // notification tapped before the UI existed
         }
+        .onChange(of: model.pendingRoute) { _, route in
+            if route != nil { consumePendingRoute() }
+        }
+    }
+
+    /// A notification tap lands here: push the player and clear the intent.
+    private func consumePendingRoute() {
+        guard let route = model.pendingRoute else { return }
+        model.pendingRoute = nil
+        homePath.append(route)
     }
 
     /// Every tab shares the two typed destinations (registered at stack level —
