@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { SeriesStatus } from "./api/types";
 
@@ -86,14 +87,86 @@ export function Modal({
   footer: ReactNode;
   onClose: () => void;
 }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    ref.current?.focus();
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={title}
+           tabIndex={-1} ref={ref}>
         <h2>{title}</h2>
         <div className="mb">{children}</div>
         <div className="mf">{footer}</div>
       </div>
     </>
   );
+}
+
+
+export function fmtINR(rupees: number): string {
+  return "₹" + Number(rupees).toLocaleString("en-IN", { maximumFractionDigits: 1 });
+}
+
+/** Humanized time from an ISO string, full stamp on hover (#094). */
+export function IsoTime({ iso }: { iso: string }) {
+  if (!iso) return <span className="muted">—</span>;
+  const t = Date.parse(iso);
+  return (
+    <span title={iso} className="mono">
+      {Number.isNaN(t) ? iso : ago(t)}
+    </span>
+  );
+}
+
+/** Click-to-copy id chip (#090). */
+export function CopyId({ value }: { value: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      className="copyid mono"
+      title={value}
+      aria-label={`Copy ${value}`}
+      onClick={() => {
+        void navigator.clipboard?.writeText(value).catch(() => {});
+        setDone(true);
+        window.setTimeout(() => setDone(false), 1200);
+      }}
+    >
+      {done ? "copied" : value}
+    </button>
+  );
+}
+
+export function Skeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="skeleton" aria-hidden>
+      {Array.from({ length: rows }, (_, i) => (
+        <div className="sk-row" key={i} />
+      ))}
+    </div>
+  );
+}
+
+/** One empty-state pattern everywhere (#089): explain the feature, not the void. */
+export function Empty({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="empty">
+      <h4>{title}</h4>
+      <p>{hint}</p>
+    </div>
+  );
+}
+
+/** Severity chip used by attention items and SLA badges. */
+export function Sev({ level, children }: { level: "danger" | "warn" | "info" | "ok";
+                                            children: ReactNode }) {
+  return <span className={`sev sev-${level}`}>{children}</span>;
 }

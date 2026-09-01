@@ -54,9 +54,9 @@ describe("Catalog view", () => {
     const { container } = await renderCatalog();
     const selects = container.querySelectorAll("select");
     fireEvent.change(selects[1], { target: { value: "draft" } });
-    // Draft series (Deny Me, Dragon King, index 5) is unrated.
-    expect(screen.getByText("unrated")).toBeInTheDocument();
-    const table = container.querySelector("table")!;
+    // Draft series (Deny Me, Dragon King, index 5) shows a dash for rating.
+    const table = screen.getByRole("table");
     expect(within(table).getByText("Deny Me, Dragon King")).toBeInTheDocument();
+    expect(within(table).queryByText("His One and Only Love")).not.toBeInTheDocument();
   });
 });

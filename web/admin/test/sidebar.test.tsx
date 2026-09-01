@@ -48,6 +48,6 @@ describe("Sidebar", () => {
     renderWithStore(<Sidebar />);
     fireEvent.change(screen.getByLabelText("Preview as role"), { target: { value: "support" } });
     expect(getStore().role).toBe("support");
-    expect(getStore().toast).toBe("Previewing as Support");
+    expect(getStore().toasts.some((t) => t.text.startsWith("Previewing as Support"))).toBe(true);
   });
 });

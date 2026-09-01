@@ -5,77 +5,106 @@ import {
   useEffect,
   useMemo,
   useState,
-  type ReactNode,
 } from "react";
-import { api, mutate } from "./api/client";
+import type { ReactNode } from "react";
+import { api, isOnline, mutate, onOnlineChange } from "./api/client";
+import type { AttentionItem, Health, MutationResult } from "./api/client";
 import type { Approval, AuditEntry, FeatureFlag } from "./api/types";
-import { ROLE_NAMES, type Role } from "./auth/roles";
+import { ROLE_NAMES } from "./auth/roles";
+import type { Role } from "./auth/roles";
 
-// The signed-in admin. In production this comes from the SSO session; here it
-// is fixed so the self-approval rule has a stable identity to compare against.
-export const ME = "Riya Menon";
+export const ME = "riya";
+
+export interface ToastMsg {
+  id: number;
+  text: string;
+  kind: "info" | "error";
+}
 
 interface Store {
   role: Role;
   setRole: (r: Role) => void;
+  online: boolean;
+  health: Health | null;
+  attention: AttentionItem[];
+  refreshSignals: () => void;
   approvals: Approval[];
+  reloadApprovals: (status?: string) => Promise<void>;
   addApproval: (a: Approval) => void;
-  resolveApproval: (id: string, decision: "approved" | "rejected", by: string) => void;
+  resolveApproval: (id: string, decision: "approved" | "rejected", by: string,
+                    note?: string) => Promise<MutationResult>;
   audit: AuditEntry[];
   addAudit: (e: Omit<AuditEntry, "ts">) => void;
   flags: FeatureFlag[];
-  toggleFlag: (key: string) => void;
-  toast: string | null;
-  showToast: (msg: string) => void;
+  toggleFlag: (key: string, confirm?: string) => Promise<MutationResult>;
+  toasts: ToastMsg[];
+  showToast: (msg: string, kind?: "info" | "error") => void;
 }
 
 const Ctx = createContext<Store | null>(null);
-
-export function useStore(): Store {
-  const v = useContext(Ctx);
-  if (!v) throw new Error("useStore must be used within StoreProvider");
-  return v;
-}
+let toastSeq = 1;
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [role, setRoleRaw] = useState<Role>("admin");
+  const [online, setOnlineState] = useState(isOnline());
+  const [health, setHealth] = useState<Health | null>(null);
+  const [attention, setAttention] = useState<AttentionItem[]>([]);
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastMsg[]>([]);
+
+  const showToast = useCallback((text: string, kind: "info" | "error" = "info") => {
+    const id = toastSeq++;
+    setToasts((prev) => [...prev.slice(-2), { id, text, kind }]);
+    window.setTimeout(
+      () => setToasts((prev) => prev.filter((t) => t.id !== id)), 4200);
+  }, []);
+
+  const refreshSignals = useCallback(() => {
+    void api.health().then(setHealth);
+    void api.attention().then((a) => setAttention(a.items));
+  }, []);
+
+  const reloadApprovals = useCallback(async (status = "pending") => {
+    setApprovals(await api.listApprovals(status));
+  }, []);
 
   useEffect(() => {
-    api.listApprovals().then(setApprovals);
-    api.listAudit().then(setAudit);
-    api.listFlags().then(setFlags);
-  }, []);
-
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 4200);
-  }, []);
-
-  const addAudit = useCallback((e: Omit<AuditEntry, "ts">) => {
-    setAudit((prev) => [{ ts: Date.now(), ...e }, ...prev]);
-  }, []);
+    void reloadApprovals();
+    void api.listAudit({}).then((a) => setAudit(a.rows));
+    void api.listFlags().then(setFlags);
+    refreshSignals();
+    const t = window.setInterval(refreshSignals, 60_000);
+    const off = onOnlineChange(setOnlineState);
+    return () => {
+      window.clearInterval(t);
+      off();
+    };
+  }, [refreshSignals, reloadApprovals]);
 
   const setRole = useCallback(
     (r: Role) => {
       setRoleRaw(r);
-      showToast(`Previewing as ${ROLE_NAMES[r]}`);
+      showToast(`Previewing as ${ROLE_NAMES[r]} — visual only; the server still sees your real role`);
     },
     [showToast]
   );
+
+  const addAudit = useCallback((e: Omit<AuditEntry, "ts">) => {
+    setAudit((prev) => [{ ts: Date.now(), ...e }, ...prev]);
+  }, []);
 
   const addApproval = useCallback((a: Approval) => {
     setApprovals((prev) => [a, ...prev]);
   }, []);
 
   const resolveApproval = useCallback(
-    (id: string, decision: "approved" | "rejected", by: string) => {
-      // Live server first (no-op when absent); local state mirrors either way.
-      if (decision === "approved") void mutate.approve(id);
-      else void mutate.reject(id);
+    async (id: string, decision: "approved" | "rejected", by: string, note = "") => {
+      const res = decision === "approved"
+        ? await mutate.approve(id)
+        : await mutate.reject(id, note);
+      if (!("offline" in res) && res.error) return res;
       setApprovals((prev) => {
         const a = prev.find((x) => x.id === id);
         if (a) {
@@ -92,50 +121,49 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         return prev.filter((x) => x.id !== id);
       });
+      return res;
     },
     []
   );
 
   const toggleFlag = useCallback(
-    (key: string) => {
-      setFlags((prev) =>
-        prev.map((f) => {
-          if (f.key !== key) return f;
-          const next = !f.enabled;
-          void mutate.setFlag(key, next);   // persists via admin-api when live
-          setAudit((au) => [
-            {
-              ts: Date.now(),
-              actor: ME,
-              action: "flag.update",
-              entity: key,
-              change: `${f.enabled ? "on" : "off"} → ${next ? "on" : "off"}`,
-            },
-            ...au,
-          ]);
-          return { ...f, enabled: next };
-        })
-      );
+    async (key: string, confirm?: string) => {
+      const flag = flags.find((f) => f.key === key);
+      if (!flag) return { error: "unknown flag" } as const;
+      const next = !flag.enabled;
+      const res = await mutate.setFlag(key, next, confirm);
+      if (!("offline" in res) && res.error) {
+        showToast(`Flag not changed: ${res.error}`, "error");   // #063: never lie
+        return res;
+      }
+      // offline: local sample flip below, clearly non-authoritative
+      setFlags((prev) => prev.map((f) => (f.key === key ? { ...f, enabled: next } : f)));
+      setAudit((au) => [
+        { ts: Date.now(), actor: ME, action: "flag.update", entity: key,
+          change: `${flag?.enabled ? "on" : "off"} → ${next ? "on" : "off"}` },
+        ...au,
+      ]);
+      return res;
     },
-    []
+    [flags, showToast]
   );
 
   const value = useMemo<Store>(
     () => ({
-      role,
-      setRole,
-      approvals,
-      addApproval,
-      resolveApproval,
-      audit,
-      addAudit,
-      flags,
-      toggleFlag,
-      toast,
-      showToast,
+      role, setRole, online, health, attention, refreshSignals,
+      approvals, reloadApprovals, addApproval, resolveApproval,
+      audit, addAudit, flags, toggleFlag, toasts, showToast,
     }),
-    [role, setRole, approvals, addApproval, resolveApproval, audit, addAudit, flags, toggleFlag, toast, showToast]
+    [role, setRole, online, health, attention, refreshSignals, approvals,
+     reloadApprovals, addApproval, resolveApproval, audit, addAudit, flags,
+     toggleFlag, toasts, showToast]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+export function useStore(): Store {
+  const s = useContext(Ctx);
+  if (!s) throw new Error("useStore outside provider");
+  return s;
 }

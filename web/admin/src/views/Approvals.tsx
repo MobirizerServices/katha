@@ -1,92 +1,175 @@
-import { PageHeader } from "../ui";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "../api/client";
+import type { Approval } from "../api/types";
+import { Empty, IsoTime, Modal, PageHeader, Sev, fmtN } from "../ui";
 import { ME, useStore } from "../store";
-import { ROLE_NAMES, canAct } from "../auth/roles";
+import { canAct } from "../auth/roles";
+
+function ageHours(when: string): number | null {
+  const t = Date.parse(when);
+  return Number.isNaN(t) ? null : (Date.now() - t) / 36e5;
+}
 
 export function Approvals() {
-  const { approvals, resolveApproval, showToast, role } = useStore();
-  const mayDecide = canAct(role, "finance");
+  const { role, online, approvals, reloadApprovals, resolveApproval, showToast } = useStore();
+  const [tab, setTab] = useState<"pending" | "history">("pending");
+  const [history, setHistory] = useState<Approval[]>([]);
+  const [rejecting, setRejecting] = useState<Approval[] | null>(null);
+  const [note, setNote] = useState("");
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [threshold, setThreshold] = useState(500);
 
-  function decide(id: string, requestedBy: string, decision: "approved" | "rejected") {
-    // The requester can never approve their own request (four-eyes / dual
-    // control). Rejecting is always allowed; approving your own is blocked.
-    if (decision === "approved" && requestedBy === ME) {
-      showToast("You can't approve your own request — a second person must.");
-      return;
+  useEffect(() => {
+    void api.policy().then((p) => setThreshold(p.dual_approval_threshold));
+  }, []);
+  useEffect(() => {
+    if (tab === "history") void api.listApprovals("all").then(setHistory);
+  }, [tab, approvals.length]);
+
+  const canDecide = canAct(role, "finance");
+  const rows = tab === "pending" ? approvals : history.filter((a) => a.status !== "pending");
+
+  const togglePick = (id: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  async function decide(list: Approval[], decision: "approved" | "rejected", withNote = "") {
+    for (const a of list) {
+      if (decision === "approved" && a.requestedBy === ME) {
+        showToast("You can't approve your own request", "error");
+        continue;
+      }
+      const res = await resolveApproval(a.id, decision, ME, withNote);
+      if (!("offline" in res) && res.error) {
+        showToast(`${a.id}: ${res.error}`, "error");
+      }
     }
-    if (!mayDecide) {
-      showToast(`${ROLE_NAMES[role]} can't decide approvals.`);
-      return;
-    }
-    resolveApproval(id, decision, ME);
-    showToast(
-      decision === "approved"
-        ? "Approved · change written to the ledger"
-        : "Rejected · returned to requester with your note"
-    );
+    showToast(decision === "approved"
+      ? "Approved · change written to the ledger"
+      : "Rejected · returned to requester with your note");
+    setPicked(new Set());
+    setRejecting(null);
+    setNote("");
+    if (online) void reloadApprovals();      // offline: local resolution stands
   }
+
+  const pickedRows = useMemo(
+    () => rows.filter((a) => picked.has(a.id)), [rows, picked]);
 
   return (
     <>
       <PageHeader
         title="Approvals inbox"
-        subtitle={`${approvals.length} requests need a second person. Approving writes the change; rejecting returns it with your note.`}
+        subtitle={`Coin adjustments above ${fmtN(threshold)} need a second person. Approving writes the change; rejecting returns it with your note. Requesters can never approve their own.`}
+        actions={
+          pickedRows.length > 1 ? (
+            <button className="btn s" onClick={() => setRejecting(pickedRows)}>
+              Reject {pickedRows.length} with one note
+            </button>
+          ) : undefined
+        }
       />
 
-      <div className="panel">
-        {approvals.length ? (
-          <div className="alerts">
-            {approvals.map((a) => {
-              const isOwn = a.requestedBy === ME;
-              return (
-                <div className="alert" key={a.id}>
-                  <span className="dot" style={{ background: "var(--warn)" }} />
-                  <div style={{ flex: 1 }}>
-                    <b>
-                      {a.kind}{" "}
-                      <span className="tiny">
-                        · requested by {a.requestedBy} · {a.when} · needs {a.needs}
-                      </span>
-                    </b>
-                    <span className="muted">{a.detail}</span>
-                    {isOwn ? (
-                      <div className="tiny" style={{ color: "var(--warn)", marginTop: 4 }}>
-                        You requested this — you can't approve it yourself.
-                      </div>
-                    ) : null}
+      <div className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === "pending"}
+                className={tab === "pending" ? "tab on" : "tab"}
+                onClick={() => setTab("pending")}>
+          Pending{approvals.length ? ` (${approvals.length})` : ""}
+        </button>
+        <button role="tab" aria-selected={tab === "history"}
+                className={tab === "history" ? "tab on" : "tab"}
+                onClick={() => setTab("history")}>
+          History
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <Empty
+          title={tab === "pending" ? "Inbox zero" : "No decisions yet"}
+          hint={tab === "pending"
+            ? `Requests above ${fmtN(threshold)} coins land here for a second pair of eyes.`
+            : "Approved and rejected requests will appear here with their outcomes."}
+        />
+      ) : (
+        <ul className="approvals">
+          {rows.map((a) => {
+            const h = ageHours(a.when);
+            const sev = h === null ? null : h > 24 ? "danger" : h > 4 ? "warn" : "ok";
+            return (
+              <li key={a.id} className="aprow">
+                {tab === "pending" ? (
+                  <input type="checkbox" checked={picked.has(a.id)}
+                         onChange={() => togglePick(a.id)}
+                         aria-label={`Select ${a.id}`} />
+                ) : null}
+                <div style={{ flex: 1 }}>
+                  <b>{a.kind}</b>
+                  {a.status && a.status !== "pending" ? (
+                    <Sev level={a.status === "approved" ? "ok" : "warn"}> {a.status}</Sev>
+                  ) : null}
+                  <span className="muted"> · requested by {a.requestedBy}</span>
+                  {typeof a.requesterToday === "number" && a.requesterToday > 1 ? (
+                    <span className="muted"> ({a.requesterToday} requests today)</span>
+                  ) : null}
+                  <div className="muted">{a.detail}</div>
+                  {a.balanceBefore != null ? (
+                    <div className="tiny mono">
+                      balance {fmtN(a.balanceBefore)} → {fmtN(a.balanceAfter ?? 0)}
+                    </div>
+                  ) : null}
+                  <div className="tiny muted">
+                    <IsoTime iso={a.when} />{" "}
+                    {sev ? <Sev level={sev}>{h! > 24 ? "SLA breach" : `${Math.round(h!)}h old`}</Sev> : null}
+                    {a.approvedBy ? ` · decided by ${a.approvedBy}` : null}
                   </div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <button
-                      className="btn s sm"
-                      onClick={() => decide(a.id, a.requestedBy, "rejected")}
-                      disabled={!mayDecide}
-                    >
+                </div>
+                {tab === "pending" ? (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn s" disabled={!canDecide || !online}
+                            onClick={() => setRejecting([a])}>
                       Reject
                     </button>
-                    <button
-                      className="btn g sm"
-                      onClick={() => decide(a.id, a.requestedBy, "approved")}
-                      disabled={!mayDecide || isOwn}
-                      title={isOwn ? "Requester can't self-approve" : undefined}
-                    >
+                    <button className="btn p"
+                            disabled={!canDecide || !online || a.requestedBy === ME}
+                            title={a.requestedBy === ME ? "Requester cannot self-approve" : ""}
+                            onClick={() => void decide([a], "approved")}>
                       Approve
                     </button>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="empty">
-            <h4>Inbox zero</h4>
-            <p>Nothing is waiting for a second approver.</p>
-          </div>
-        )}
-      </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
-      <p className="tiny" style={{ marginTop: 10 }}>
-        Dual approval applies to coin adjustments above 500, price or free-count changes above 20%,
-        and takedowns. The requester can never approve their own request.
-      </p>
+      {rejecting ? (
+        <Modal
+          title={rejecting.length === 1
+            ? `Reject · ${rejecting[0].id}` : `Reject ${rejecting.length} requests`}
+          onClose={() => setRejecting(null)}
+          footer={
+            <>
+              <button className="btn s" onClick={() => setRejecting(null)}>Cancel</button>
+              <button className="btn danger" disabled={!note.trim()}
+                      onClick={() => void decide(rejecting, "rejected", note.trim())}>
+                Reject with note
+              </button>
+            </>
+          }
+        >
+          <p className="tiny">The requester sees this note — say what to fix.</p>
+          <label>
+            Note (required)
+            <input value={note} onChange={(e) => setNote(e.target.value)}
+                   placeholder="e.g. use the refund flow for this, not goodwill" />
+          </label>
+        </Modal>
+      ) : null}
     </>
   );
 }

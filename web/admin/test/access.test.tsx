@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { describe, it, expect, vi, waitFor as _wf } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { Access } from "../src/views/Access";
 import { PERMISSION_MATRIX, ROLE_NAMES } from "../src/auth/roles";
 
@@ -39,5 +39,24 @@ describe("Access view — permission matrix", () => {
     expect(within(row).getByText("2 approvers")).toBeInTheDocument();
     expect(within(row).getByText("request")).toBeInTheDocument();
     expect(within(row).getByText("approve")).toBeInTheDocument();
+  });
+});
+
+describe("Access — live matrix (#077)", () => {
+  it("renders the server-provided matrix and says so", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
+      const u = String(url);
+      const ok = (b: unknown) => Promise.resolve({ ok: true, json: async () => b });
+      if (u.includes("/access/matrix")) return ok({
+        matrix: [{ capability: "Grievance triage", roles: ["admin", "support"] }],
+        roles: [] });
+      if (u.includes("/health/full")) return ok({ status: "ok", checks: {}, at: "" });
+      if (u.includes("/attention")) return ok({ items: [] });
+      return Promise.reject(new Error("offline"));
+    }));
+    render(<Access />);
+    await waitFor(() =>
+      expect(screen.getByText("Grievance triage")).toBeInTheDocument());
+    expect(screen.getByText(/cannot drift from reality/)).toBeInTheDocument();
   });
 });

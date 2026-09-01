@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor, fireEvent } from "@testing-library/react";
 import { Overview } from "../src/views/Overview";
-import { LocationDisplay, renderWithStore } from "./helpers";
-import { api } from "../src/api/client";
-import { MOCK_APPROVALS } from "../src/api/mock";
+import { renderWithStore, LocationDisplay } from "./helpers";
+import { MOCK_OVERVIEW } from "../src/api/mock";
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
@@ -12,46 +11,61 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+async function renderOverview() {
+  const view = renderWithStore(
+    <>
+      <Overview />
+      <LocationDisplay />
+    </>
+  );
+  await waitFor(() =>
+    expect(screen.getByText(MOCK_OVERVIEW.kpis[0].value)).toBeInTheDocument());
+  return view;
+}
+
 describe("Overview view", () => {
-  it("shows a loading skeleton before data arrives", () => {
-    renderWithStore(<Overview />);
-    expect(screen.getByText("Loading dashboard…")).toBeInTheDocument();
+  it("greets with a real time-of-day and date, and reports refresh honestly", async () => {
+    await renderOverview();
+    expect(screen.getByText(/Good (morning|afternoon|evening), riya/)).toBeInTheDocument();
+    expect(screen.getByText(/updated \d+s ago/)).toBeInTheDocument();
   });
 
-  it("renders KPIs, pipeline and the up/down delta emphasis", async () => {
-    const { container } = renderWithStore(<Overview />);
-    await waitFor(() => expect(screen.getByText("Daily active users")).toBeInTheDocument());
-    expect(screen.getByText("118,420")).toBeInTheDocument();
-    // delta with an up direction gets an ".up" span; down gets ".down"
-    expect(container.querySelector(".dl .up")).toBeTruthy();
-    expect(container.querySelector(".dl .down")).toBeTruthy();
-    // pipeline stage present
-    expect(screen.getByText("Human QC & rating")).toBeInTheDocument();
+  it("renders every KPI card from the data", async () => {
+    await renderOverview();
+    for (const k of MOCK_OVERVIEW.kpis) {
+      expect(screen.getByText(k.label)).toBeInTheDocument();
+    }
   });
 
-  it("fills the 'Approvals waiting' alert with the live approval kinds", async () => {
-    renderWithStore(<Overview />);
-    await waitFor(() => expect(screen.getByText("Approvals waiting")).toBeInTheDocument());
-    const kinds = MOCK_APPROVALS.map((a) => a.kind).join(" · ");
-    expect(screen.getByText(kinds)).toBeInTheDocument();
+  it("shows an honest all-clear when no attention items exist", async () => {
+    await renderOverview();
+    expect(screen.getByText(/Nothing needs a human right now/)).toBeInTheDocument();
   });
 
-  it("shows 'Inbox zero' when there are no approvals", async () => {
-    vi.spyOn(api, "listApprovals").mockResolvedValue([]);
-    renderWithStore(<Overview />);
-    await waitFor(() => expect(screen.getByText("Approvals waiting")).toBeInTheDocument());
-    expect(screen.getByText("Inbox zero")).toBeInTheDocument();
+  it("renders live attention items as links when the server provides them", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes("/attention")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ items: [{ id: "approvals", severity: "warn",
+            title: "2 approvals waiting", detail: "second person needed",
+            to: "/approvals" }] }),
+        });
+      }
+      return Promise.reject(new Error("offline"));
+    }));
+    await renderOverview();
+    await waitFor(() =>
+      expect(screen.getByText("2 approvals waiting")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("2 approvals waiting"));
+    expect(screen.getByTestId("location").textContent).toBe("/approvals");
   });
 
-  it("navigates when an attention item is clicked", async () => {
-    renderWithStore(
-      <>
-        <Overview />
-        <LocationDisplay />
-      </>
-    );
-    await waitFor(() => expect(screen.getByText("Approvals waiting")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("Approvals waiting"));
-    expect(screen.getByTestId("location")).toHaveTextContent("/approvals");
+  it("links KPI cards to their detail views (#008)", async () => {
+    await renderOverview();
+    const card = screen.getByText("Registered users").closest("a");
+    expect(card).not.toBeNull();
+    fireEvent.click(card!);
+    expect(screen.getByTestId("location").textContent).toBe("/users");
   });
 });

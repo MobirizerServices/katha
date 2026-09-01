@@ -1,132 +1,107 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { Series } from "../api/types";
-import { PageHeader, Poster, StatusBadge, ago } from "../ui";
+import { Empty, PageHeader, Skeleton, StatusBadge, fmtN } from "../ui";
+import type { SeriesStatus } from "../api/types";
 
 const LANGS = ["All", "Hindi", "Tamil", "Telugu"];
-const STATUSES = ["All", "live", "sched", "qc", "draft", "arch"];
+const STATUSES = ["All statuses", "live", "scheduled", "draft", "archived"];
+
+function toBadge(status: string): SeriesStatus {
+  const map: Record<string, SeriesStatus> = {
+    live: "live", scheduled: "sched", draft: "draft", archived: "arch", qc: "qc",
+  };
+  return map[status] ?? "live";
+}
 
 export function Catalog() {
-  const [series, setSeries] = useState<Series[]>([]);
+  const [rows, setRows] = useState<Series[] | null>(null);
   const [q, setQ] = useState("");
   const [lang, setLang] = useState("All");
-  const [status, setStatus] = useState("All");
+  const [status, setStatus] = useState("All statuses");
 
   useEffect(() => {
-    api.listSeries().then(setSeries);
+    void api.listSeries().then(setRows);
   }, []);
 
-  const rows = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    return series.filter(
-      (s) =>
-        (lang === "All" || s.language === lang) &&
-        (status === "All" || s.status === status) &&
-        (!query ||
-          s.title.toLowerCase().includes(query) ||
-          s.slug.includes(query) ||
-          s.genres.join(" ").toLowerCase().includes(query))
-    );
-  }, [series, q, lang, status]);
+  const filtered = useMemo(() => {
+    if (!rows) return [];
+    return rows.filter((s) => {
+      if (lang !== "All" && s.language !== lang) return false;
+      const norm = (st: string) =>
+        (({ sched: "scheduled", arch: "archived", qc: "draft" }) as Record<string, string>)[st] ?? st;
+      if (status !== "All statuses" && norm(s.status) !== status) return false;
+      const needle = q.trim().toLowerCase();
+      if (needle &&
+          !s.title.toLowerCase().includes(needle) &&
+          !s.slug.includes(needle) &&
+          !s.genres.some((g) => g.toLowerCase().includes(needle))) return false;
+      return true;
+    });
+  }, [rows, q, lang, status]);
 
-  const totalEps = series.reduce((a, s) => a + s.episodeCount, 0);
+  const total = rows?.reduce((n, s) => n + s.episodeCount, 0) ?? 0;
 
   return (
     <>
       <PageHeader
         title="Catalog"
-        subtitle={`${series.length} series · ${totalEps.toLocaleString("en-IN")} episodes · 3 languages. First 10 episodes of every series are free, then 30 coins each.`}
+        subtitle={rows
+          ? `${rows.length} series · ${fmtN(total)} episodes · 3 languages. First ${rows[0]?.freeEpisodes ?? 10} episodes of every series are free, then ${rows[0]?.coinPrice ?? 30} coins each.`
+          : "Loading catalog…"}
       />
 
       <div className="filters">
-        <div className="search">
-          <span>⌕</span>
-          <input
-            placeholder="Search title, slug or genre…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-        <select value={lang} onChange={(e) => setLang(e.target.value)}>
-          {LANGS.map((l) => (
-            <option key={l}>{l}</option>
-          ))}
+        <input placeholder="Search title, slug or genre…" value={q}
+               onChange={(e) => setQ(e.target.value)} aria-label="Search catalog" />
+        <select value={lang} onChange={(e) => setLang(e.target.value)} aria-label="Language">
+          {LANGS.map((l) => <option key={l}>{l}</option>)}
         </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s === "All" ? "All statuses" : s}
-            </option>
-          ))}
+        <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
+          {STATUSES.map((s) => <option key={s}>{s}</option>)}
         </select>
       </div>
 
-      <div className="panel">
-        <div className="tablewrap">
-          <table className="t">
-            <thead>
-              <tr>
-                <th>Series</th>
-                <th>Language</th>
-                <th>Rating</th>
-                <th className="num">Episodes</th>
-                <th>Free</th>
-                <th className="num">Price</th>
-                <th className="num">Bundle</th>
-                <th>Status</th>
-                <th>Updated</th>
+      {rows === null ? (
+        <Skeleton rows={6} />
+      ) : filtered.length === 0 ? (
+        <Empty title="No series match" hint="Clear a filter, or draft a new series (coming with the content pipeline)." />
+      ) : (
+        <table className="table cat">
+          <thead>
+            <tr>
+              <th>Series</th><th>Language</th><th>Rating</th>
+              <th style={{ textAlign: "right" }}>Episodes</th>
+              <th>Free</th><th>Price</th><th>Bundle</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((s) => (
+              <tr key={s.slug}>
+                <td>
+                  <Link to={`/catalog/${s.slug}`} className="serieslink">
+                    <img className="covermini" alt=""
+                         src={`http://127.0.0.1:8799/media/${s.slug}/cover_9x16.jpg`}
+                         onError={(e) => ((e.target as HTMLImageElement).style.visibility = "hidden")} />
+                    <span>
+                      <b>{s.title}</b>
+                      <small className="muted"> {s.genres.join(" · ")} · {s.slug}</small>
+                    </span>
+                  </Link>
+                </td>
+                <td>{s.language}</td>
+                <td><span className="rt">{s.rating}</span></td>
+                <td style={{ textAlign: "right" }} className="mono">{s.episodeCount}</td>
+                <td>{s.freeEpisodes} free</td>
+                <td>{s.coinPrice} coins</td>
+                <td>−{s.bundleDiscountPct}%</td>
+                <td><StatusBadge status={toBadge(s.status)} /></td>
               </tr>
-            </thead>
-            <tbody>
-              {rows.map((s, i) => (
-                <tr key={s.id}>
-                  <td>
-                    <div className="cell">
-                      <Poster i={i} />
-                      <div>
-                        <div className="tt">{s.title}</div>
-                        <div className="ss">
-                          {s.genres.join(" · ")} · {s.slug}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>{s.language}</td>
-                  <td>
-                    {s.rating === "—" ? (
-                      <span className="tag">unrated</span>
-                    ) : (
-                      <span className="tag">{s.rating}</span>
-                    )}
-                  </td>
-                  <td className="num">
-                    {s.liveCount} / {s.episodeCount}
-                  </td>
-                  <td>{s.freeEpisodes} free</td>
-                  <td className="num">{s.coinPrice} coins</td>
-                  <td className="num">−{s.bundleDiscountPct}%</td>
-                  <td>
-                    <StatusBadge status={s.status} />
-                  </td>
-                  <td>
-                    <span className="muted">{ago(s.updatedAt)}</span>
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={9}>
-                    <div className="empty">
-                      <h4>No series match</h4>
-                      <p>Try clearing a filter.</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            ))}
+          </tbody>
+        </table>
+      )}
     </>
   );
 }
