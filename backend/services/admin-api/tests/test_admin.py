@@ -54,7 +54,7 @@ def test_list_and_publish_series():
     after = client.get("/admin/v1/series", headers=CONTENT).json()
     assert next(s for s in after if s["slug"] == "kaanch-ka-mahal")["published"] is True
     # publish is a mutation -> audited.
-    audit = client.get("/admin/v1/audit", headers=ADMIN).json()
+    audit = client.get("/admin/v1/audit", headers=ADMIN).json()["rows"]
     assert any(a["action"] == "series.publish" for a in audit)
 
 
@@ -73,7 +73,7 @@ def test_small_adjust_applies_immediately_and_audits():
     assert ledger["wallet"]["total"] == 100
     assert ledger["transactions"][0]["type"] == TxType.ADMIN_ADJUST.value
 
-    audit = client.get("/admin/v1/audit", headers=ADMIN).json()
+    audit = client.get("/admin/v1/audit", headers=ADMIN).json()["rows"]
     assert any(a["action"] == "wallet.adjust.applied" for a in audit)
 
 
@@ -122,7 +122,7 @@ def test_second_actor_approves_and_applies():
     # Second approval attempt is a conflict.
     assert client.post(f"/admin/v1/approvals/{ap_id}/approve", headers=ADMIN).status_code == 409
     # Both the request and the approval are in the audit trail.
-    actions = [a["action"] for a in client.get("/admin/v1/audit", headers=ADMIN).json()]
+    actions = [a["action"] for a in client.get("/admin/v1/audit", headers=ADMIN).json()["rows"]]
     assert "wallet.adjust.requested" in actions and "wallet.adjust.approved" in actions
 
 
@@ -140,5 +140,5 @@ def test_negative_large_adjust_also_needs_approval():
 def test_users_list_reflects_adjusted_users():
     client.post("/admin/v1/wallet/adjust", headers=SUPPORT,
                 json={"user_id": "u1", "coins": 50, "reason_code": "g"})
-    users = client.get("/admin/v1/users", headers=FINANCE).json()
+    users = client.get("/admin/v1/users", headers=FINANCE).json()["users"]
     assert any(u["id"] == "u1" for u in users)          # AdminUser shape (id, wallet, ...)

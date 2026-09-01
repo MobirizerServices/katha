@@ -738,6 +738,67 @@
         }
       }
     },
+    "/v1/grievance": {
+      "post": {
+        "tags": [
+          "engagement"
+        ],
+        "summary": "File Grievance",
+        "operationId": "file_grievance_v1_grievance_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrievanceIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response File Grievance V1 Grievance Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/series/{slug}/episodes/{number}/playback": {
       "post": {
         "tags": [
@@ -1476,6 +1537,34 @@
           "coin_price"
         ],
         "title": "Episode"
+      },
+      "GrievanceIn": {
+        "properties": {
+          "contact": {
+            "type": "string",
+            "title": "Contact"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "default": ""
+          },
+          "channel": {
+            "type": "string",
+            "title": "Channel",
+            "default": "app"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contact",
+          "subject"
+        ],
+        "title": "GrievanceIn"
       },
       "HTTPValidationError": {
         "properties": {

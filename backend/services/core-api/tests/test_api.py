@@ -42,7 +42,7 @@ def test_free_episode_plays_without_coins():
     assert r.status_code == 200
     body = r.json()
     assert body["locked"] is False
-    assert body["hls_master_url"].endswith("master.m3u8?exp=2026-09-14T14:03:22+05:30")
+    assert "master.m3u8?exp=" in body["hls_master_url"]   # real expiry now (#001)
 
 
 def test_locked_episode_returns_price_and_bundle_offer():

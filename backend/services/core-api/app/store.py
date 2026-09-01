@@ -25,9 +25,11 @@ PACKS = {
     "coins_web_popular_in": dict(storefront="WEB", price_minor=19900, currency="INR", coins=1300, bonus=130),
 }
 
-# A fixed clock keeps the dev slice deterministic and mirrors the ledger's design.
+from katha_domain.timeutil import ist_day, now_iso
+
+# Historical rows carry this frozen stamp; every NEW write uses now_iso()
+# (admin review #001). Kept for reference/back-compat only.
 CLOCK = "2026-09-14T14:03:22+05:30"
-CLOCK_DAY = CLOCK[:10]  # "2026-09-14" — used for idempotent daily check-ins.
 CHECKIN_COINS = 5
 WEB_BONUS_PCT = 10  # +10% web bonus on any web-store purchase (PDD §19 decision 11)
 
@@ -48,7 +50,7 @@ class ProgressItem:
     episode_id: str
     position_ms: int = 0
     duration_ms: int = 0
-    updated_at: str = CLOCK
+    updated_at: str = ""
 
 
 @dataclass
@@ -93,7 +95,7 @@ class Store:
         u = self.users.get(user_id)
         if u is not None:
             self.shared.upsert_profile(user_id, phone=u.phone or "", kind=u.kind,
-                                       language=u.language, created_at=CLOCK)
+                                       language=u.language, created_at=now_iso())
 
     # ---- engagement -----------------------------------------------------
     def _eng(self, user_id: str) -> UserEngagement:
@@ -139,6 +141,25 @@ class Store:
         return self._eng(user_id).my_list
 
     # ---- entitlements ---------------------------------------------------
+    _seen_stamp: dict = {}
+
+    def touch_seen(self, user_id: str) -> None:
+        """Record activity for the back office (admin review #020) — at most
+        once a minute per user to keep the hot path cheap."""
+        if self.shared is None:
+            return
+        stamp = now_iso()[:16]                      # minute resolution
+        if self._seen_stamp.get(user_id) == stamp:
+            return
+        self._seen_stamp[user_id] = stamp
+        self.shared.touch_last_seen(user_id, now_iso())
+
+    def kv(self, key: str) -> str | None:
+        return self.shared.kv_get(key) if self.shared is not None else None
+
+    def kv_prefix(self, prefix: str) -> dict:
+        return self.shared.kv_prefix(prefix) if self.shared is not None else {}
+
     def refresh_ledger(self) -> None:
         """Fold in ledger rows other services wrote to the shared DB.
 
@@ -158,7 +179,7 @@ class Store:
         if number <= series.free_episode_count:
             eid = catalog.episode_id(slug, number)
             if not self.ledger.is_entitled(user_id, eid):
-                self.ledger.grant_free(user_id, eid, created_at=CLOCK)
+                self.ledger.grant_free(user_id, eid, created_at=now_iso())
             return True
         return False
 

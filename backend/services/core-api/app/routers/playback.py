@@ -10,7 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from katha_domain import catalog
 from ..deps import current_user
 from ..media import media_dir
-from ..store import CLOCK, store
+from katha_domain.timeutil import iso_plus
+
+from ..store import store
 
 router = APIRouter(prefix="/v1", tags=["playback"])
 
@@ -21,8 +23,8 @@ def _signed_url(episode_id: str) -> str:
     slug, _, tail = episode_id.partition(":e")
     rel = f"{slug}/e{int(tail):03d}/hls/master.m3u8"
     if (media_dir() / rel).is_file():
-        return f"{catalog.media_base()}/media/{rel}?exp={CLOCK}"
-    return f"https://cdn.katha.dev/hls/{episode_id}/master.m3u8?exp={CLOCK}"
+        return f"{catalog.media_base()}/media/{rel}?exp={iso_plus(6)}"
+    return f"https://cdn.katha.dev/hls/{episode_id}/master.m3u8?exp={iso_plus(6)}"
 
 
 @router.post("/series/{slug}/episodes/{number}/playback")
@@ -42,7 +44,7 @@ def playback(slug: str, number: int, response: Response, user: str = Depends(cur
             "episode_id": eid,
             "entitled": True,
             "hls_master_url": _signed_url(eid),
-            "expires_at": CLOCK,
+            "expires_at": iso_plus(6),
             "resume_position_ms": 0,
             "captions": [{"lang": series.primary_language, "url": f".../{eid}/subs.vtt"}],
         }

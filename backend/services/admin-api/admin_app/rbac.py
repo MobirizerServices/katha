@@ -56,3 +56,28 @@ def require(*roles: Role):
         return actor
 
     return _dep
+
+
+# The capability → roles matrix, served to the Roles & Access page so the docs
+# can never drift from enforcement (routes below reference these same names).
+MATRIX: list[dict] = [
+    {"capability": "Create / edit series & episodes", "roles": ["admin", "content"]},
+    {"capability": "Publish / schedule / takedown", "roles": ["admin", "content"],
+     "notes": {"qc": "takedown"}},
+    {"capability": "Rating & moderation decisions", "roles": ["admin", "qc", "content"]},
+    {"capability": "View user PII (phone)", "roles": ["admin", "support"],
+     "notes": {"finance": "masked"}},
+    {"capability": "Coin adjustment ≤ 500", "roles": ["admin", "support", "finance"]},
+    {"capability": "Coin adjustment > 500", "roles": ["admin"],
+     "notes": {"support": "request", "finance": "approve"}},
+    {"capability": "Refunds & clawbacks", "roles": ["admin", "finance", "support"]},
+    {"capability": "Grievance triage", "roles": ["admin", "support"]},
+    {"capability": "Flags, experiments, SKUs", "roles": ["admin"],
+     "notes": {"content": "flags", "finance": "SKUs"}},
+    {"capability": "DPDP export / erase", "roles": ["admin"]},
+    {"capability": "Analytics dashboards",
+     "roles": ["admin", "content", "qc", "support", "finance", "analyst", "ro"]},
+    {"capability": "Audit log",
+     "roles": ["admin", "finance", "analyst", "ro"],
+     "notes": {"content": "own", "qc": "own", "support": "own"}},
+]

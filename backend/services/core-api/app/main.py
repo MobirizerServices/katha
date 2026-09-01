@@ -75,7 +75,7 @@ def config() -> dict:
     prof = catalog.pricing()
     overrides = _store.shared.flag_overrides() if getattr(_store, "shared", None) else {}
     return {
-        "min_app_version": "1.0.0",
+        "min_app_version": _store.kv("config:app.min_version") or "1.0.0",
         "free_episode_count": prof["free_episode_count"],
         "episode_coin_price": prof["episode_coin_price"],
         "bundle_discount_pct": prof["bundle_discount_pct"],

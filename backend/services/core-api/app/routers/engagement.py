@@ -14,7 +14,9 @@ from katha_domain.schemas import (
 )
 from katha_ledger import TxType
 from ..auth import current_user
-from ..store import CHECKIN_COINS, CLOCK, CLOCK_DAY, store
+from katha_domain.timeutil import ist_day, now_iso
+
+from ..store import CHECKIN_COINS, store
 
 router = APIRouter(prefix="/v1", tags=["engagement"])
 
@@ -83,13 +85,41 @@ def _list_response(user: str) -> MyListResponse:
 @router.post("/rewards/checkin", response_model=CheckinResponse)
 def checkin(user: str = Depends(current_user)) -> CheckinResponse:
     """Daily check-in: +5 bonus coins, idempotent per day via the ledger key."""
-    key = f"checkin:{user}:{CLOCK_DAY}"
+    key = f"checkin:{user}:{ist_day()}"
     before = store.ledger.balance(user).total
     store.ledger.credit(user, TxType.CHECKIN, coins=CHECKIN_COINS, reference_type="day",
-                        reference_id=CLOCK_DAY, idempotency_key=key, created_at=CLOCK)
+                        reference_id=ist_day(), idempotency_key=key, created_at=now_iso())
     after = store.ledger.balance(user).total
     already = after == before
     return CheckinResponse(
         granted_coins=0 if already else CHECKIN_COINS,
-        already_claimed=already, day=CLOCK_DAY, wallet=_wallet(user),
+        already_claimed=already, day=ist_day(), wallet=_wallet(user),
     )
+
+
+# ---- grievance intake (IT Rules; back office triages — admin review #073) ----
+from pydantic import BaseModel as _BM
+
+
+class GrievanceIn(_BM):
+    contact: str
+    subject: str
+    body: str = ""
+    channel: str = "app"
+
+
+@router.post("/grievance")
+def file_grievance(g: GrievanceIn, user: str = Depends(current_user)) -> dict:
+    from uuid import uuid4
+
+    from katha_domain.timeutil import now_iso
+    if store.shared is None:
+        raise HTTPException(status_code=503, detail="grievance intake needs persistence")
+    if not g.contact.strip() or not g.subject.strip():
+        raise HTTPException(status_code=400, detail="contact and subject are required")
+    gid = f"G-{uuid4().hex[:6].upper()}"
+    store.shared.grievance_create(gid=gid, user_id=user, contact=g.contact.strip(),
+                                  channel=g.channel, subject=g.subject.strip(),
+                                  body=g.body.strip(), created_at=now_iso())
+    return {"id": gid, "status": "new",
+            "promise": "acknowledged within 24 hours, resolved within 15 days"}

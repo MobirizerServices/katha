@@ -52,6 +52,7 @@ class UserProfileRow(Base):
     kind: Mapped[str] = mapped_column(String, nullable=False, default="guest")  # guest | phone | apple
     language: Mapped[str] = mapped_column(String, nullable=False, default="hi")
     created_at: Mapped[str] = mapped_column(String, nullable=False, default="")
+    last_seen: Mapped[str] = mapped_column(String, nullable=False, default="")
 
 
 class EntitlementRow(Base):
@@ -74,3 +75,45 @@ class KVRow(Base):
 
     key: Mapped[str] = mapped_column(String(128), primary_key=True)
     value: Mapped[str] = mapped_column(String(1024))
+
+
+class AuditLogRow(Base):
+    """Persisted, hash-chained audit trail (admin review #066/#068/#069).
+
+    `hash` = sha256(prev_hash + ts + actor + action + target + detail); any
+    edit breaks every later link, making "append-only" checkable, not asserted.
+    """
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ts: Mapped[str] = mapped_column(String, nullable=False)
+    actor_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    actor_role: Mapped[str] = mapped_column(String, nullable=False)
+    action: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    target: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    detail: Mapped[str] = mapped_column(String, nullable=False, default="{}")
+    ip: Mapped[str] = mapped_column(String, nullable=False, default="")
+    user_agent: Mapped[str] = mapped_column(String, nullable=False, default="")
+    prev_hash: Mapped[str] = mapped_column(String, nullable=False, default="")
+    hash: Mapped[str] = mapped_column(String, nullable=False, default="")
+
+
+class GrievanceRow(Base):
+    """IT Rules grievance ticket (admin review #073): acknowledge within 24 h,
+    resolve within 15 days. Timestamps are real UTC; SLA math derives from them."""
+
+    __tablename__ = "grievance"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False, default="")
+    contact: Mapped[str] = mapped_column(String, nullable=False)
+    channel: Mapped[str] = mapped_column(String, nullable=False, default="app")
+    subject: Mapped[str] = mapped_column(String, nullable=False)
+    body: Mapped[str] = mapped_column(String, nullable=False, default="")
+    status: Mapped[str] = mapped_column(String, index=True, nullable=False, default="new")
+    assignee: Mapped[str] = mapped_column(String, nullable=False, default="")
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    ack_at: Mapped[str] = mapped_column(String, nullable=False, default="")
+    resolved_at: Mapped[str] = mapped_column(String, nullable=False, default="")
+    notes: Mapped[str] = mapped_column(String, nullable=False, default="[]")

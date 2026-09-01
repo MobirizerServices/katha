@@ -73,6 +73,15 @@ class Database:
         except OperationalError as e:
             if "already exists" not in str(e):
                 raise
+        # Additive column migration for pre-existing dev DBs (create_all never
+        # alters tables): ignore "duplicate column" on already-migrated files.
+        from sqlalchemy import text
+        for ddl in ("ALTER TABLE user_profile ADD COLUMN last_seen VARCHAR NOT NULL DEFAULT ''",):
+            try:
+                async with self.engine.begin() as conn:
+                    await conn.execute(text(ddl))
+            except OperationalError:
+                pass
 
     def run(self, coro: Awaitable[T]) -> T:
         return self.runner.run(coro)

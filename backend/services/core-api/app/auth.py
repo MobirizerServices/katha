@@ -57,5 +57,9 @@ def current_user(authorization: str | None = Header(default=None)) -> str:
         token = authorization.split(" ", 1)[1].strip()
         sub = decode_token(token)
         # Dev fallback: a non-JWT bearer value is treated as the raw user id.
-        return sub if sub is not None else token
-    return "guest-dev"
+        user = sub if sub is not None else token
+    else:
+        user = "guest-dev"
+    from .store import store
+    store.touch_seen(user)          # back-office "last active" (admin review #020)
+    return user

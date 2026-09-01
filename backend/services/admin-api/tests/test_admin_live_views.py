@@ -66,7 +66,7 @@ def test_approvals_list_and_reject_flow():
     assert client.post(f"/admin/v1/approvals/{ap_id}/reject", headers=FINANCE).status_code == 409
     # nothing was applied to the ledger
     assert store.ledger.balance("u2").total == 0
-    audit = client.get("/admin/v1/audit", headers=ADMIN).json()
+    audit = client.get("/admin/v1/audit", headers=ADMIN).json()["rows"]
     assert any(a["action"] == "wallet.adjust.rejected" for a in audit)
 
 
@@ -88,7 +88,7 @@ def test_flags_read_toggle_and_audit():
 
     assert client.patch("/admin/v1/config/flags/not.a.flag",
                         headers=ADMIN, json={"enabled": True}).status_code == 404
-    audit = client.get("/admin/v1/audit", headers=ADMIN).json()
+    audit = client.get("/admin/v1/audit", headers=ADMIN).json()["rows"]
     assert any(a["action"] == "config.flag.set" and a["entity"] == "rewards.referral_enabled"
                for a in audit)
 
@@ -96,7 +96,7 @@ def test_flags_read_toggle_and_audit():
 def test_audit_rows_carry_client_shape():
     client.post("/admin/v1/wallet/adjust", headers=SUPPORT,
                 json={"user_id": "u3", "coins": 10, "reason_code": "goodwill"})
-    row = client.get("/admin/v1/audit", headers=ADMIN).json()[-1]
+    row = client.get("/admin/v1/audit", headers=ADMIN).json()["rows"][-1]
     for key in ("ts", "actor", "action", "entity", "change"):
         assert key in row
     assert "coins=10" in row["change"]
