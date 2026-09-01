@@ -306,16 +306,19 @@ struct PinPad: View {
 // MARK: - 4.6 Help & grievance
 
 struct HelpView: View {
-    private let faqs: [(q: String, a: String)] = [
+    @Environment(AppModel.self) private var model
+    private var faqs: [(q: String, a: String)] {
+        [
         ("How do coins work?",
-         "The first 10 episodes of every series are free. After that, each episode costs 30 coins (about ₹4.5). Buy packs once — coins never expire."),
+         faqCoinsAnswer(model)),
         ("I paid but didn't get my coins",
          "Pull to refresh your Wallet, then tap Restore purchases. If the coins still haven't landed within a few minutes, contact support — verified failed transactions are re-credited."),
         ("Refunds and cancellations",
          "App Store purchases are refunded by Apple under Apple's policy (reportaproblem.apple.com). Coins bought on the web are refundable within 7 days if unspent."),
         ("Parental controls",
          "Set a PIN in Settings → Parental lock. U/A 16+ and A-rated titles then require it before playing."),
-    ]
+        ]
+    }
 
     var body: some View {
         List {
@@ -406,4 +409,14 @@ struct DeleteAccountSheet: View {
                 .foregroundStyle(Katha.Color.text2)
         }
     }
+}
+
+
+/// FAQ copy renders the SERVER's pricing profile, never a baked-in number.
+@MainActor func faqCoinsAnswer(_ model: AppModel) -> String {
+    let free = model.freeEpisodesDefault
+    let price = model.appConfig?.episodeCoinPrice ?? 30
+    return "The first \(free) episodes of every series are free. After that, " +
+           "each episode costs \(price) coins (about ₹\(rupees(price, rate: model.rupeeRate))). " +
+           "Buy packs once — coins never expire."
 }

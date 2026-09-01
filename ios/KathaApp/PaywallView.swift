@@ -53,7 +53,7 @@ struct PaywallView: View {
                         Text("\(price) coins")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(Katha.Color.text)
-                        Text("≈ ₹\(rupees(price))")
+                        Text("≈ ₹\(rupees(price, rate: model.rupeeRate))")
                             .font(.system(size: 13))
                             .foregroundStyle(Katha.Color.text2)
                     }
@@ -91,7 +91,7 @@ struct PaywallView: View {
                                 Text("Unlock all \(remainingLocked) remaining · \(bundle) coins")
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundStyle(Katha.Color.text)
-                                Text("≈ ₹\(rupees(bundle)) vs ₹\(rupees(remainingLocked * price)) one by one")
+                                Text("≈ ₹\(rupees(bundle, rate: model.rupeeRate)) vs ₹\(rupees(remainingLocked * price, rate: model.rupeeRate)) one by one")
                                     .font(.system(size: 12))
                                     .foregroundStyle(Katha.Color.text2)
                             }
@@ -223,11 +223,11 @@ struct PackMeta {
     let badge: String?
     let highlighted: Bool
 
-    static func lookup(_ sku: String) -> PackMeta {
+    static func lookup(_ sku: String, firstPack2x: Bool) -> PackMeta {
         switch sku {
         case "coins_starter_in":
             return .init(name: "Starter", blurb: "Enough for 20 episodes",
-                         badge: "2× on your first pack", highlighted: false)
+                         badge: firstPack2x ? "2× on your first pack" : nil, highlighted: false)
         case "coins_popular_in":
             return .init(name: "Popular", blurb: "Finishes a series and the next",
                          badge: "Popular", highlighted: true)
@@ -244,12 +244,13 @@ struct PackMeta {
 }
 
 struct PackRow: View {
+    @Environment(AppModel.self) private var model
     let pack: CoinPack
     var buying = false
     let action: () -> Void
 
     var body: some View {
-        let meta = PackMeta.lookup(pack.sku)
+        let meta = PackMeta.lookup(pack.sku, firstPack2x: model.firstPack2x)
         Button(action: action) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {

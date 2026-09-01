@@ -1,6 +1,7 @@
 # Katha monorepo — dev orchestration. Requires: uv (Python), node/npm (web), swift (iOS).
 PYBIN := backend/.venv/bin/python
-PP := backend/packages/ledger:backend/packages/domain:backend/packages/infra:backend/services/core-api
+# Paths are relative to backend/ (every recipe cd's there first).
+PP := packages/ledger:packages/domain:packages/infra:services/core-api
 
 .PHONY: help setup test test-backend test-ios test-e2e api admin openapi gen-contracts seed-media web fmt clean
 
@@ -52,7 +53,7 @@ cov: test    # alias — every surface's run prints and gates its coverage
 SHARED_ENV := KATHA_PERSIST=1 KATHA_DB_URL=sqlite+aiosqlite:////tmp/katha_shared.db
 
 api:
-	cd backend && $(SHARED_ENV) PYTHONPATH=$(PP:backend/%=%) \
+	cd backend && $(SHARED_ENV) PYTHONPATH=$(PP) \
 		.venv/bin/python -m uvicorn app.main:app --port 8799
 	# NOTE: no --reload — restart after backend edits (matches how it is run in dev)
 
@@ -72,7 +73,7 @@ gen-contracts: openapi
 	backend/.venv/bin/python tools/gen_admin_types.py
 
 openapi:
-	cd backend && PYTHONPATH=$(PP:backend/%=%) .venv/bin/python -c \
+	cd backend && PYTHONPATH=$(PP) .venv/bin/python -c \
 		"import json; from app.main import app; open('../contracts/openapi/core-api.json','w').write(json.dumps(app.openapi(), indent=2))"
 	@echo "wrote contracts/openapi/core-api.json"
 

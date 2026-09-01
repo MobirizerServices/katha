@@ -1319,17 +1319,45 @@
           "config"
         ],
         "summary": "Config",
-        "description": "Remote config the clients read (feature flags, pricing defaults, min version).\n\nFlags = shared defaults merged with admin overrides from the shared DB \u2014\na toggle flipped in the back office reaches this endpoint on the next call.",
+        "description": "Remote config the clients read (feature flags, pricing defaults, min version).\n\nFlags = shared defaults merged with admin overrides from the shared DB \u2014\na toggle flipped in the back office reaches this endpoint on the next call.\nWith a bearer token, percentage rollouts (#056) and experiment assignments\n(#061) are evaluated for THAT user; anonymous callers get ramps only at\n100% and no assignments.",
         "operationId": "config_v1_config_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Config V1 Config Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }

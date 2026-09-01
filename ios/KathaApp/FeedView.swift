@@ -14,8 +14,11 @@ struct FeedView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     HStack(spacing: 8) {
-                        Image(systemName: "play.rectangle.fill")
-                            .foregroundStyle(Katha.Color.accent)
+                        Image("KathaMark")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 26, height: 26)
+                            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                         Text("Katha")
                             .font(.system(size: 22, weight: .heavy))
                             .foregroundStyle(Katha.Color.text)
@@ -98,7 +101,7 @@ struct FeedView: View {
                 Text("Daily check-in")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Katha.Color.text)
-                Text("Claim today's 5 coins")
+                Text("Claim today's \(model.checkinCoins) coins")
                     .font(.system(size: 13))
                     .foregroundStyle(Katha.Color.text2)
             }
@@ -168,6 +171,7 @@ struct FeedView: View {
 
 /// The big For You card (2.1): tagline + Play E1, "Free · 10 episodes" badge.
 private struct HeroCard: View {
+    @Environment(AppModel.self) private var model
     let series: SeriesSummary
 
     var body: some View {
@@ -208,7 +212,7 @@ private struct HeroCard: View {
 
                 VStack {
                     HStack {
-                        Text("Free · 10 episodes")
+                        Text("Free · \(model.freeEpisodesDefault) episodes")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Katha.Color.text)
                             .padding(.horizontal, 8)

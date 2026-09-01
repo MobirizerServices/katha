@@ -259,3 +259,41 @@ extension AccountAPITests {
                               session: URLSession(configuration: config))
     }
 }
+
+extension AccountAPITests {
+    func testConfigDecodesEveryServerDerivedNumber() async throws {
+        reply("""
+        {"min_app_version":"1.2.0","free_episode_count":8,
+         "episode_coin_price":40,"bundle_discount_pct":20,
+         "coin_rupee_rate":0.2,"checkin_coins":7,
+         "flags":{"offers.first_pack_2x":false},
+         "experiments":{"free-count":"eight"}}
+        """)
+        let cfg = try await makeClient().config()
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.path, "/v1/config")
+        XCTAssertEqual(cfg.freeEpisodeCount, 8)
+        XCTAssertEqual(cfg.episodeCoinPrice, 40)
+        XCTAssertEqual(cfg.coinRupeeRate, 0.2, accuracy: 0.0001)
+        XCTAssertEqual(cfg.checkinCoins, 7)
+        XCTAssertEqual(cfg.flags["offers.first_pack_2x"], false)
+        XCTAssertEqual(cfg.experiments["free-count"], "eight")
+        XCTAssertEqual(cfg.minAppVersion, "1.2.0")
+        XCTAssertEqual(cfg.bundleDiscountPct, 20)
+    }
+
+    func testAppConfigMemberwiseInitAndDefaults() {
+        let cfg = AppConfig(minAppVersion: "1.0.0", freeEpisodeCount: 10,
+                            episodeCoinPrice: 30, bundleDiscountPct: 25,
+                            coinRupeeRate: 0.15, checkinCoins: 5)
+        XCTAssertTrue(cfg.flags.isEmpty && cfg.experiments.isEmpty)
+        XCTAssertEqual(cfg.episodeCoinPrice, 30)
+    }
+
+    func testVersionGateComparesNumerically() {
+        XCTAssertTrue(AppConfig.isOutdated(current: "1.0.0", minimum: "1.2.0"))
+        XCTAssertTrue(AppConfig.isOutdated(current: "1.9", minimum: "1.10"))
+        XCTAssertFalse(AppConfig.isOutdated(current: "1.2.0", minimum: "1.2"))
+        XCTAssertFalse(AppConfig.isOutdated(current: "2.0", minimum: "1.9.9"))
+        XCTAssertFalse(AppConfig.isOutdated(current: "1.0.0", minimum: "1.0.0"))
+    }
+}

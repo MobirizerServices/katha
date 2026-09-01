@@ -931,3 +931,13 @@ def test_last_analytics_and_overrides_lines(shared):
     shared.grievance_update("G-DONE", status="resolved", resolved_at=T0)
     items = a2.get("/admin/v1/attention", headers=ADMIN_H).json()["items"]
     assert not any(i["id"] == "G-DONE" for i in items)
+
+
+def test_config_serves_rate_and_checkin(shared):
+    core = _core()
+    cfg = core.get("/v1/config").json()
+    assert cfg["coin_rupee_rate"] == 0.15 and cfg["checkin_coins"] == 5
+    shared.kv_set("config:coin.rupee_rate", "0.2")
+    assert core.get("/v1/config").json()["coin_rupee_rate"] == 0.2
+    shared.kv_set("config:coin.rupee_rate", "junk")
+    assert core.get("/v1/config").json()["coin_rupee_rate"] == 0.15

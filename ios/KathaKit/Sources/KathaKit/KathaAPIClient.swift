@@ -140,6 +140,10 @@ public actor KathaAPIClient {
         try await get("/v1/wallet/transactions")
     }
 
+    public func config() async throws -> AppConfig {
+        try await get("/v1/config")
+    }
+
     public func packs(storefront: String = "IN") async throws -> [CoinPack] {
         try await get("/v1/iap/packs", query: ["storefront": storefront])
     }

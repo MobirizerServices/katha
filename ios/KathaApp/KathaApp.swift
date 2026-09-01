@@ -142,8 +142,26 @@ final class AppModel {
     // MARK: Session lifecycle
 
     /// Establish a session: reuse the stored token, else start as a guest.
+    // Remote config: the server owns every business number the UI shows.
+    var appConfig: AppConfig?
+    var rupeeRate: Double { appConfig?.coinRupeeRate ?? 0.15 }
+    var checkinCoins: Int { appConfig?.checkinCoins ?? 5 }
+    var freeEpisodesDefault: Int { appConfig?.freeEpisodeCount ?? 10 }
+    var firstPack2x: Bool { appConfig?.flags["offers.first_pack_2x"] ?? true }
+    var updateRequired: Bool {
+        guard let min = appConfig?.minAppVersion else { return false }
+        let current = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+        return AppConfig.isOutdated(current: current, minimum: min)
+    }
+
+    func loadConfig() async {
+        if let cfg = try? await api.config() { appConfig = cfg }
+    }
+
     func bootstrap() async {
         setupNotifications()
+        await loadConfig()
         if let token = storedToken {
             await api.setAuthToken(token)
             if let me = try? await api.me() {
@@ -370,6 +388,11 @@ struct MainTabView: View {
             }
             .background(Katha.Color.bg)
 
+            // Force update below config.min_app_version (server-decided).
+            if model.updateRequired {
+                UpdateRequiredView()
+            }
+
             // 3.6: a drop that lands while the app is open shows the in-app card.
             if let drop = model.incomingDrop {
                 DropBanner(drop: drop) {
@@ -426,6 +449,30 @@ struct MainTabView: View {
                 NavigationStack(path: path) { destinations }
             } else {
                 NavigationStack { destinations }
+            }
+        }
+    }
+}
+
+
+/// Blocking overlay when the server's `min_app_version` outruns this build —
+/// payment-integrity gate (PDD app.min_version flag).
+struct UpdateRequiredView: View {
+    var body: some View {
+        ZStack {
+            Katha.Color.bg.ignoresSafeArea()
+            VStack(spacing: Katha.Spacing.md) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(Katha.Color.accent)
+                Text("Update Katha to continue")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Katha.Color.text)
+                Text("This version can no longer make purchases safely. Get the latest from the App Store.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Katha.Color.text2)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
             }
         }
     }

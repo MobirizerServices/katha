@@ -66,7 +66,7 @@ struct WalletView: View {
                 Text("\(model.wallet.total)")
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(Katha.Color.text)
-                Text("≈ ₹\(rupees(model.wallet.total))")
+                Text("≈ ₹\(rupees(model.wallet.total, rate: model.rupeeRate))")
                     .font(.system(size: 14))
                     .foregroundStyle(Katha.Color.text2)
             }

@@ -252,3 +252,54 @@ public struct UnlockResult: Codable, Hashable, Sendable {
         self.spentBought = spentBought; self.wallet = wallet
     }
 }
+
+/// Remote config from `GET /v1/config` — the app renders THESE values and
+/// never carries its own copies of business numbers (pricing, the coin→₹
+/// rate, check-in reward, kill-switch flags). Edited in the back office;
+/// live on the next fetch.
+public struct AppConfig: Codable, Hashable, Sendable {
+    public let minAppVersion: String
+    public let freeEpisodeCount: Int
+    public let episodeCoinPrice: Int
+    public let bundleDiscountPct: Int
+    public let coinRupeeRate: Double
+    public let checkinCoins: Int
+    public let flags: [String: Bool]
+    public let experiments: [String: String]
+
+    enum CodingKeys: String, CodingKey {
+        case minAppVersion = "min_app_version"
+        case freeEpisodeCount = "free_episode_count"
+        case episodeCoinPrice = "episode_coin_price"
+        case bundleDiscountPct = "bundle_discount_pct"
+        case coinRupeeRate = "coin_rupee_rate"
+        case checkinCoins = "checkin_coins"
+        case flags
+        case experiments
+    }
+
+    public init(minAppVersion: String, freeEpisodeCount: Int, episodeCoinPrice: Int,
+                bundleDiscountPct: Int, coinRupeeRate: Double, checkinCoins: Int,
+                flags: [String: Bool] = [:], experiments: [String: String] = [:]) {
+        self.minAppVersion = minAppVersion
+        self.freeEpisodeCount = freeEpisodeCount
+        self.episodeCoinPrice = episodeCoinPrice
+        self.bundleDiscountPct = bundleDiscountPct
+        self.coinRupeeRate = coinRupeeRate
+        self.checkinCoins = checkinCoins
+        self.flags = flags
+        self.experiments = experiments
+    }
+
+    /// Force-update check: numeric dotted-version compare (missing parts = 0).
+    public static func isOutdated(current: String, minimum: String) -> Bool {
+        func parts(_ v: String) -> [Int] { v.split(separator: ".").map { Int($0) ?? 0 } }
+        let a = parts(current), b = parts(minimum)
+        for i in 0..<max(a.count, b.count) {
+            let x = i < a.count ? a[i] : 0
+            let y = i < b.count ? b[i] : 0
+            if x != y { return x < y }
+        }
+        return false
+    }
+}

@@ -114,7 +114,6 @@ struct PlayerView: View {
     @State private var showDrawer = false
     @State private var chromeVisible = true
     @State private var liked = false
-    @State private var likeCount = Int.random(in: 800...14000)
     /// UI-test runs record the screen by design; the env flag keeps the §12.9
     /// capture shield honest in production while letting automation through.
     private static let allowCapture =
@@ -221,10 +220,12 @@ struct PlayerView: View {
                 Spacer()
                 // right rail
                 VStack(spacing: 22) {
+                    // No fabricated counts: the label reflects only this
+                    // viewer's action until a real engagement API exists.
                     railButton(icon: liked ? "heart.fill" : "heart",
-                               label: compact(likeCount),
+                               label: liked ? "Liked" : "Like",
                                tint: liked ? Katha.Color.accent : .white) {
-                        liked.toggle(); likeCount += liked ? 1 : -1
+                        liked.toggle()
                     }
                     railButton(icon: "square.stack.3d.down.right", label: "E\(current)", tint: .white) {
                         showDrawer = true
@@ -288,7 +289,7 @@ struct PlayerView: View {
             Text("Episode \(current) is locked")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Katha.Color.text)
-            KathaPrimaryButton(title: "Unlock for \(playback?.priceCoins ?? 30) coins  ·  ≈ ₹\(rupees(playback?.priceCoins ?? 30))") {
+            KathaPrimaryButton(title: "Unlock for \(playback?.priceCoins ?? detail?.episodeCoinPrice ?? model.appConfig?.episodeCoinPrice ?? 30) coins  ·  ≈ ₹\(rupees(playback?.priceCoins ?? detail?.episodeCoinPrice ?? model.appConfig?.episodeCoinPrice ?? 30, rate: model.rupeeRate))") {
                 showPaywall = true
             }
             .padding(.horizontal, 44)
@@ -424,9 +425,6 @@ struct PlayerView: View {
         return String(format: "%d:%02d", t / 60, t % 60)
     }
 
-    private func compact(_ n: Int) -> String {
-        n >= 1000 ? String(format: "%.1fk", Double(n) / 1000) : "\(n)"
-    }
 }
 
 // MARK: - Episode drawer (3.2)

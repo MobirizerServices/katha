@@ -102,11 +102,19 @@ def config(authorization: str | None = Header(default=None)) -> dict:
                 if b < edge:
                     experiments[key] = var.get("name", "control")
                     break
+    try:
+        rate = float(_store.kv("config:coin.rupee_rate") or 0.15)
+    except ValueError:
+        rate = 0.15
+    from .store import CHECKIN_COINS
     return {
         "min_app_version": _store.kv("config:app.min_version") or "1.0.0",
         "free_episode_count": prof["free_episode_count"],
         "episode_coin_price": prof["episode_coin_price"],
         "bundle_discount_pct": prof["bundle_discount_pct"],
+        # Clients render these; they never carry their own copies (#023):
+        "coin_rupee_rate": rate,
+        "checkin_coins": CHECKIN_COINS,
         "flags": effective_flags(overrides, user_id=user),
         "experiments": experiments,
     }
