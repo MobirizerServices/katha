@@ -138,7 +138,7 @@ struct WalletView: View {
     private func buy(_ pack: CoinPack) async {
         buying = pack.sku; defer { buying = nil }
         // Production: StoreKit 2 signed transaction; dev build stubs the JWS.
-        if let w = try? await model.api.verifyIAP(jws: "dev-jws-\(pack.sku)", sku: pack.sku) {
+        if let w = try? await model.api.verifyIAP(jws: "dev-jws-\(pack.sku)-\(UUID().uuidString)", sku: pack.sku) {
             model.wallet.reconcile(with: w)
             history = (try? await model.api.walletTransactions()) ?? history
         }

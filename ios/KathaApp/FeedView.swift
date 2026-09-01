@@ -26,6 +26,7 @@ struct FeedView: View {
                         languageMenu
                         NavigationLink(value: SearchRoute()) {
                             Image(systemName: "magnifyingglass")
+                                .accessibilityLabel("Search")
                                 .foregroundStyle(Katha.Color.text)
                         }
                     }

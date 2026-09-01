@@ -53,15 +53,39 @@ target.build_configurations.each do |cfg|
   s['SWIFT_EMIT_LOC_STRINGS'] = 'NO'
 end
 
+# UI-test bundle (XCUITest) — the e2e suite that drives every screen. It taps
+# through the real app against the live core-api; `xcodebuild test` runs it.
+ui_target = project.new_target(:ui_test_bundle, 'KathaAppUITests', :ios, '17.0')
+ui_group = project.new_group('KathaAppUITests', 'KathaAppUITests')
+Dir[File.join(here, 'KathaAppUITests', '*.swift')].sort.each do |f|
+  ref = ui_group.new_reference(File.basename(f))
+  ui_target.add_file_references([ref])
+end
+ui_target.add_dependency(target)
+ui_target.build_configurations.each do |cfg|
+  s = cfg.build_settings
+  s['TEST_TARGET_NAME'] = 'KathaApp'
+  s['PRODUCT_BUNDLE_IDENTIFIER'] = 'dev.katha.uitests'
+  s['GENERATE_INFOPLIST_FILE'] = 'YES'
+  s['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+  s['SWIFT_VERSION'] = '5.0'
+  s['TARGETED_DEVICE_FAMILY'] = '1'
+  s['CODE_SIGNING_ALLOWED'] = 'NO'
+  s['CODE_SIGNING_REQUIRED'] = 'NO'
+  s['CODE_SIGN_IDENTITY'] = ''
+end
+
 project.save
 puts "Wrote #{proj_path}"
 puts "Targets: #{project.targets.map(&:name).join(', ')}"
 puts "Sources: #{target.source_build_phase.files.count} files"
+puts "UI tests: #{ui_target.source_build_phase.files.count} files"
 puts "Package deps: #{target.package_product_dependencies.map(&:product_name).join(', ')}"
 
-# Shared scheme so xcodebuild -scheme works headlessly.
+# Shared scheme so xcodebuild -scheme works headlessly (build, run and test).
 scheme = Xcodeproj::XCScheme.new
 scheme.add_build_target(target)
 scheme.set_launch_target(target)
+scheme.add_test_target(ui_target)
 scheme.save_as(proj_path, 'KathaApp', true)
-puts "Scheme: KathaApp (shared)"
+puts "Scheme: KathaApp (shared, with test action)"

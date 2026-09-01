@@ -206,7 +206,7 @@ struct PaywallView: View {
         buyingSku = pack.sku; defer { buyingSku = nil }
         // Production: StoreKit 2 purchase → send tx.jwsRepresentation. Dev: stub JWS.
         do {
-            let w = try await model.api.verifyIAP(jws: "dev-jws-\(pack.sku)", sku: pack.sku)
+            let w = try await model.api.verifyIAP(jws: "dev-jws-\(pack.sku)-\(UUID().uuidString)", sku: pack.sku)
             model.wallet.reconcile(with: w)
             errorText = nil
         } catch {

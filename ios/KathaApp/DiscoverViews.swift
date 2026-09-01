@@ -97,6 +97,27 @@ struct SearchView: View {
     @AppStorage("katha.recentSearches") private var recentsRaw = ""
 
     private var recents: [String] { recentsRaw.split(separator: "|").map(String.init) }
+
+    /// Inline field per mockup 2.3 — always visible. (.searchable is collapsed
+    /// entirely on pushed screens by iOS 26, leaving search unreachable.)
+    private var searchBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass").foregroundStyle(Katha.Color.text2)
+            TextField("Series, genres, tropes", text: $query)
+                .foregroundStyle(Katha.Color.text)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(Katha.Color.text2)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 46)
+        .background(Katha.Color.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
+    }
     private var results: [SeriesSummary] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return [] }
@@ -108,6 +129,7 @@ struct SearchView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
+                searchBar
                 if query.isEmpty {
                     if !recents.isEmpty {
                         Text("Recent")
@@ -169,7 +191,6 @@ struct SearchView: View {
         }
         .background(Katha.Color.bg)
         .navigationTitle("Search")
-        .searchable(text: $query, prompt: "Series, genres, tropes")
         .toolbarBackground(Katha.Color.bg, for: .navigationBar)
         .task { if all.isEmpty { all = (try? await model.api.listSeries()) ?? [] } }
     }

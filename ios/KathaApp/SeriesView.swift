@@ -33,6 +33,7 @@ struct SeriesView: View {
                     Task { await model.toggleMyList(slug: slug) }
                 } label: {
                     Image(systemName: model.myListSlugs.contains(slug) ? "bookmark.fill" : "bookmark")
+                        .accessibilityLabel("Save to My list")
                         .foregroundStyle(model.myListSlugs.contains(slug)
                                          ? Katha.Color.accent : Katha.Color.text)
                 }

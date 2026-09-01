@@ -66,50 +66,72 @@ final class AppModel {
         set { defaults.set(newValue, forKey: "katha.checkin.day") }
     }
 
-    // Preferences (device-local)
+    // Preferences (device-local). Stored properties (not computed over
+    // UserDefaults) so @Observable tracks them — a computed getter is invisible
+    // to observation and views would never refresh on change; persistence
+    // happens in didSet. Loaded in init.
     private let defaults = UserDefaults.standard
-    var contentLanguage: String {
-        get { defaults.string(forKey: "katha.lang") ?? "hi" }
-        set { defaults.set(newValue, forKey: "katha.lang") }
+    var contentLanguage = "hi" {
+        didSet { defaults.set(contentLanguage, forKey: "katha.lang") }
     }
-    var onboarded: Bool {
-        get { defaults.bool(forKey: "katha.onboarded") }
-        set { defaults.set(newValue, forKey: "katha.onboarded") }
+    var onboarded = false {
+        didSet { defaults.set(onboarded, forKey: "katha.onboarded") }
     }
-    var interests: [String] {
-        get { defaults.stringArray(forKey: "katha.interests") ?? [] }
-        set { defaults.set(newValue, forKey: "katha.interests") }
+    var interests: [String] = [] {
+        didSet { defaults.set(interests, forKey: "katha.interests") }
     }
-    var autoUnlock: Bool {
-        get { defaults.bool(forKey: "katha.autounlock") }
-        set { defaults.set(newValue, forKey: "katha.autounlock") }
+    var autoUnlock = false {
+        didSet { defaults.set(autoUnlock, forKey: "katha.autounlock") }
     }
-    var dataSaver: Bool {
-        get { defaults.bool(forKey: "katha.datasaver") }
-        set { defaults.set(newValue, forKey: "katha.datasaver") }
+    var dataSaver = false {
+        didSet { defaults.set(dataSaver, forKey: "katha.datasaver") }
     }
     /// New-episode alerts (default on; delivery starts provisional/quiet).
-    var episodeAlerts: Bool {
-        get { defaults.object(forKey: "katha.alerts") == nil ? true : defaults.bool(forKey: "katha.alerts") }
-        set {
-            defaults.set(newValue, forKey: "katha.alerts")
-            if !newValue { cancelDropNudges() }
+    var episodeAlerts = true {
+        didSet {
+            defaults.set(episodeAlerts, forKey: "katha.alerts")
+            if !episodeAlerts { cancelDropNudges() }
         }
     }
     /// Dev-slice parental PIN (production hashes with Argon2 server-side, PDD §12.9).
     var parentalPin: String? {
-        get { defaults.string(forKey: "katha.pin") }
-        set { defaults.set(newValue, forKey: "katha.pin") }
+        didSet {
+            if let parentalPin { defaults.set(parentalPin, forKey: "katha.pin") }
+            else { defaults.removeObject(forKey: "katha.pin") }
+        }
     }
     private var storedToken: String? {
         get { defaults.string(forKey: "katha.token") }
         set { defaults.set(newValue, forKey: "katha.token") }
     }
 
-    init(baseURL: URL = URL(string: "http://127.0.0.1:8799")!) {
+    init(baseURL: URL? = nil) {
+        let env = ProcessInfo.processInfo.environment
+        // UI-test hook: start from a blank slate (fresh guest, defaults cleared).
+        if env["KATHA_RESET"] != nil {
+            for key in ["katha.token", "katha.onboarded", "katha.lang", "katha.interests",
+                        "katha.autounlock", "katha.datasaver", "katha.pin", "katha.alerts",
+                        "katha.checkin.day", "katha.recentSearches"] {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
         // 127.0.0.1 (not "localhost"): core-api binds IPv4 only, and "localhost"
         // resolves to IPv6 ::1 first on the simulator → a refused connection first.
-        self.api = KathaAPIClient(baseURL: baseURL)
+        let base = baseURL
+            ?? env["KATHA_API_BASE"].flatMap(URL.init(string:))
+            ?? URL(string: "http://127.0.0.1:8799")!
+        self.api = KathaAPIClient(baseURL: base)
+
+        // Load persisted preferences into the observed stored properties.
+        let d = UserDefaults.standard
+        contentLanguage = d.string(forKey: "katha.lang") ?? "hi"
+        // UI-test hook: KATHA_ONBOARDED skips onboarding without persisting.
+        onboarded = env["KATHA_ONBOARDED"] != nil || d.bool(forKey: "katha.onboarded")
+        interests = d.stringArray(forKey: "katha.interests") ?? []
+        autoUnlock = d.bool(forKey: "katha.autounlock")
+        dataSaver = d.bool(forKey: "katha.datasaver")
+        episodeAlerts = d.object(forKey: "katha.alerts") == nil ? true : d.bool(forKey: "katha.alerts")
+        parentalPin = d.string(forKey: "katha.pin")
     }
 
     // MARK: Session lifecycle
