@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../api/client";
-import type { AdminUser } from "../api/types";
+import { api, mutate } from "../api/client";
+import type { AdminUser, UserLedger } from "../api/types";
 import { Modal, PageHeader, fmtN } from "../ui";
 import { ME, useStore } from "../store";
 import { DUAL_APPROVAL, ROLE_NAMES, canAct } from "../auth/roles";
@@ -34,6 +34,8 @@ function AdjustDialog({
   const needsApproval = amount > DUAL_APPROVAL.coinAdjustment;
 
   function submit() {
+    // Live server first; the admin-api applies (or queues) the same request.
+    void mutate.adjust(user.id, dir === "Credit" ? amount : -amount, reason, note);
     if (needsApproval) {
       // Above 500 coins: nothing is written to the ledger. A second approver
       // from Finance or Admin must confirm — the request goes to the inbox.
@@ -134,6 +136,7 @@ export function Users() {
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adjustFor, setAdjustFor] = useState<AdminUser | null>(null);
+  const [ledgerFor, setLedgerFor] = useState<AdminUser | null>(null);
   const { role } = useStore();
 
   useEffect(() => {
@@ -263,7 +266,9 @@ export function Users() {
                 <button className="btn p" onClick={() => setAdjustFor(selected)}>
                   Adjust coins…
                 </button>
-                <button className="btn s">View ledger</button>
+                <button className="btn s" onClick={() => setLedgerFor(selected)}>
+                  View ledger
+                </button>
               </div>
             </div>
           ) : (
@@ -276,6 +281,57 @@ export function Users() {
       </div>
 
       {adjustFor ? <AdjustDialog user={adjustFor} onClose={() => setAdjustFor(null)} /> : null}
+      {ledgerFor ? <LedgerDialog user={ledgerFor} onClose={() => setLedgerFor(null)} /> : null}
     </>
+  );
+}
+
+function LedgerDialog({ user, onClose }: { user: AdminUser; onClose: () => void }) {
+  const [ledger, setLedger] = useState<UserLedger | null>(null);
+
+  useEffect(() => {
+    api.getUserLedger(user.id).then(setLedger);
+  }, [user.id]);
+
+  return (
+    <Modal
+      title={`Ledger · ${user.id}`}
+      onClose={onClose}
+      footer={
+        <button className="btn s" onClick={onClose}>
+          Close
+        </button>
+      }
+    >
+      {ledger === null ? (
+        <p className="tiny">Loading…</p>
+      ) : ledger.transactions.length === 0 ? (
+        <p className="tiny">No ledger entries for this user yet.</p>
+      ) : (
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Reference</th>
+              <th style={{ textAlign: "right" }}>Coins</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ledger.transactions.map((t) => {
+              const net = t.amount_bought + t.amount_bonus;
+              return (
+                <tr key={t.id}>
+                  <td>{t.type}</td>
+                  <td className="mono">{t.reference_id}</td>
+                  <td style={{ textAlign: "right" }} className="mono">
+                    {net > 0 ? `+${fmtN(net)}` : fmtN(net)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </Modal>
   );
 }

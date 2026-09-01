@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api } from "./api/client";
+import { api, mutate } from "./api/client";
 import type { Approval, AuditEntry, FeatureFlag } from "./api/types";
 import { ROLE_NAMES, type Role } from "./auth/roles";
 
@@ -73,6 +73,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const resolveApproval = useCallback(
     (id: string, decision: "approved" | "rejected", by: string) => {
+      // Live server first (no-op when absent); local state mirrors either way.
+      if (decision === "approved") void mutate.approve(id);
+      else void mutate.reject(id);
       setApprovals((prev) => {
         const a = prev.find((x) => x.id === id);
         if (a) {
@@ -99,6 +102,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         prev.map((f) => {
           if (f.key !== key) return f;
           const next = !f.enabled;
+          void mutate.setFlag(key, next);   // persists via admin-api when live
           setAudit((au) => [
             {
               ts: Date.now(),

@@ -132,3 +132,41 @@ describe("Users view — coin adjustment dialog (dual control)", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
+
+describe("Users view — ledger dialog", () => {
+  it("opens the ledger, shows live rows when the server answers, and closes", async () => {
+    // First render uses the rejecting fetch stub (mock users), then the ledger
+    // fetch resolves with two rows.
+    await renderUsers();
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        user_id: "u1",
+        wallet: { balance_bought: 570, balance_bonus: 0, total: 570 },
+        transactions: [
+          { id: "ctx_1", type: "purchase", amount_bought: 600, amount_bonus: 0,
+            reference_type: "iap", reference_id: "coins_starter_in", created_at: "t1" },
+          { id: "ctx_2", type: "unlock", amount_bought: -30, amount_bonus: 0,
+            reference_type: "episode", reference_id: "kaanch-ka-mahal:e11", created_at: "t2" },
+        ],
+      }),
+    } as unknown as Response);
+
+    fireEvent.click(screen.getByText("View ledger"));
+    await waitFor(() => expect(screen.getByText("coins_starter_in")).toBeInTheDocument());
+    expect(screen.getByText("+600")).toBeInTheDocument();
+    expect(screen.getByText("-30")).toBeInTheDocument();
+    expect(screen.getByText("kaanch-ka-mahal:e11")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Close"));
+    await waitFor(() =>
+      expect(screen.queryByText("coins_starter_in")).not.toBeInTheDocument());
+  });
+
+  it("shows the empty state when the server is absent", async () => {
+    await renderUsers();
+    fireEvent.click(screen.getByText("View ledger"));
+    await waitFor(() =>
+      expect(screen.getByText("No ledger entries for this user yet.")).toBeInTheDocument());
+  });
+});
