@@ -66,7 +66,7 @@ final class ScreenshotTour: XCTestCase {
 
         app.tabBars.buttons["Home"].tap()
         app.buttons["Search"].tap()
-        let field = app.searchFields.firstMatch
+        let field = app.textFields.firstMatch          // inline 2.3 search bar
         _ = field.waitForExistence(timeout: 8)
         snap("2.3-search-empty")
         field.tap()
