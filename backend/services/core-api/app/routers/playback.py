@@ -9,13 +9,19 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from katha_domain import catalog
 from ..deps import current_user
+from ..media import media_dir
 from ..store import CLOCK, store
 
 router = APIRouter(prefix="/v1", tags=["playback"])
 
 
 def _signed_url(episode_id: str) -> str:
-    # Dev stub for CloudFront/Cloudflare signed delivery (SAD §7.1). Never a real secret.
+    # Serve the generated placeholder HLS when it exists on disk; otherwise fall
+    # back to the CloudFront/Cloudflare signing stub (SAD §7.1). Never a real secret.
+    slug, _, tail = episode_id.partition(":e")
+    rel = f"{slug}/e{int(tail):03d}/hls/master.m3u8"
+    if (media_dir() / rel).is_file():
+        return f"{catalog.media_base()}/media/{rel}?exp={CLOCK}"
     return f"https://cdn.katha.dev/hls/{episode_id}/master.m3u8?exp={CLOCK}"
 
 

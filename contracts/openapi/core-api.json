@@ -1687,6 +1687,16 @@
             "title": "Content Rating",
             "default": "U/A 16+"
           },
+          "cover_url": {
+            "type": "string",
+            "title": "Cover Url",
+            "default": ""
+          },
+          "cover_wide_url": {
+            "type": "string",
+            "title": "Cover Wide Url",
+            "default": ""
+          },
           "synopsis": {
             "type": "string",
             "title": "Synopsis"
@@ -1762,6 +1772,16 @@
             "type": "string",
             "title": "Content Rating",
             "default": "U/A 16+"
+          },
+          "cover_url": {
+            "type": "string",
+            "title": "Cover Url",
+            "default": ""
+          },
+          "cover_wide_url": {
+            "type": "string",
+            "title": "Cover Wide Url",
+            "default": ""
           }
         },
         "type": "object",

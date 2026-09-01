@@ -11,6 +11,8 @@ public struct SeriesSummary: Codable, Hashable, Identifiable, Sendable {
     public let episodeCount: Int
     public let primaryLanguage: String
     public let contentRating: String   // IT Rules self-classification, e.g. "U/A 16+"
+    public let coverUrl: String        // 9:16 poster (absolute URL; empty when unset)
+    public let coverWideUrl: String    // 16:9 billboard
 
     public var id: String { slug }
 
@@ -19,13 +21,17 @@ public struct SeriesSummary: Codable, Hashable, Identifiable, Sendable {
         case episodeCount = "episode_count"
         case primaryLanguage = "primary_language"
         case contentRating = "content_rating"
+        case coverUrl = "cover_url"
+        case coverWideUrl = "cover_wide_url"
     }
 
     public init(slug: String, title: String, genres: [String], episodeCount: Int,
-                primaryLanguage: String, contentRating: String = "") {
+                primaryLanguage: String, contentRating: String = "",
+                coverUrl: String = "", coverWideUrl: String = "") {
         self.slug = slug; self.title = title; self.genres = genres
         self.episodeCount = episodeCount; self.primaryLanguage = primaryLanguage
         self.contentRating = contentRating
+        self.coverUrl = coverUrl; self.coverWideUrl = coverWideUrl
     }
 
     public init(from decoder: Decoder) throws {
@@ -36,6 +42,8 @@ public struct SeriesSummary: Codable, Hashable, Identifiable, Sendable {
         episodeCount = try c.decode(Int.self, forKey: .episodeCount)
         primaryLanguage = try c.decode(String.self, forKey: .primaryLanguage)
         contentRating = try c.decodeIfPresent(String.self, forKey: .contentRating) ?? ""
+        coverUrl = try c.decodeIfPresent(String.self, forKey: .coverUrl) ?? ""
+        coverWideUrl = try c.decodeIfPresent(String.self, forKey: .coverWideUrl) ?? ""
     }
 }
 
@@ -65,6 +73,8 @@ public struct SeriesDetail: Codable, Hashable, Identifiable, Sendable {
     public let episodeCount: Int
     public let primaryLanguage: String
     public let contentRating: String   // IT Rules self-classification badge
+    public let coverUrl: String
+    public let coverWideUrl: String
     public let synopsis: String
     public let tropes: [String]
     public let freeEpisodeCount: Int
@@ -79,6 +89,8 @@ public struct SeriesDetail: Codable, Hashable, Identifiable, Sendable {
         case episodeCount = "episode_count"
         case primaryLanguage = "primary_language"
         case contentRating = "content_rating"
+        case coverUrl = "cover_url"
+        case coverWideUrl = "cover_wide_url"
         case freeEpisodeCount = "free_episode_count"
         case episodeCoinPrice = "episode_coin_price"
         case bundleDiscountPct = "bundle_discount_pct"
@@ -87,10 +99,12 @@ public struct SeriesDetail: Codable, Hashable, Identifiable, Sendable {
     public init(slug: String, title: String, genres: [String], episodeCount: Int,
                 primaryLanguage: String, synopsis: String, tropes: [String],
                 freeEpisodeCount: Int, episodeCoinPrice: Int, bundleDiscountPct: Int,
-                episodes: [Episode], contentRating: String = "") {
+                episodes: [Episode], contentRating: String = "",
+                coverUrl: String = "", coverWideUrl: String = "") {
         self.slug = slug; self.title = title; self.genres = genres
         self.episodeCount = episodeCount; self.primaryLanguage = primaryLanguage
         self.contentRating = contentRating
+        self.coverUrl = coverUrl; self.coverWideUrl = coverWideUrl
         self.synopsis = synopsis; self.tropes = tropes
         self.freeEpisodeCount = freeEpisodeCount; self.episodeCoinPrice = episodeCoinPrice
         self.bundleDiscountPct = bundleDiscountPct; self.episodes = episodes
@@ -105,6 +119,8 @@ public struct SeriesDetail: Codable, Hashable, Identifiable, Sendable {
         episodeCount = try c.decode(Int.self, forKey: .episodeCount)
         primaryLanguage = try c.decode(String.self, forKey: .primaryLanguage)
         contentRating = try c.decodeIfPresent(String.self, forKey: .contentRating) ?? ""
+        coverUrl = try c.decodeIfPresent(String.self, forKey: .coverUrl) ?? ""
+        coverWideUrl = try c.decodeIfPresent(String.self, forKey: .coverWideUrl) ?? ""
         synopsis = try c.decode(String.self, forKey: .synopsis)
         tropes = try c.decodeIfPresent([String].self, forKey: .tropes) ?? []
         freeEpisodeCount = try c.decode(Int.self, forKey: .freeEpisodeCount)

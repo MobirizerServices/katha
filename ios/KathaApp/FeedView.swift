@@ -134,12 +134,14 @@ struct FeedView: View {
                         NavigationLink(value: EpisodeRoute(slug: item.slug, number: item.number)) {
                             VStack(alignment: .leading, spacing: 6) {
                                 ZStack(alignment: .bottom) {
-                                    RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous)
-                                        .fill(Katha.Color.raised)
+                                    CoverImage(url: model.coverURL(forSlug: item.slug, wide: true))
                                         .frame(width: 168, height: 96)
+                                        .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md,
+                                                                    style: .continuous))
                                         .overlay {
                                             Image(systemName: "play.fill")
                                                 .foregroundStyle(Katha.Color.text)
+                                                .shadow(radius: 4)
                                         }
                                     GeometryReader { geo in
                                         Rectangle().fill(Katha.Color.accent)
@@ -170,10 +172,14 @@ private struct HeroCard: View {
     var body: some View {
         NavigationLink(value: series.slug) {
             ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous)
-                    .fill(LinearGradient(colors: [Katha.Color.raised, Katha.Color.bg],
-                                         startPoint: .top, endPoint: .bottom))
+                CoverImage(url: series.coverUrl)
                     .frame(height: 420)
+                    .overlay {
+                        // Keep the title/CTA legible over the artwork.
+                        LinearGradient(colors: [.clear, Katha.Color.bg.opacity(0.9)],
+                                       startPoint: .center, endPoint: .bottom)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
                 VStack(alignment: .leading, spacing: 8) {
                     Text(series.title)
                         .font(.system(size: 30, weight: .heavy))
@@ -245,14 +251,35 @@ private struct FeedRow: View {
     }
 }
 
+/// Cover art over the gradient placeholder — the gradient shows while the image
+/// loads and stays as the fallback when a series has no artwork yet.
+struct CoverImage: View {
+    let url: String
+
+    var body: some View {
+        LinearGradient(colors: [Katha.Color.raised, Katha.Color.bg],
+                       startPoint: .top, endPoint: .bottom)
+            .overlay {
+                if let u = URL(string: url), !url.isEmpty {
+                    AsyncImage(url: u) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                        }
+                    }
+                }
+            }
+            .clipped()
+    }
+}
+
 struct PosterCard: View {
     let series: SeriesSummary
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous)
-                .fill(Katha.Color.raised)
+            CoverImage(url: series.coverUrl)
                 .frame(width: 124, height: 176)
+                .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
                 .overlay(alignment: .bottomLeading) {
                     Text(series.primaryLanguage.uppercased())
                         .font(.system(size: 10, weight: .bold))

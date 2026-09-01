@@ -204,6 +204,14 @@ final class AppModel {
         return r.alreadyClaimed ? nil : r.grantedCoins
     }
 
+    /// Cover art for a slug from whatever is already cached (feed rows, my list) —
+    /// used where the payload has no cover of its own (e.g. continue-watching).
+    func coverURL(forSlug slug: String, wide: Bool = false) -> String {
+        let all = feed.rows.flatMap(\.series) + myListSeries
+        guard let s = all.first(where: { $0.slug == slug }) else { return "" }
+        return wide ? s.coverWideUrl : s.coverUrl
+    }
+
     // MARK: Parental lock
 
     func ratingNeedsPin(_ rating: String) -> Bool {

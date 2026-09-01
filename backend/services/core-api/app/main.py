@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from katha_domain import catalog
+from .media import media_dir
 from .routers import auth as auth_router
 from .routers import catalog as catalog_router
 from .routers import engagement as engagement_router
@@ -44,6 +46,16 @@ app.include_router(catalog_router.router)
 app.include_router(engagement_router.router)
 app.include_router(playback_router.router)
 app.include_router(wallet_router.router)
+
+
+@app.get("/media/{path:path}", include_in_schema=False)
+def media(path: str) -> FileResponse:
+    """Dev stand-in for the CDN: covers + placeholder HLS from KATHA_MEDIA_DIR."""
+    base = media_dir().resolve()
+    target = (base / path).resolve()
+    if not target.is_relative_to(base) or not target.is_file():
+        raise HTTPException(status_code=404, detail="not found")
+    return FileResponse(target)
 
 
 @app.get("/health", tags=["ops"])

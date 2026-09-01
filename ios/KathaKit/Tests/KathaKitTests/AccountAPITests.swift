@@ -130,12 +130,18 @@ final class AccountAPITests: XCTestCase {
         let json = """
         {"slugs":["kaanch-ka-mahal"],"series":[
           {"slug":"kaanch-ka-mahal","title":"Kaanch Ka Mahal","genres":[],
-           "episode_count":60,"primary_language":"hi","content_rating":"U/A 16+"}]}
+           "episode_count":60,"primary_language":"hi","content_rating":"U/A 16+",
+           "cover_url":"http://127.0.0.1:8799/media/kaanch-ka-mahal/cover_9x16.jpg",
+           "cover_wide_url":"http://127.0.0.1:8799/media/kaanch-ka-mahal/cover_16x9.jpg"}]}
         """
         reply(json)
         let list = try await makeClient().myList()
         XCTAssertEqual(list.slugs, ["kaanch-ka-mahal"])
         XCTAssertEqual(list.series.first?.contentRating, "U/A 16+")
+        XCTAssertEqual(list.series.first?.coverUrl,
+                       "http://127.0.0.1:8799/media/kaanch-ka-mahal/cover_9x16.jpg")
+        XCTAssertEqual(list.series.first?.coverWideUrl,
+                       "http://127.0.0.1:8799/media/kaanch-ka-mahal/cover_16x9.jpg")
 
         reply(json)
         _ = try await makeClient().addToList(slug: "kaanch-ka-mahal")

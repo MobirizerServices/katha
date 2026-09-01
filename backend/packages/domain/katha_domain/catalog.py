@@ -25,8 +25,14 @@ def pricing() -> dict:
     return _raw()["_meta"]["pricing_profile"]
 
 
+def media_base() -> str:
+    """Origin serving /media — core-api itself in dev, the CDN domain in prod."""
+    return os.environ.get("KATHA_MEDIA_BASE", "http://127.0.0.1:8799").rstrip("/")
+
+
 def all_series() -> list[SeriesDetail]:
     prof = pricing()
+    base = media_base()
     out: list[SeriesDetail] = []
     for s in _raw()["series"]:
         out.append(
@@ -37,6 +43,8 @@ def all_series() -> list[SeriesDetail]:
                 episode_count=s["episode_count"],
                 primary_language=s.get("primary_language", "hi"),
                 content_rating=s.get("content_rating", "U/A 16+"),
+                cover_url=f"{base}/media/{s['slug']}/cover_9x16.jpg",
+                cover_wide_url=f"{base}/media/{s['slug']}/cover_16x9.jpg",
                 synopsis=s["synopsis"],
                 tropes=s.get("tropes", []),
                 free_episode_count=prof["free_episode_count"],

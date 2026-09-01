@@ -45,9 +45,12 @@ struct SeriesView: View {
         VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
             // Billboard
             ZStack(alignment: .bottomLeading) {
-                LinearGradient(colors: [Katha.Color.raised, Katha.Color.bg],
-                               startPoint: .top, endPoint: .bottom)
+                CoverImage(url: d.coverWideUrl)
                     .frame(height: 230)
+                    .overlay {
+                        LinearGradient(colors: [.clear, Katha.Color.bg.opacity(0.9)],
+                                       startPoint: .center, endPoint: .bottom)
+                    }
                 Text(d.title)
                     .font(.system(size: 26, weight: .bold))
                     .foregroundStyle(Katha.Color.text)

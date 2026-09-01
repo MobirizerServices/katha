@@ -18,6 +18,8 @@ class SeriesSummary(BaseModel):
     episode_count: int
     primary_language: str
     content_rating: str = "U/A 16+"   # IT Rules 2021 self-classification
+    cover_url: str = ""               # 9:16 poster (absolute; media origin from env)
+    cover_wide_url: str = ""          # 16:9 billboard
 
 
 class SeriesDetail(SeriesSummary):

@@ -144,8 +144,10 @@ struct SearchView: View {
                     ForEach(results) { s in
                         NavigationLink(value: s.slug) {
                             HStack(spacing: Katha.Spacing.md) {
-                                RoundedRectangle(cornerRadius: Katha.Radius.sm, style: .continuous)
-                                    .fill(Katha.Color.raised).frame(width: 44, height: 62)
+                                CoverImage(url: s.coverUrl)
+                                    .frame(width: 44, height: 62)
+                                    .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.sm,
+                                                                style: .continuous))
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(s.title)
                                         .font(.system(size: 15, weight: .semibold))
