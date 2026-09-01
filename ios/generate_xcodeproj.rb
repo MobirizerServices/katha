@@ -77,9 +77,16 @@ ui_target.build_configurations.each do |cfg|
   s['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
   s['SWIFT_VERSION'] = '5.0'
   s['TARGETED_DEVICE_FAMILY'] = '1'
-  s['CODE_SIGNING_ALLOWED'] = 'NO'
-  s['CODE_SIGNING_REQUIRED'] = 'NO'
-  s['CODE_SIGN_IDENTITY'] = ''
+  if ENV['KATHA_TEAM'] && !ENV['KATHA_TEAM'].empty?
+    # Device test runs: the UI-test runner must be signed like the app.
+    s['CODE_SIGN_STYLE'] = 'Automatic'
+    s['DEVELOPMENT_TEAM'] = ENV['KATHA_TEAM']
+    s['CODE_SIGN_IDENTITY'] = 'Apple Development'
+  else
+    s['CODE_SIGNING_ALLOWED'] = 'NO'
+    s['CODE_SIGNING_REQUIRED'] = 'NO'
+    s['CODE_SIGN_IDENTITY'] = ''
+  end
 end
 
 project.save

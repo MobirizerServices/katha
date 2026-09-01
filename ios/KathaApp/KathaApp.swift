@@ -388,6 +388,9 @@ struct MainTabView: View {
             if let spec = ProcessInfo.processInfo.environment["KATHA_AUTOPLAY"] {
                 let parts = spec.split(separator: ":")
                 if parts.count == 2, let n = Int(parts[1]) {
+                    // One beat so the stack's destinations are registered — a
+                    // push on the very first render is dropped on-device.
+                    try? await Task.sleep(for: .milliseconds(500))
                     homePath.append(EpisodeRoute(slug: String(parts[0]), number: n))
                 }
             }

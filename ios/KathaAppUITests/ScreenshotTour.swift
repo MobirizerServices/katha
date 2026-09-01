@@ -13,7 +13,7 @@ final class ScreenshotTour: XCTestCase {
     private func launchApp(reset: Bool = true, onboarded: Bool = true,
                            extra: [String: String] = [:]) -> XCUIApplication {
         let app = XCUIApplication()
-        var env: [String: String] = [:]
+        var env: [String: String] = ["KATHA_ALLOW_CAPTURE": "1"]   // device runs are recorded
         if reset { env["KATHA_RESET"] = "1" }
         if onboarded { env["KATHA_ONBOARDED"] = "1" }
         extra.forEach { env[$0] = $1 }

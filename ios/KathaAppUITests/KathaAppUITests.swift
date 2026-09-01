@@ -20,7 +20,7 @@ final class KathaAppUITests: XCTestCase {
     private func launchApp(reset: Bool = true, onboarded: Bool = true,
                            extra: [String: String] = [:]) -> XCUIApplication {
         let app = XCUIApplication()
-        var env: [String: String] = [:]
+        var env: [String: String] = ["KATHA_ALLOW_CAPTURE": "1"]   // device runs are recorded
         if reset { env["KATHA_RESET"] = "1" }
         if onboarded { env["KATHA_ONBOARDED"] = "1" }
         extra.forEach { env[$0] = $1 }
@@ -236,11 +236,17 @@ final class KathaAppUITests: XCTestCase {
         let app = launchApp()
         assertExists(app.staticTexts["Daily check-in"], 20)
         tapWhenReady(app.tabBars.buttons["Profile"])
+        // iOS 27 beta can restore the previous run's pushed stack — pop to root.
+        for _ in 0..<3 where !app.staticTexts["You're browsing as a guest"].exists {
+            let back = app.navigationBars.buttons.firstMatch
+            if back.exists { back.tap() } else { break }
+        }
         tapWhenReady(button(app, containing: "Help & grievance"))
         assertExists(app.links["grievance@katha.example"], 10)
         app.navigationBars.buttons.firstMatch.tap()      // back to Profile
 
         tapWhenReady(button(app, containing: "Settings"))
+        app.swipeUp()                                    // small screens: row is below the fold
         tapWhenReady(app.buttons["Delete account"])      // opens the sheet
         assertExists(app.staticTexts["Delete your account?"], 8)
         tapWhenReady(app.switches.containing(
@@ -248,10 +254,15 @@ final class KathaAppUITests: XCTestCase {
         // two "Delete account" buttons exist now (settings row + sheet confirm)
         tapWhenReady(app.buttons.matching(identifier: "Delete account").element(boundBy: 1))
 
-        // sheet dismisses; back out to Profile — a fresh guest again
+        // sheet dismisses; back out to Profile — a fresh guest again. The pop
+        // can be swallowed while the post-delete refresh runs, so retry it.
         assertExists(app.staticTexts["Settings"], 10)
-        app.navigationBars.buttons.firstMatch.tap()
-        assertExists(app.staticTexts["You're browsing as a guest"], 15)
+        for _ in 0..<4 where !app.staticTexts["You're browsing as a guest"]
+            .waitForExistence(timeout: 3) {
+            let back = app.navigationBars.buttons.firstMatch
+            if back.exists { back.tap() }
+        }
+        assertExists(app.staticTexts["You're browsing as a guest"], 5)
     }
 
     // MARK: 5.1 error state (backend unreachable) + retry control
