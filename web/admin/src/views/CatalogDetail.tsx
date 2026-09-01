@@ -25,6 +25,13 @@ export function CatalogDetail() {
   const [rateOpen, setRateOpen] = useState(false);
   const [rating, setRating] = useState("U/A 13+");
   const [rateReason, setRateReason] = useState("");
+  const [priceOpen, setPriceOpen] = useState(false);
+  const [priceFields, setPriceFields] = useState({ coin_price: 30, free_episodes: 10 });
+  const [priceTyped, setPriceTyped] = useState("");
+  const [rightsOpen, setRightsOpen] = useState(false);
+  const [rightsFields, setRightsFields] = useState({ owner: "", license_until: "" });
+  const [retitle, setRetitle] = useState<number | null>(null);
+  const [newTitle, setNewTitle] = useState("");
 
   const load = useCallback(() => {
     void api.seriesDetail(slug).then(setD);
@@ -48,6 +55,35 @@ export function CatalogDetail() {
     showToast(`Rated ${rating} · accountable to you in the audit log`);
     setRateOpen(false);
     setRateReason("");
+    load();
+  }
+
+  async function savePricing() {
+    const res = await mutate.setPricing(slug, priceFields);
+    if ("offline" in res) return showToast("Offline — pricing unchanged", "error");
+    if (res.error) return showToast(`Pricing not changed: ${res.error}`, "error");
+    showToast("Pricing live — playback and the ledger charge the new price now");
+    setPriceOpen(false);
+    load();
+  }
+
+  async function saveRights() {
+    const res = await mutate.setRights(slug, rightsFields.owner,
+                                       rightsFields.license_until);
+    if ("offline" in res) return showToast("Offline — rights unchanged", "error");
+    if (res.error) return showToast(`Rights not saved: ${res.error}`, "error");
+    showToast("Rights recorded — expiring licences hit the attention rail");
+    setRightsOpen(false);
+    load();
+  }
+
+  async function saveTitle() {
+    if (retitle === null) return;
+    const res = await mutate.setEpisodeTitle(slug, retitle, newTitle.trim());
+    if ("offline" in res) return showToast("Offline — title unchanged", "error");
+    if (res.error) return showToast(`Not renamed: ${res.error}`, "error");
+    showToast(`E${retitle} renamed · serves everywhere immediately`);
+    setRetitle(null);
     load();
   }
 
@@ -124,6 +160,39 @@ export function CatalogDetail() {
                   </dd>
                 </>
               ) : null}
+              <dt>Pricing</dt>
+              <dd>
+                first {d.freeEpisodes} free · {d.coinPrice} coins
+                {d.pricingOverridden ? <span className="sev sev-warn" style={{ marginLeft: 6 }}>overridden</span> : null}{" "}
+                {canAct(role, "finance") ? (
+                  <button className="btn s" disabled={!online}
+                          onClick={() => {
+                            setPriceFields({ coin_price: d.coinPrice,
+                                             free_episodes: d.freeEpisodes });
+                            setPriceTyped("");
+                            setPriceOpen(true);
+                          }}>
+                    Reprice…
+                  </button>
+                ) : null}
+              </dd>
+              <dt>Rights</dt>
+              <dd>
+                {d.rights?.owner ?? "Katha Originals"}
+                {d.rights?.license_until ? (
+                  <small className="muted"> · licensed until {d.rights.license_until}</small>
+                ) : null}{" "}
+                {contentRole ? (
+                  <button className="btn s" disabled={!online}
+                          onClick={() => {
+                            setRightsFields({ owner: d.rights?.owner ?? "",
+                                              license_until: d.rights?.license_until ?? "" });
+                            setRightsOpen(true);
+                          }}>
+                    Edit…
+                  </button>
+                ) : null}
+              </dd>
               <dt>Last content change</dt>
               <dd>{d.updatedAt ? <IsoTime iso={d.updatedAt} /> : <span className="muted">—</span>}</dd>
             </dl>
@@ -156,13 +225,25 @@ export function CatalogDetail() {
       <div className="panel" style={{ marginTop: 16 }}>
         <header><h3>Episodes</h3><span className="muted">{d.episodeCount} total · 1–{d.freeEpisodes} free</span></header>
         <table className="table">
-          <thead><tr><th>#</th><th>Title</th><th>Access</th></tr></thead>
+          <thead><tr><th>#</th><th>Title</th><th>Media</th><th>Access</th>
+                     <th aria-label="actions"></th></tr></thead>
           <tbody>
             {d.episodes.slice(0, 15).map((e) => (
               <tr key={e.number}>
                 <td className="mono">{e.number}</td>
                 <td>{e.title}</td>
+                <td>{e.hasMedia
+                  ? <Sev level="ok">HLS</Sev>
+                  : <Sev level="warn">no media</Sev>}</td>
                 <td>{e.isFree ? "Free" : `${d.coinPrice} coins`}</td>
+                <td style={{ textAlign: "right" }}>
+                  {contentRole ? (
+                    <button className="btn s" disabled={!online}
+                            onClick={() => { setRetitle(e.number); setNewTitle(e.title); }}>
+                      Rename…
+                    </button>
+                  ) : null}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -193,6 +274,88 @@ export function CatalogDetail() {
             Reason (required — reference a grievance id if there is one)
             <input value={reason} onChange={(e) => setReason(e.target.value)}
                    placeholder="e.g. G-4F2A1B legal notice" />
+          </label>
+        </Modal>
+      ) : null}
+
+      {priceOpen ? (
+        <Modal title={`Pricing · ${d.title}`} onClose={() => setPriceOpen(false)}
+               footer={
+                 <>
+                   <button className="btn s" onClick={() => setPriceOpen(false)}>Cancel</button>
+                   <button className="btn danger" disabled={priceTyped !== d.slug}
+                           onClick={() => void savePricing()}>
+                     Change pricing
+                   </button>
+                 </>
+               }>
+          <p className="tiny">
+            This changes what the paywall asks AND what the ledger charges, for
+            this series only, on core-api's next request. Type the slug to confirm.
+          </p>
+          <div className="frow">
+            <label>
+              Coins per episode
+              <input type="number" value={priceFields.coin_price} aria-label="Coins per episode"
+                     onChange={(e) => setPriceFields({ ...priceFields,
+                                                       coin_price: Number(e.target.value) })} />
+            </label>
+            <label>
+              Free episodes
+              <input type="number" value={priceFields.free_episodes} aria-label="Free episodes"
+                     onChange={(e) => setPriceFields({ ...priceFields,
+                                                       free_episodes: Number(e.target.value) })} />
+            </label>
+          </div>
+          <label>
+            Slug
+            <input value={priceTyped} onChange={(e) => setPriceTyped(e.target.value)}
+                   placeholder={d.slug} aria-label="Confirm slug" />
+          </label>
+        </Modal>
+      ) : null}
+
+      {rightsOpen ? (
+        <Modal title={`Rights · ${d.title}`} onClose={() => setRightsOpen(false)}
+               footer={
+                 <>
+                   <button className="btn s" onClick={() => setRightsOpen(false)}>Cancel</button>
+                   <button className="btn p" onClick={() => void saveRights()}>
+                     Save rights
+                   </button>
+                 </>
+               }>
+          <label>
+            Owner / licensor
+            <input value={rightsFields.owner} aria-label="Owner"
+                   onChange={(e) => setRightsFields({ ...rightsFields, owner: e.target.value })}
+                   placeholder="Katha Originals" />
+          </label>
+          <label>
+            Licensed until (YYYY-MM-DD, blank for owned)
+            <input value={rightsFields.license_until} aria-label="Licensed until"
+                   onChange={(e) => setRightsFields({ ...rightsFields,
+                                                      license_until: e.target.value })}
+                   placeholder="2027-03-31" />
+          </label>
+        </Modal>
+      ) : null}
+
+      {retitle !== null ? (
+        <Modal title={`Rename · Episode ${retitle}`} onClose={() => setRetitle(null)}
+               footer={
+                 <>
+                   <button className="btn s" onClick={() => setRetitle(null)}>Cancel</button>
+                   <button className="btn p" disabled={!newTitle.trim()}
+                           onClick={() => void saveTitle()}>
+                     Rename
+                   </button>
+                 </>
+               }>
+          <label>
+            Episode title
+            <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
+                   aria-label="Episode title" autoFocus />
           </label>
         </Modal>
       ) : null}

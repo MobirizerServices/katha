@@ -59,6 +59,7 @@ export interface FeatureFlag {
   enabled: boolean;
   env: string;
   guarded?: boolean;
+  pct?: number;
   owner?: string;
   review_by?: string;
 }

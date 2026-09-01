@@ -76,7 +76,8 @@ class Database:
         # Additive column migration for pre-existing dev DBs (create_all never
         # alters tables): ignore "duplicate column" on already-migrated files.
         from sqlalchemy import text
-        for ddl in ("ALTER TABLE user_profile ADD COLUMN last_seen VARCHAR NOT NULL DEFAULT ''",):
+        for ddl in ("ALTER TABLE user_profile ADD COLUMN last_seen VARCHAR NOT NULL DEFAULT ''",
+                    "ALTER TABLE user_profile ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"):
             try:
                 async with self.engine.begin() as conn:
                     await conn.execute(text(ddl))

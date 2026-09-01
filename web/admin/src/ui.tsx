@@ -145,6 +145,48 @@ export function CopyId({ value }: { value: string }) {
   );
 }
 
+/** 30-day sparkline (#015): plain canvas, no library. */
+export function Spark({ points, width = 120, height = 28 }:
+                      { points: number[]; width?: number; height?: number }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    let ctx: CanvasRenderingContext2D | null = null;
+    try {
+      ctx = el?.getContext("2d") ?? null;   // jsdom throws instead of null
+    } catch {
+      return;
+    }
+    if (!el || !ctx || points.length < 2) return;
+    const max = Math.max(...points, 1);
+    const min = Math.min(...points, 0);
+    const span = max - min || 1;
+    const dpr = window.devicePixelRatio || 1;
+    el.width = width * dpr;
+    el.height = height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, width, height);
+    const x = (i: number) => (i / (points.length - 1)) * (width - 2) + 1;
+    const y = (v: number) => height - 3 - ((v - min) / span) * (height - 6);
+    ctx.beginPath();
+    points.forEach((v, i) => (i === 0 ? ctx.moveTo(x(i), y(v)) : ctx.lineTo(x(i), y(v))));
+    ctx.strokeStyle = "rgba(246,84,44,.9)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.lineTo(x(points.length - 1), height);
+    ctx.lineTo(x(0), height);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(246,84,44,.12)";
+    ctx.fill();
+    ctx.beginPath();                                   // emphasized endpoint
+    ctx.arc(x(points.length - 1), y(points[points.length - 1]), 2, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(246,84,44,1)";
+    ctx.fill();
+  }, [points, width, height]);
+  return <canvas ref={ref} style={{ width, height }} aria-hidden="true" />;
+}
+
+
 export function Skeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="skeleton" aria-hidden>

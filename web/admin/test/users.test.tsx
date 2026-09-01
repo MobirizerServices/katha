@@ -193,6 +193,10 @@ describe("Users view — drill-down tabs, refund, DPDP (#029/#031/#032)", () => 
         transactions: refunded ? [] : [
           { id: "ctx_1", type: "purchase", amount_bought: 600, amount_bonus: 0,
             reference_type: "iap", reference_id: "coins_starter_in", created_at: "2026-09-01T10:00:00+00:00" }] });
+      if (u.includes("/devices")) return ok({ devices: [
+        { ua: "KathaApp/1.0 (iPhone 16)", ip: "192.168.1.4",
+          first_seen: "2026-09-01T09:00:00+00:00",
+          last_seen: "2026-09-01T10:00:00+00:00" }] });
       if (u.includes("/health/full")) return ok({ status: "ok", checks: {}, at: "" });
       if (u.includes("/attention")) return ok({ items: [] });
       return Promise.reject(new Error("offline"));

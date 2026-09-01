@@ -86,3 +86,19 @@ moment a real issuer is set.
 - `KATHA_ADMIN_SESSION_TTL_H` (default 12) bounds session lifetime.
 - Keep `KATHA_ADMIN_AUTH=headers` only for local unit-test runs; never expose
   a headers-mode admin-api beyond localhost.
+
+## Ops platform env (added 2026-09-01, wave 3)
+
+| Variable | Default | What it does |
+|---|---|---|
+| `KATHA_ALERT_WEBHOOK` (or KV `config:alert.webhook`) | unset | Slack-compatible webhook: new pending approvals and un-acked danger attention items post `{"text": ...}` once (deduped). Paste a Slack *Incoming Webhook* URL to go live. |
+| `KATHA_ADMIN_RATE_LIMIT` | 240/min | Per-actor mutation rate limit (429 beyond). |
+| `KATHA_ADMIN_STEP_UP_S` | 900 | Money actions (approve/refund/erase/sign-out-devices) refuse OIDC sessions older than this — the operator signs in again (step-up). |
+| KV `config:adjust.daily_cap` | 2000 | Per-agent daily coin-adjustment cap; attention warns at 80%. |
+| KV `config:coin.rupee_rate` | 0.15 | The coin→₹ rate used by LTV/analytics — finance edits one number. |
+
+Prod posture notes (#080/#082/#084/#085): pin `KATHA_ADMIN_CORS` and `KATHA_CORS_ORIGINS`
+to the real origins; admin-api already sends CSP/`X-Frame-Options: DENY`/nosniff on its
+responses — mirror them on the SPA host (nginx `add_header`); move
+`KATHA_ADMIN_SESSION_SECRET`/`KATHA_OIDC_CLIENT_SECRET` into a secret manager with
+rotation; decide VPN/IP-allowlist before external exposure.

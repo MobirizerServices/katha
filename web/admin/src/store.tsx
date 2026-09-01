@@ -40,6 +40,7 @@ interface Store {
   addAudit: (e: Omit<AuditEntry, "ts">) => void;
   flags: FeatureFlag[];
   toggleFlag: (key: string, confirm?: string) => Promise<MutationResult>;
+  setFlagPct: (key: string, pct: number, confirm?: string) => Promise<MutationResult>;
   toasts: ToastMsg[];
   showToast: (msg: string, kind?: "info" | "error") => void;
 }
@@ -156,7 +157,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const flag = flags.find((f) => f.key === key);
       if (!flag) return { error: "unknown flag" } as const;
       const next = !flag.enabled;
-      const res = await mutate.setFlag(key, next, confirm);
+      const res = await mutate.setFlag(key, next, flag.pct ?? 100, confirm);
       if (!("offline" in res) && res.error) {
         showToast(`Flag not changed: ${res.error}`, "error");   // #063: never lie
         return res;
@@ -175,15 +176,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const signedOut = identity?.mode === "oidc" && !identity.authenticated;
 
+  const setFlagPct = useCallback(
+    async (key: string, pct: number, confirm?: string) => {
+      const flag = flags.find((f) => f.key === key);
+      if (!flag) return { error: "unknown flag" } as const;
+      const res = await mutate.setFlag(key, flag.enabled, pct, confirm);
+      if (!("offline" in res) && res.error) {
+        showToast(`Rollout not changed: ${res.error}`, "error");
+        return res;
+      }
+      setFlags((prev) => prev.map((f) => (f.key === key ? { ...f, pct } : f)));
+      setAudit((au) => [
+        { ts: Date.now(), actor: ME, action: "flag.rollout", entity: key,
+          change: `${flag.pct ?? 100}% → ${pct}%` },
+        ...au,
+      ]);
+      return res;
+    },
+    [flags, showToast]
+  );
+
   const value = useMemo<Store>(
     () => ({
       role, setRole, identity, signedOut, logout, online, health, attention,
       refreshSignals, approvals, reloadApprovals, addApproval, resolveApproval,
-      audit, addAudit, flags, toggleFlag, toasts, showToast,
+      audit, addAudit, flags, toggleFlag, setFlagPct, toasts, showToast,
     }),
     [role, setRole, identity, signedOut, logout, online, health, attention,
      refreshSignals, approvals, reloadApprovals, addApproval, resolveApproval,
-     audit, addAudit, flags, toggleFlag, toasts, showToast]
+     audit, addAudit, flags, toggleFlag, setFlagPct, toasts, showToast]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

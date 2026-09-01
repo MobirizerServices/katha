@@ -27,10 +27,31 @@ DEFAULT_FLAGS: dict[str, dict] = {
 }
 
 
-def effective_flags(overrides: dict[str, bool] | None = None) -> dict[str, bool]:
-    """Defaults merged with admin overrides (unknown override keys ignored)."""
+def bucket(key: str, user_id: str) -> int:
+    """Stable 0-99 bucket for percentage rollout (#056) — the same user always
+    lands in the same bucket for a given flag, independent of other flags."""
+    import hashlib
+    return int(hashlib.sha256(f"{key}:{user_id}".encode()).hexdigest()[:8], 16) % 100
+
+
+def effective_flags(overrides: dict | None = None,
+                    user_id: str | None = None) -> dict[str, bool]:
+    """Defaults merged with admin overrides (unknown override keys ignored).
+
+    An override is either a bool (legacy: global on/off) or
+    ``{"enabled": bool, "pct": 0-100}`` — a ramp. Without a user context a
+    ramped flag only reads true at 100% (anonymous callers never get a partial
+    rollout by accident)."""
     merged = {k: v["enabled"] for k, v in DEFAULT_FLAGS.items()}
     for k, v in (overrides or {}).items():
-        if k in merged:
-            merged[k] = v
+        if k not in merged:
+            continue
+        if isinstance(v, dict):
+            enabled = bool(v.get("enabled", False))
+            pct = int(v.get("pct", 100))
+            if enabled and pct < 100:
+                enabled = user_id is not None and bucket(k, user_id) < pct
+            merged[k] = enabled
+        else:
+            merged[k] = bool(v)
     return merged

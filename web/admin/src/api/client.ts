@@ -50,7 +50,21 @@ const HEADERS = {
   "X-Katha-CSRF": "1",
 };
 
-async function get<T>(path: string, fallback: T): Promise<T> {
+// Tiny TTL cache (#103): hot lists (series, flags, policy, matrix) skip a
+// round-trip for 30s. Mutating views call the API directly; money reads and
+// health signals are never cached.
+const CACHE = new Map<string, { t: number; v: unknown }>();
+const CACHE_TTL_MS = 30_000;
+
+export function __resetApiCache(): void {
+  CACHE.clear();
+}
+
+async function get<T>(path: string, fallback: T, ttl = 0): Promise<T> {
+  if (ttl > 0) {
+    const hit = CACHE.get(path);
+    if (hit && Date.now() - hit.t < ttl) return hit.v as T;
+  }
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 2500);
@@ -58,7 +72,9 @@ async function get<T>(path: string, fallback: T): Promise<T> {
     clearTimeout(t);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     setOnline(true);
-    return (await res.json()) as T;
+    const parsed = (await res.json()) as T;
+    if (ttl > 0) CACHE.set(path, { t: Date.now(), v: parsed });
+    return parsed;
   } catch {
     setOnline(false);
     return fallback;
@@ -88,6 +104,7 @@ export interface AttentionItem {
   title: string;
   detail: string;
   to: string;
+  ack?: { by: string; at: string };
 }
 
 export interface Grievance {
@@ -124,8 +141,10 @@ export interface SeriesDetail {
   updatedAt: string;
   coverUrl: string;
   media: { covers_ok: boolean; episodes_with_media: number; episodes_missing: number };
-  episodes: { number: number; title: string; isFree: boolean }[];
+  episodes: { number: number; title: string; isFree: boolean; hasMedia?: boolean }[];
   previewWeb: string;
+  pricingOverridden?: boolean;
+  rights?: { owner: string; license_until: string };
 }
 
 /** Who is signed in, and how auth works on this deployment (#074). */
@@ -147,6 +166,42 @@ export interface AccessUser {
   at?: string;
 }
 
+export interface AnalyticsWindow {
+  coins_purchased: number;
+  revenue_rupees: number;
+  coins_iap: number;
+  coins_web: number;
+  unlocks: number;
+  dau_peak: number;
+  new_users: number;
+  watch_minutes: number;
+  coins_refunded: number;
+  refund_ratio_pct: number;
+}
+
+export interface Analytics {
+  windows: Record<"today" | "7d" | "30d",
+                  { current: AnalyticsWindow; previous: AnalyticsWindow }>;
+  funnel: Record<"1d" | "7d" | "30d",
+                 { paywall_view: number; purchase: number; unlock: number }>;
+  days: string[];
+  spark: Record<string, number[]>;
+  outstanding_trend: number[];
+  outstanding_rupees: number;
+  breakage_dormant_coins: number;
+  coin_rupee_rate: number;
+  generated_at: string;
+}
+
+export interface Experiment {
+  key: string;
+  hypothesis: string;
+  variants: { name: string; pct: number }[];
+  status: "draft" | "running" | "stopped";
+  by?: string;
+  at?: string;
+}
+
 export interface Policy {
   dual_approval_threshold: number;
   coin_rupee_rate: number;
@@ -159,7 +214,7 @@ export const api = {
     return get<Overview>("/overview", MOCK_OVERVIEW);
   },
   async listSeries(): Promise<Series[]> {
-    return get<Series[]>("/catalog/series", MOCK_SERIES);
+    return get<Series[]>("/catalog/series", MOCK_SERIES, CACHE_TTL_MS);
   },
   async seriesDetail(slug: string): Promise<SeriesDetail | null> {
     return get<SeriesDetail | null>(`/catalog/series/${slug}`, null);
@@ -188,7 +243,7 @@ export const api = {
     return get<Approval[]>(`/approvals?status=${status}`, MOCK_APPROVALS);
   },
   async listFlags(): Promise<FeatureFlag[]> {
-    return get<FeatureFlag[]>("/config/flags", MOCK_FLAGS);
+    return get<FeatureFlag[]>("/config/flags", MOCK_FLAGS, CACHE_TTL_MS);
   },
   async listAudit(opts: { actor?: string; q?: string; limit?: number; before?: number } = {}):
       Promise<AuditPage> {
@@ -254,6 +309,17 @@ export const api = {
   async listAccessUsers(): Promise<{ users: AccessUser[] } | null> {
     return get<{ users: AccessUser[] } | null>("/access/users", null);
   },
+  async analytics(): Promise<Analytics | null> {
+    return get<Analytics | null>("/analytics", null);
+  },
+  async listExperiments(): Promise<{ experiments: Experiment[] }> {
+    return get("/experiments", { experiments: [] });
+  },
+  async listDevices(userId: string):
+      Promise<{ devices: { ua: string; ip: string; first_seen: string;
+                           last_seen: string }[] }> {
+    return get(`/users/${userId}/devices`, { devices: [] });
+  },
 };
 
 /** Mutations. Every call resolves to the parsed body, or `{ offline: true }`
@@ -288,8 +354,8 @@ export const mutate = {
   erase: (userId: string) => send(`/users/${userId}/erase`, "POST"),
   approve: (id: string) => send(`/approvals/${id}/approve`, "POST"),
   reject: (id: string, note = "") => send(`/approvals/${id}/reject`, "POST", { note }),
-  setFlag: (key: string, enabled: boolean, confirm?: string) =>
-    send(`/config/flags/${key}`, "PATCH", { enabled, confirm }),
+  setFlag: (key: string, enabled: boolean, pct = 100, confirm?: string) =>
+    send(`/config/flags/${key}`, "PATCH", { enabled, pct, confirm }),
   setStatus: (slug: string, status: string, reason = "") =>
     send(`/catalog/series/${slug}/status`, "POST", { status, reason }),
   setRating: (slug: string, rating: string, reason: string) =>
@@ -306,4 +372,20 @@ export const mutate = {
     send(`/access/users/${encodeURIComponent(email)}`, "PUT", { role, confirm }),
   revokeAccess: (email: string) =>
     send(`/access/users/${encodeURIComponent(email)}`, "DELETE"),
+  ackAttention: (id: string) =>
+    send(`/attention/${encodeURIComponent(id)}/ack`, "POST"),
+  createSeries: (body: Record<string, unknown>) =>
+    send("/catalog/series", "POST", body),
+  setPricing: (slug: string, fields: { coin_price?: number; free_episodes?: number }) =>
+    send(`/catalog/series/${slug}/pricing`, "PATCH", { ...fields, confirm: slug }),
+  setEpisodeTitle: (slug: string, number: number, title: string) =>
+    send(`/catalog/series/${slug}/episodes/${number}`, "PATCH", { title }),
+  setRights: (slug: string, owner: string, licenseUntil: string) =>
+    send(`/catalog/series/${slug}/rights`, "PATCH",
+         { owner, license_until: licenseUntil }),
+  setExperiment: (key: string, body: Record<string, unknown>) =>
+    send(`/experiments/${key}`, "PUT", body),
+  signoutDevices: (userId: string) =>
+    send(`/users/${userId}/signout-devices`, "POST"),
+  uiPing: (view: string) => send("/metrics/ui", "POST", { view }),
 };

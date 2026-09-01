@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
@@ -65,19 +65,48 @@ def health() -> dict:
 
 
 @app.get("/v1/config", tags=["config"])
-def config() -> dict:
+def config(authorization: str | None = Header(default=None)) -> dict:
     """Remote config the clients read (feature flags, pricing defaults, min version).
 
     Flags = shared defaults merged with admin overrides from the shared DB —
     a toggle flipped in the back office reaches this endpoint on the next call.
+    With a bearer token, percentage rollouts (#056) and experiment assignments
+    (#061) are evaluated for THAT user; anonymous callers get ramps only at
+    100% and no assignments.
     """
+    import json as _json
+
+    from katha_domain.flags import bucket
+
+    from .auth import decode_token
     from .store import store as _store
+    user: str | None = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        payload = decode_token(token)
+        user = payload["sub"] if payload else token
     prof = catalog.pricing()
     overrides = _store.shared.flag_overrides() if getattr(_store, "shared", None) else {}
+    experiments: dict[str, str] = {}
+    if user:
+        for key, raw in _store.kv_prefix("exp:").items():
+            try:
+                exp = _json.loads(raw)
+            except ValueError:
+                continue
+            if exp.get("status") != "running":
+                continue
+            edge, b = 0, bucket(f"exp:{key}", user)
+            for var in exp.get("variants", []):
+                edge += int(var.get("pct", 0))
+                if b < edge:
+                    experiments[key] = var.get("name", "control")
+                    break
     return {
         "min_app_version": _store.kv("config:app.min_version") or "1.0.0",
         "free_episode_count": prof["free_episode_count"],
         "episode_coin_price": prof["episode_coin_price"],
         "bundle_discount_pct": prof["bundle_discount_pct"],
-        "flags": effective_flags(overrides),
+        "flags": effective_flags(overrides, user_id=user),
+        "experiments": experiments,
     }

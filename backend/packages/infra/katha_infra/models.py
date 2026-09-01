@@ -53,6 +53,9 @@ class UserProfileRow(Base):
     language: Mapped[str] = mapped_column(String, nullable=False, default="hi")
     created_at: Mapped[str] = mapped_column(String, nullable=False, default="")
     last_seen: Mapped[str] = mapped_column(String, nullable=False, default="")
+    # Bumped by "sign out all devices" (#021): JWTs carry the version they were
+    # issued under and stop validating once it moves.
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class EntitlementRow(Base):
@@ -97,6 +100,41 @@ class AuditLogRow(Base):
     user_agent: Mapped[str] = mapped_column(String, nullable=False, default="")
     prev_hash: Mapped[str] = mapped_column(String, nullable=False, default="")
     hash: Mapped[str] = mapped_column(String, nullable=False, default="")
+
+
+class EventRow(Base):
+    """One product event (admin review #011): the raw material for DAU, funnels,
+    watch minutes and every Overview trend. Emitted server-side by core-api at
+    the endpoints where the behaviour is already observable — no client SDK yet.
+    `day` is the precomputed UTC date for cheap bucketing."""
+
+    __tablename__ = "event"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ts: Mapped[str] = mapped_column(String, nullable=False)
+    day: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    ref: Mapped[str] = mapped_column(String, nullable=False, default="")
+    value: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    channel: Mapped[str] = mapped_column(String, nullable=False, default="")
+
+
+class DeviceRow(Base):
+    """One observed client per user (admin review #021), keyed by user-agent
+    hash. Recorded on authenticated traffic; "sign out all devices" works by
+    bumping the profile's token_version, not by deleting rows."""
+
+    __tablename__ = "device"
+    __table_args__ = (UniqueConstraint("user_id", "ua_hash", name="uq_user_ua"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    ua_hash: Mapped[str] = mapped_column(String, nullable=False)
+    ua: Mapped[str] = mapped_column(String, nullable=False, default="")
+    ip: Mapped[str] = mapped_column(String, nullable=False, default="")
+    first_seen: Mapped[str] = mapped_column(String, nullable=False, default="")
+    last_seen: Mapped[str] = mapped_column(String, nullable=False, default="")
 
 
 class GrievanceRow(Base):

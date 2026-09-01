@@ -364,3 +364,40 @@ def test_auth_me_in_headers_mode_echoes_headers():
     assert me == {"mode": "headers", "authenticated": True,
                   "email": "riya", "role": "admin"}
     assert client.get("/admin/v1/auth/me").json()["authenticated"] is False
+
+
+def test_step_up_blocks_stale_sessions_from_money(oidc_mode):
+    """#079: a session older than 15 min cannot approve/refund — re-auth first."""
+    client = TestClient(app)
+    sign_in(client, "ops@katha.dev")
+    # queue an approval with the FRESH session
+    r = client.post("/admin/v1/wallet/adjust", headers={"X-Katha-CSRF": "1"},
+                    json={"user_id": "su-u", "coins": 900, "reason_code": "goodwill"})
+    ap_id = r.json()["approval"]["id"]
+    # a second admin with an OLD session tries to approve
+    store.admin_users["lead@katha.dev"] = {"role": "admin"}
+    old = oidc.sign_payload({"email": "lead@katha.dev", "sid": "x",
+                             "iat": time.time() - 3600,
+                             "exp": time.time() + 3600})
+    client.cookies.set(oidc.SESSION_COOKIE, old)
+    r = client.post(f"/admin/v1/approvals/{ap_id}/approve",
+                    headers={"X-Katha-CSRF": "1"})
+    assert r.status_code == 403 and "step-up" in r.json()["detail"]
+    # fresh sign-in → allowed
+    client.cookies.delete(oidc.SESSION_COOKIE)
+    sign_in(client, "lead@katha.dev")
+    r = client.post(f"/admin/v1/approvals/{ap_id}/approve",
+                    headers={"X-Katha-CSRF": "1"})
+    assert r.status_code == 200
+    # sign-out-everywhere is money-adjacent: stale session also refused
+    client.cookies.set(oidc.SESSION_COOKIE, old)
+    r = client.post("/admin/v1/users/su-u/signout-devices",
+                    headers={"X-Katha-CSRF": "1"})
+    assert r.status_code == 403
+
+
+def test_auth_me_reports_session_age(oidc_mode):
+    client = TestClient(app)
+    sign_in(client, "ops@katha.dev")
+    me = client.get("/admin/v1/auth/me").json()
+    assert me["since"] > 0 and time.time() - me["since"] < 60

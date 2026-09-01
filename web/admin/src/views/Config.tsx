@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, mutate } from "../api/client";
-import type { Policy } from "../api/client";
-import { Modal, PageHeader, fmtINR, fmtN } from "../ui";
+import type { Experiment, Policy } from "../api/client";
+import { Modal, PageHeader, Sev, fmtINR, fmtN } from "../ui";
 import { useStore } from "../store";
 import { canAct } from "../auth/roles";
 
@@ -16,7 +16,7 @@ interface PackRow {
 }
 
 export function Config() {
-  const { flags, toggleFlag, role, online, showToast } = useStore();
+  const { flags, toggleFlag, setFlagPct, role, online, showToast } = useStore();
   const mayFlag = canAct(role, "content");
   const mayFinance = canAct(role, "finance");
   const [policy, setPolicy] = useState<Policy | null>(null);
@@ -27,6 +27,12 @@ export function Config() {
   const [packTyped, setPackTyped] = useState("");
   const [packFields, setPackFields] = useState({ price_minor: 0, coins: 0, bonus: 0 });
   const [minVer, setMinVer] = useState("");
+  const [rampKey, setRampKey] = useState<string | null>(null);
+  const [rampPct, setRampPct] = useState(100);
+  const [exps, setExps] = useState<Experiment[]>([]);
+  const [expOpen, setExpOpen] = useState(false);
+  const [expForm, setExpForm] = useState({ key: "", hypothesis: "",
+                                          variants: "control:50,treatment:50" });
 
   useEffect(() => {
     void api.policy().then((p) => {
@@ -34,7 +40,38 @@ export function Config() {
       setMinVer(p.min_app_version);
     });
     void api.packs().then(setPacks);
+    void api.listExperiments().then((r) => setExps(r.experiments));
   }, []);
+
+  async function saveRamp() {
+    if (!rampKey) return;
+    const flag = flags.find((f) => f.key === rampKey);
+    const res = await setFlagPct(rampKey, rampPct,
+                                 flag?.guarded ? rampKey : undefined);
+    if (!("offline" in res) && !res.error) {
+      showToast(`${rampKey} → ${rampPct}% of users`);
+    }
+    setRampKey(null);
+  }
+
+  async function saveExperiment(status: "running" | "stopped", key?: string,
+                                variants?: { name: string; pct: number }[]) {
+    const k = key ?? expForm.key.trim();
+    const vars = variants ?? expForm.variants.split(",").map((part) => {
+      const [name, pct] = part.split(":");
+      return { name: (name ?? "").trim(), pct: Number(pct ?? 0) };
+    });
+    const res = await mutate.setExperiment(k, {
+      hypothesis: expForm.hypothesis, variants: vars, status,
+    });
+    if ("offline" in res) return showToast("Offline — experiment unchanged", "error");
+    if (res.error) return showToast(`Experiment not saved: ${res.error}`, "error");
+    showToast(status === "running"
+      ? `${k} running — assignments serve in /v1/config now`
+      : `${k} stopped`);
+    setExpOpen(false);
+    setExps((await api.listExperiments()).experiments);
+  }
 
   async function flip(key: string, guarded?: boolean) {
     if (guarded) {
@@ -101,7 +138,13 @@ export function Config() {
                   <div className="tiny muted">owner: {f.owner} · review by {f.review_by}</div>
                 ) : null}
               </div>
-              <span className="muted tiny">prod</span>
+              {typeof f.pct === "number" && f.pct < 100 ? (
+                <Sev level="warn">{f.pct}%</Sev>
+              ) : null}
+              <button className="btn s" disabled={!mayFlag || !online}
+                      onClick={() => { setRampKey(f.key); setRampPct(f.pct ?? 100); }}>
+                Ramp…
+              </button>
               <button
                 role="switch"
                 aria-checked={f.enabled}
@@ -190,6 +233,106 @@ export function Config() {
           </tbody>
         </table>
       </section>
+
+      <section className="panel" style={{ marginTop: 16 }}>
+        <header>
+          <h3>Experiments</h3>
+          <span className="muted">
+            assignments by stable user hash · served in /v1/config
+          </span>
+        </header>
+        {exps.length === 0 ? (
+          <p className="tiny muted" style={{ padding: "12px 14px" }}>
+            No experiments registered. The classic first test: 8 vs 10 vs 12
+            free episodes.
+          </p>
+        ) : (
+          <table className="table">
+            <thead><tr><th>Key</th><th>Hypothesis</th><th>Variants</th>
+                       <th>Status</th><th aria-label="actions"></th></tr></thead>
+            <tbody>
+              {exps.map((x) => (
+                <tr key={x.key}>
+                  <td className="mono">{x.key}</td>
+                  <td className="tiny">{x.hypothesis || "—"}</td>
+                  <td className="tiny mono">
+                    {x.variants.map((v) => `${v.name} ${v.pct}%`).join(" · ")}
+                  </td>
+                  <td><Sev level={x.status === "running" ? "ok" : "info"}>{x.status}</Sev></td>
+                  <td style={{ textAlign: "right" }}>
+                    {x.status === "running" ? (
+                      <button className="btn s" disabled={!mayFlag || !online}
+                              onClick={() => void saveExperiment("stopped", x.key, x.variants)}>
+                        Stop
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <div style={{ padding: "0 14px 14px" }}>
+          <button className="btn s" disabled={!mayFlag || !online}
+                  onClick={() => setExpOpen(true)}>
+            New experiment…
+          </button>
+        </div>
+      </section>
+
+      {rampKey ? (
+        <Modal title={`Rollout · ${rampKey}`} onClose={() => setRampKey(null)}
+               footer={
+                 <>
+                   <button className="btn s" onClick={() => setRampKey(null)}>Cancel</button>
+                   <button className="btn p" onClick={() => void saveRamp()}>
+                     Set rollout
+                   </button>
+                 </>
+               }>
+          <p className="tiny">
+            Percentage rollout (#056): the flag reads true for a stable {rampPct}%
+            of signed-in users. Anonymous callers only see it at 100%.
+          </p>
+          <label>
+            Percent of users (0–100)
+            <input type="number" min={0} max={100} value={rampPct}
+                   aria-label="Rollout percent"
+                   onChange={(e) => setRampPct(Number(e.target.value))} />
+          </label>
+        </Modal>
+      ) : null}
+
+      {expOpen ? (
+        <Modal title="New experiment" onClose={() => setExpOpen(false)}
+               footer={
+                 <>
+                   <button className="btn s" onClick={() => setExpOpen(false)}>Cancel</button>
+                   <button className="btn p" disabled={!expForm.key.trim()}
+                           onClick={() => void saveExperiment("running")}>
+                     Start running
+                   </button>
+                 </>
+               }>
+          <label>
+            Key (a-z, 0-9, dots/hyphens)
+            <input value={expForm.key} aria-label="Experiment key"
+                   onChange={(e) => setExpForm({ ...expForm, key: e.target.value })}
+                   placeholder="free-count" />
+          </label>
+          <label>
+            Hypothesis
+            <input value={expForm.hypothesis} aria-label="Hypothesis"
+                   onChange={(e) => setExpForm({ ...expForm, hypothesis: e.target.value })}
+                   placeholder="8 free episodes converts better than 10" />
+          </label>
+          <label>
+            Variants (name:pct, comma-separated; ≤100 total)
+            <input value={expForm.variants} aria-label="Variants"
+                   onChange={(e) => setExpForm({ ...expForm, variants: e.target.value })} />
+          </label>
+        </Modal>
+      ) : null}
 
       {guardKey ? (
         <Modal title={`Guarded flag · ${guardKey}`} onClose={() => setGuardKey(null)}

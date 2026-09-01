@@ -143,8 +143,8 @@ class Store:
     # ---- entitlements ---------------------------------------------------
     _seen_stamp: dict = {}
 
-    def touch_seen(self, user_id: str) -> None:
-        """Record activity for the back office (admin review #020) — at most
+    def touch_seen(self, user_id: str, *, ua: str = "", ip: str = "") -> None:
+        """Record activity + device for the back office (#020/#021) — at most
         once a minute per user to keep the hot path cheap."""
         if self.shared is None:
             return
@@ -153,6 +153,27 @@ class Store:
             return
         self._seen_stamp[user_id] = stamp
         self.shared.touch_last_seen(user_id, now_iso())
+        if ua:
+            self.shared.device_touch(user_id, ua=ua, ip=ip, ts=now_iso())
+
+    def emit(self, user_id: str, name: str, *, ref: str = "", value: int = 0,
+             channel: str = "") -> None:
+        """Append a product event (admin review #011). Best-effort: analytics
+        must never take down a money path, so failures are swallowed."""
+        if self.shared is None:
+            return
+        try:
+            self.shared.event_append(ts=now_iso(), user_id=user_id, name=name,
+                                     ref=ref, value=value, channel=channel)
+        except Exception:
+            pass
+
+    def progress_delta(self, user_id: str, episode_id: str, position_ms: int) -> int:
+        """Watched-time delta vs the last reported position, clamped to a sane
+        step so seeks don't count as watch time (#011 watch minutes)."""
+        prev = self._eng(user_id).progress.get(episode_id)
+        delta = position_ms - (prev.position_ms if prev else 0)
+        return max(0, min(delta, 30_000))
 
     def kv(self, key: str) -> str | None:
         return self.shared.kv_get(key) if self.shared is not None else None
@@ -173,7 +194,8 @@ class Store:
 
     def ensure_free(self, user_id: str, slug: str, number: int) -> bool:
         """Grant + report free entitlement for the first N episodes of a series."""
-        series = catalog.get_series(slug)
+        from .overrides import get_series
+        series = get_series(slug)
         if series is None:
             return False
         if number <= series.free_episode_count:

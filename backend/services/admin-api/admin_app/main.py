@@ -15,6 +15,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from katha_domain import catalog
@@ -48,12 +49,45 @@ if os.environ.get("KATHA_PERSIST") == "1":
 router = APIRouter(prefix="/admin/v1")
 
 
+RATE_BUCKETS: dict = defaultdict(list)
+
+
+def _rate_key(request: Request) -> str:
+    from . import oidc
+    ident = oidc.session_identity(request)
+    if ident:
+        return str(ident.get("email", "session"))
+    return (request.headers.get("x-actor-id")
+            or (request.client.host if request.client else "anon"))
+
+
 @app.middleware("http")
 async def _metrics_mw(request: Request, call_next):
     t0 = time.monotonic()
+    # Per-actor rate limit on mutations (#081): scripted abuse and stuck retry
+    # loops hit a wall; normal operation never comes near it.
+    if (request.method not in ("GET", "HEAD", "OPTIONS")
+            and "/auth/" not in request.url.path):
+        limit = int(os.environ.get("KATHA_ADMIN_RATE_LIMIT", "240"))
+        key = _rate_key(request)
+        now_s = time.monotonic()
+        window = [t for t in RATE_BUCKETS[key] if now_s - t < 60]
+        if len(window) >= limit:
+            RATE_BUCKETS[key] = window
+            return JSONResponse(
+                {"detail": "rate limited: too many changes in a minute"},
+                status_code=429)
+        window.append(now_s)
+        RATE_BUCKETS[key] = window
     try:
         response = await call_next(request)
         ok = response.status_code < 500
+        # Security headers (#085). The dev IdP page needs its inline styles.
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        if "/devidp/" not in request.url.path:
+            response.headers.setdefault("Content-Security-Policy", "default-src 'none'")
         return response
     except Exception:
         ok = False
@@ -82,8 +116,70 @@ def audit(actor: Actor, action: str, target: str, detail: dict,
 REQUEST_METRICS: dict = defaultdict(lambda: {"count": 0, "errors": 0, "ms": 0.0})
 
 
+def _rupee_rate() -> float:
+    """coin→rupee rate from shared config (#023) — finance edits one number."""
+    raw = SHARED.kv_get("config:coin.rupee_rate") if SHARED is not None else None
+    try:
+        return float(raw) if raw else 0.15
+    except ValueError:
+        return 0.15
+
+
 def _rupees(coins: int) -> str:
-    return f"₹{round(coins * 0.15):,}"
+    return f"₹{round(coins * _rupee_rate()):,}"
+
+
+def _notify(text: str) -> bool:
+    """Mirror an operational signal to a webhook (#053/#111) — Slack-compatible
+    {"text": ...}. Configure KATHA_ALERT_WEBHOOK or KV config:alert.webhook;
+    silently a no-op until one is set."""
+    url = os.environ.get("KATHA_ALERT_WEBHOOK") or (
+        SHARED.kv_get("config:alert.webhook") if SHARED is not None else None)
+    if not url:
+        return False
+    try:
+        req = urllib.request.Request(
+            url, data=_json.dumps({"text": text}).encode(),
+            headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=2)
+        return True
+    except Exception:
+        return False
+
+
+STEP_UP_MAX_AGE_S = int(os.environ.get("KATHA_ADMIN_STEP_UP_S", "900"))
+
+
+def _step_up(request: Request) -> None:
+    """Money actions demand a fresh sign-in (#079): with OIDC sessions, a
+    session older than 15 minutes cannot approve/refund/erase — sign in again."""
+    from . import oidc
+    if oidc.auth_mode() != "oidc":
+        return
+    ident = oidc.session_identity(request)
+    if ident is None:
+        return
+    if time.time() - float(ident.get("iat", 0)) > STEP_UP_MAX_AGE_S:
+        raise HTTPException(
+            status_code=403,
+            detail="step-up required: your session is older than "
+                   f"{STEP_UP_MAX_AGE_S // 60} min — sign in again to move money")
+
+
+def _daily_cap_check(actor: Actor, coins: int) -> None:
+    """Per-agent daily adjustment cap (#027): fifty grants of 499 now trip
+    something. Counted against the requester at request time."""
+    if SHARED is None:
+        return
+    cap = int(SHARED.kv_get("config:adjust.daily_cap") or 2000)
+    key = f"adjcap:{actor.id}:{now_iso()[:10]}"
+    used = int(SHARED.kv_get(key) or 0)
+    if used + abs(coins) > cap:
+        raise HTTPException(
+            status_code=409,
+            detail=f"daily adjustment cap reached: {used:,} of {cap:,} coins "
+                   "already today — an admin can raise config:adjust.daily_cap")
+    SHARED.kv_set(key, str(used + abs(coins)))
 
 
 def _admin_user_view(u: dict) -> dict:
@@ -96,8 +192,8 @@ def _admin_user_view(u: dict) -> dict:
         "languages": u.get("language", "hi"),
         "wallet": {"bought": u["balance_bought"], "bonus": u["balance_bonus"],
                    "unlocked": u.get("unlocked", 0), "ltv": _rupees(total)},
-        "lastActive": "recently",
-        "flags": [],
+        "lastActive": u.get("last_seen") or "never",
+        "flags": u.get("flags", []),
         "devices": [],
         "payer": "web/app" if u["balance_bought"] > 0 else "—",
     }
@@ -183,19 +279,69 @@ def overview(actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE, Role.ANA
     }
 
 
+_LIVECOUNT_CACHE: dict = {}
+
+
+def _live_count(slug: str, episode_count: int) -> int:
+    """Transcoded-and-on-disk episodes (#037), cached a minute per series."""
+    stamp = now_iso()[:16]
+    hit = _LIVECOUNT_CACHE.get(slug)
+    if hit and hit[0] == stamp:
+        return hit[1]
+    live = _media_health(slug, episode_count)["episodes_with_media"]
+    _LIVECOUNT_CACHE[slug] = (stamp, live)
+    return live
+
+
+def _rights(slug: str) -> dict:
+    raw = SHARED.kv_get(f"rights:{slug}") if SHARED is not None else None
+    if raw:
+        try:
+            return _json.loads(raw)
+        except ValueError:
+            pass
+    return {"owner": "Katha Originals", "license_until": ""}
+
+
+def _admin_all_series():
+    """Seed catalog + panel-drafted series (#043)."""
+    from app.overrides import draft_series
+    out = list(catalog.all_series())
+    seen = {s.slug for s in out}
+    if SHARED is not None:
+        for slug in SHARED.kv_prefix("series:"):
+            if slug not in seen:
+                d = draft_series(slug)
+                if d is not None:
+                    out.append(d)
+    return out
+
+
+def _series_exists(slug: str) -> bool:
+    if catalog.get_series(slug) is not None:
+        return True
+    return SHARED is not None and bool(SHARED.kv_get(f"series:{slug}"))
+
+
 @router.get("/catalog/series", tags=["catalog"])
 def catalog_series(actor: Actor = Depends(require(Role.CONTENT, Role.QC, Role.ANALYST, Role.RO))):
-    """The live catalog in the back-office client shape."""
+    """The catalog in the back-office client shape — real lifecycle status,
+    media-derived live counts (#037), rights (#039), panel drafts (#043)."""
     out = []
-    for i, s in enumerate(catalog.all_series()):
+    for s in _admin_all_series():
+        status, _rating, touched = _series_overrides(s.slug)
+        rights = _rights(s.slug)
         out.append({
             "id": s.slug, "slug": s.slug, "title": s.title, "synopsis": s.synopsis,
             "genres": s.genres, "language": _LANG_NAMES.get(s.primary_language, s.primary_language),
-            "episodeCount": s.episode_count, "liveCount": s.episode_count,
+            "episodeCount": s.episode_count,
+            "liveCount": _live_count(s.slug, s.episode_count),
             "freeEpisodes": s.free_episode_count, "coinPrice": s.episode_coin_price,
             "bundleDiscountPct": s.bundle_discount_pct,
-            "status": "live", "rating": s.content_rating,
-            "owner": "Katha Originals", "updatedAt": 0,
+            "status": status, "rating": s.content_rating,
+            "owner": rights.get("owner") or "Katha Originals",
+            "licenseUntil": rights.get("license_until", ""),
+            "updatedAt": touched or 0,
         })
     return out
 
@@ -246,15 +392,22 @@ def reject(approval_id: str, request: Request = None, body: dict = Body(default=
 @router.get("/config/flags", tags=["config"])
 def config_flags(actor: Actor = Depends(require(Role.CONTENT, Role.FINANCE, Role.ANALYST, Role.RO))):
     overrides = SHARED.flag_overrides() if SHARED is not None else store.flag_overrides
-    merged = effective_flags(overrides)
-    return [
-        {"key": k, "description": DEFAULT_FLAGS[k]["description"],
-         "enabled": merged[k], "env": "prod",
-         "guarded": bool(DEFAULT_FLAGS[k].get("guarded")),
-         "owner": DEFAULT_FLAGS[k].get("owner", ""),
-         "review_by": DEFAULT_FLAGS[k].get("review_by", "")}
-        for k in DEFAULT_FLAGS
-    ]
+    out = []
+    for k in DEFAULT_FLAGS:
+        o = overrides.get(k)
+        if isinstance(o, dict):
+            enabled, pct = bool(o.get("enabled")), int(o.get("pct", 100))
+        elif isinstance(o, bool):
+            enabled, pct = o, 100
+        else:
+            enabled, pct = DEFAULT_FLAGS[k]["enabled"], 100
+        out.append(
+            {"key": k, "description": DEFAULT_FLAGS[k]["description"],
+             "enabled": enabled, "pct": pct, "env": "prod",
+             "guarded": bool(DEFAULT_FLAGS[k].get("guarded")),
+             "owner": DEFAULT_FLAGS[k].get("owner", ""),
+             "review_by": DEFAULT_FLAGS[k].get("review_by", "")})
+    return out
 
 
 @router.patch("/config/flags/{key}", tags=["config"])
@@ -265,21 +418,33 @@ def set_flag(key: str, request: Request = None, body: dict = Body(...),
     if key not in DEFAULT_FLAGS:
         raise HTTPException(status_code=404, detail="unknown flag")
     enabled = bool(body.get("enabled"))
+    pct = int(body.get("pct", 100))
+    if not (0 <= pct <= 100):
+        raise HTTPException(status_code=400, detail="pct must be 0-100")
     if DEFAULT_FLAGS[key].get("guarded") and body.get("confirm") != key:
         raise HTTPException(status_code=428,
                             detail=f"guarded flag: repeat the key '{key}' as confirm")
     overrides = SHARED.flag_overrides() if SHARED is not None else {
-        k: v for k, v in store.flag_overrides.items() if isinstance(v, bool)}
-    current = effective_flags(overrides)[key]
-    if current == enabled:                       # no-op writes are not audited
-        return {"key": key, "enabled": enabled}
-    if SHARED is not None:
-        SHARED.set_flag(key, enabled)
+        k: v for k, v in store.flag_overrides.items()
+        if isinstance(v, (bool, dict))}
+    cur = overrides.get(key)
+    if isinstance(cur, dict):
+        current = (bool(cur.get("enabled")), int(cur.get("pct", 100)))
+    elif isinstance(cur, bool):
+        current = (cur, 100)
     else:
-        store.flag_overrides[key] = enabled
+        current = (DEFAULT_FLAGS[key]["enabled"], 100)
+    if current == (enabled, pct):                # no-op writes are not audited
+        return {"key": key, "enabled": enabled, "pct": pct}
+    if SHARED is not None:
+        SHARED.set_flag(key, enabled, pct)
+    else:
+        store.flag_overrides[key] = (
+            enabled if pct >= 100 else {"enabled": enabled, "pct": pct})
     audit(actor, "config.flag.set", key,
-          {"from": current, "to": enabled}, request)
-    return {"key": key, "enabled": enabled}
+          {"from": f"{current[0]}@{current[1]}%", "to": f"{enabled}@{pct}%"},
+          request)
+    return {"key": key, "enabled": enabled, "pct": pct}
 
 
 # ---- catalog ---------------------------------------------------------------
@@ -373,11 +538,15 @@ def wallet_adjust(
         raise HTTPException(status_code=400,
                             detail="coins must be a non-zero integer within ±100,000")
 
+    _daily_cap_check(actor, coins)
+
     # Above the threshold: do NOT apply — queue a pending approval for a 2nd actor.
     if abs(coins) > DUAL_APPROVAL_THRESHOLD:
         ap = store.create_approval(actor, user_id, coins, reason_code, note)
         audit(actor, "wallet.adjust.requested", user_id,
               {"approval_id": ap.id, "coins": coins, "reason_code": reason_code}, request)
+        _notify(f"[katha-admin] approval {ap.id}: {coins:+,} coins for {user_id} "
+                f"requested by {actor.id} — needs a second person")
         return {"status": "pending_approval", "approval": _approval_view(ap)}
 
     # Within the threshold: apply immediately.
@@ -391,6 +560,7 @@ def wallet_adjust(
 @router.post("/approvals/{approval_id}/approve", tags=["wallet"])
 def approve(approval_id: str, request: Request = None,
             actor: Actor = Depends(require(Role.FINANCE))):
+    _step_up(request)
     ap = store.approvals.get(approval_id)
     if ap is None:
         raise HTTPException(status_code=404, detail="approval not found")
@@ -451,6 +621,7 @@ def user_export(user_id: str, request: Request = None,
 @router.post("/users/{user_id}/erase", tags=["users"])
 def user_erase(user_id: str, request: Request = None,
                actor: Actor = Depends(require())):
+    _step_up(request)
     """DPDP verified-erasure: scrub PII, retain the money ledger (admin review
     #032). Admin-only; audited."""
     if SHARED is None:
@@ -464,6 +635,7 @@ def user_erase(user_id: str, request: Request = None,
 @router.post("/wallet/refund", tags=["wallet"])
 def wallet_refund(request: Request, body: dict = Body(...),
                   actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE))):
+    _step_up(request)
     """Refund a specific purchase: claws the coins back against that transaction
     (admin review #029). Distinct from goodwill adjustments."""
     user_id = (body.get("user_id") or "").strip()
@@ -525,22 +697,29 @@ def _series_overrides(slug: str) -> tuple[str, dict, str]:
 def catalog_series_detail(slug: str,
                           actor: Actor = Depends(require(Role.CONTENT, Role.QC,
                                                          Role.ANALYST, Role.RO))):
-    d = catalog.get_series(slug)
+    from app.overrides import get_series
+    d = get_series(slug)          # seed or panel draft, panel pricing applied
     if d is None:
         raise HTTPException(status_code=404, detail="series not found")
     status, rating, touched = _series_overrides(slug)
+    base = _media_root() / slug
+    pricing_over = bool(SHARED and SHARED.kv_get(f"price:{slug}"))
     return {
         "slug": d.slug, "title": d.title, "synopsis": d.synopsis,
         "genres": d.genres, "language": _LANG_NAMES.get(d.primary_language,
                                                         d.primary_language),
         "episodeCount": d.episode_count, "freeEpisodes": d.free_episode_count,
         "coinPrice": d.episode_coin_price, "bundleDiscountPct": d.bundle_discount_pct,
+        "pricingOverridden": pricing_over,
         "status": status,
         "rating": rating.get("value") or d.content_rating,
         "ratingHistory": rating, "updatedAt": touched,
+        "rights": _rights(slug),
         "coverUrl": f"{catalog.media_base()}/media/{slug}/cover_9x16.jpg",
         "media": _media_health(slug, d.episode_count),
-        "episodes": [{"number": e.number, "title": e.title, "isFree": e.is_free}
+        "episodes": [{"number": e.number, "title": e.title, "isFree": e.is_free,
+                      "hasMedia": (base / f"e{e.number:03d}" / "hls"
+                                   / "master.m3u8").is_file()}
                      for e in d.episodes],
         "previewWeb": f"http://localhost:3000/watch/{slug}/1",
     }
@@ -552,7 +731,7 @@ def set_series_status(slug: str, request: Request = None, body: dict = Body(...)
     """Lifecycle control: live | scheduled | draft | archived. Archived/draft
     series disappear from the public catalog on core-api's next request
     (admin review #035/#046). QC may only take DOWN (archive)."""
-    if catalog.get_series(slug) is None:
+    if not _series_exists(slug):
         raise HTTPException(status_code=404, detail="series not found")
     status = (body.get("status") or "").strip()
     reason = (body.get("reason") or "").strip()
@@ -576,7 +755,7 @@ def set_series_rating(slug: str, request: Request = None, body: dict = Body(...)
                       actor: Actor = Depends(require(Role.QC, Role.CONTENT))):
     """IT Rules self-classification with accountability: who, when, why
     (admin review #041)."""
-    if catalog.get_series(slug) is None:
+    if not _series_exists(slug):
         raise HTTPException(status_code=404, detail="series not found")
     value = (body.get("rating") or "").strip()
     reason = (body.get("reason") or "").strip()
@@ -599,10 +778,17 @@ def config_policy(actor: Actor = Depends(require(Role.CONTENT, Role.SUPPORT,
     prof = catalog.pricing()
     return {
         "dual_approval_threshold": DUAL_APPROVAL_THRESHOLD,
-        "coin_rupee_rate": 0.15,
+        "coin_rupee_rate": _rupee_rate(),
+        "adjust_daily_cap": int((SHARED.kv_get("config:adjust.daily_cap")
+                                 if SHARED is not None else None) or 2000),
         "pricing": prof,
         "min_app_version": (SHARED.kv_get("config:app.min_version")
                             if SHARED is not None else None) or "1.0.0",
+        "retention": {
+            "money_ledger": "append-only, kept 7 years (finance/GST)",
+            "audit_log": "hash-chained, never edited; legal hold via export",
+            "events_days": 365,
+        },
     }
 
 
@@ -674,7 +860,9 @@ def health_full():
 def attention(actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,
                                              Role.CONTENT, Role.ANALYST, Role.RO))):
     """Real signals only (admin review #006): pending approvals, grievance SLA,
-    service health, media gaps. Empty means genuinely clear."""
+    service health, license expiry, adjustment-cap usage. Each item has a
+    stable id and can be acknowledged (#016); new danger items mirror to the
+    alert webhook once (#111)."""
     items = []
     pending = [ap for ap in store.approvals.values() if ap.status == "pending"]
     if pending:
@@ -705,13 +893,52 @@ def attention(actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,
                       "detail": ", ".join(f"{k}: {v}" for k, v in h["checks"].items()
                                           if v not in ("ok", "memory")),
                       "to": "/overview"})
+    if SHARED is not None:
+        from datetime import date, timedelta
+        # Licensed content expiring inside 30 days (#039)
+        soon = (date.fromisoformat(now_iso()[:10]) + timedelta(days=30)).isoformat()
+        for slug, raw in SHARED.kv_prefix("rights:").items():
+            try:
+                r = _json.loads(raw)
+            except ValueError:
+                continue
+            until = r.get("license_until", "")
+            if until and until <= soon:
+                items.append({"id": f"license:{slug}", "severity": "warn",
+                              "title": f"Licence for {slug} ends {until}",
+                              "detail": f"owner: {r.get('owner', '?')} — renew or archive",
+                              "to": f"/catalog/{slug}"})
+        # An agent near their daily adjustment cap (#027)
+        cap = int(SHARED.kv_get("config:adjust.daily_cap") or 2000)
+        day = now_iso()[:10]
+        for suffix, used in SHARED.kv_prefix("adjcap:").items():
+            who, _, d = suffix.rpartition(":")
+            if d == day and int(used) >= cap * 8 // 10:
+                items.append({"id": f"cap:{who}", "severity": "warn",
+                              "title": f"{who} at {int(used):,}/{cap:,} of the daily adjust cap",
+                              "detail": "Unusual grant volume — worth a look.",
+                              "to": "/audit"})
+        # Acknowledgement state (#016) + one-shot webhook mirror (#111)
+        for it in items:
+            raw = SHARED.kv_get(f"attnack:{it['id']}")
+            if raw:
+                try:
+                    it["ack"] = _json.loads(raw)
+                except ValueError:
+                    pass
+            if it["severity"] == "danger" and "ack" not in it and \
+                    not SHARED.kv_get(f"alerted:{it['id']}"):
+                if _notify(f"[katha-admin] {it['title']} — {it['detail']}"):
+                    SHARED.kv_set(f"alerted:{it['id']}", now_iso())
     return {"items": items}
 
 
 @router.get("/metrics", tags=["ops"])
 def metrics():
-    return {path: {**m, "avg_ms": round(m["ms"] / m["count"], 1) if m["count"] else 0}
-            for path, m in REQUEST_METRICS.items()}
+    out = {path: {**m, "avg_ms": round(m["ms"] / m["count"], 1) if m["count"] else 0}
+           for path, m in REQUEST_METRICS.items()}
+    out["ui"] = dict(UI_METRICS)   # which views operators actually open (#112)
+    return out
 
 
 @router.get("/access/matrix", tags=["ops"])
@@ -779,6 +1006,268 @@ def audit_log(actor: str = "", q: str = "", limit: int = 100,
         rows = [r for r in rows if n in r["action"].lower() or n in r["entity"].lower()
                 or n in str(r["change"]).lower()]
     return {"rows": rows[-limit:][::-1], "chain_ok": True, "total": len(rows)}
+
+
+
+
+# ---- attention acknowledgement (#016) ---------------------------------------
+@router.post("/attention/{item_id}/ack", tags=["ops"])
+def attention_ack(item_id: str, request: Request = None,
+                  actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,
+                                                 Role.CONTENT, Role.ANALYST))):
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+    SHARED.kv_set(f"attnack:{item_id}",
+                  _json.dumps({"by": actor.id, "at": now_iso()}))
+    audit(actor, "attention.ack", item_id, {}, request)
+    return {"id": item_id, "ack": {"by": actor.id, "at": now_iso()}}
+
+
+# ---- the analytics rollup (#009-#015) ---------------------------------------
+@router.get("/analytics", tags=["overview"])
+def analytics(actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,
+                                             Role.ANALYST, Role.RO, Role.CONTENT))):
+    """Windowed KPIs with deltas (#009), revenue split by channel (#010), the
+    paywall→purchase→unlock funnel (#013), refund ratio (#014), the coin
+    liability trend + breakage (#012), and 30-day sparklines (#015)."""
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+    a = SHARED.analytics(now=now_iso(), days=60)
+    daily = a["daily"]
+    rate = _rupee_rate()
+
+    def window(rows: list[dict]) -> dict:
+        purchased = sum(r["coins_purchased"] for r in rows)
+        refunded = sum(r["coins_refunded"] for r in rows)
+        return {
+            "coins_purchased": purchased,
+            "revenue_rupees": round(purchased * rate),
+            "coins_iap": sum(r["coins_iap"] for r in rows),
+            "coins_web": sum(r["coins_web"] for r in rows),
+            "unlocks": sum(r["unlocks"] for r in rows),
+            "dau_peak": max((r["dau"] for r in rows), default=0),
+            "new_users": sum(r["new_users"] for r in rows),
+            "watch_minutes": sum(r["watch_minutes"] for r in rows),
+            "coins_refunded": refunded,
+            "refund_ratio_pct": round(refunded * 100 / purchased, 2) if purchased else 0.0,
+        }
+
+    windows = {}
+    for name, n in (("today", 1), ("7d", 7), ("30d", 30)):
+        cur, prev = window(daily[-n:]), window(daily[-2 * n:-n])
+        windows[name] = {"current": cur, "previous": prev}
+    spark = {k: [r[k] for r in daily[-30:]]
+             for k in ("coins_purchased", "unlocks", "dau", "new_users",
+                       "watch_minutes", "paywall_views")}
+    return {
+        "windows": windows,
+        "funnel": a["funnel"],
+        "days": a["days"][-30:],
+        "spark": spark,
+        "outstanding_trend": a["outstanding_trend"][-30:],
+        "outstanding_rupees": round(a["outstanding_trend"][-1] * rate)
+                              if a["outstanding_trend"] else 0,
+        "breakage_dormant_coins": a["breakage_dormant_coins"],
+        "coin_rupee_rate": rate,
+        "generated_at": now_iso(),
+    }
+
+
+# ---- per-series pricing (#040), episode edits (#034), rights (#039) --------
+@router.patch("/catalog/series/{slug}/pricing", tags=["catalog"])
+def set_series_pricing(slug: str, request: Request = None, body: dict = Body(...),
+                       actor: Actor = Depends(require(Role.FINANCE))):
+    """Per-series price/free-window override reaching playback AND the ledger
+    charge on core-api's next request. Guarded by a typed confirm."""
+    if not _series_exists(slug):
+        raise HTTPException(status_code=404, detail="series not found")
+    if body.get("confirm") != slug:
+        raise HTTPException(status_code=428, detail="type the slug to confirm")
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+    fields = {}
+    if "coin_price" in body:
+        fields["coin_price"] = int(body["coin_price"])
+        if not (1 <= fields["coin_price"] <= 1000):
+            raise HTTPException(status_code=400, detail="coin_price must be 1-1000")
+    if "free_episodes" in body:
+        fields["free_episodes"] = int(body["free_episodes"])
+        if not (0 <= fields["free_episodes"] <= 100):
+            raise HTTPException(status_code=400, detail="free_episodes must be 0-100")
+    if not fields:
+        raise HTTPException(status_code=400, detail="nothing to change")
+    SHARED.kv_set(f"price:{slug}", _json.dumps(fields))
+    SHARED.kv_set(f"touched:{slug}", now_iso())
+    audit(actor, "series.pricing", slug, fields, request)
+    return {"slug": slug, **fields}
+
+
+@router.patch("/catalog/series/{slug}/episodes/{number}", tags=["catalog"])
+def set_episode(slug: str, number: int, request: Request = None,
+                body: dict = Body(...),
+                actor: Actor = Depends(require(Role.CONTENT))):
+    """Episode-level management (#034): retitle without touching the seed file."""
+    if not _series_exists(slug):
+        raise HTTPException(status_code=404, detail="series not found")
+    title = (body.get("title") or "").strip()
+    if not title or len(title) > 120:
+        raise HTTPException(status_code=400, detail="title must be 1-120 chars")
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+    SHARED.kv_set(f"ep:{slug}:{number}", _json.dumps({"title": title}))
+    SHARED.kv_set(f"touched:{slug}", now_iso())
+    audit(actor, "series.episode", f"{slug}:e{number}", {"title": title}, request)
+    return {"slug": slug, "number": number, "title": title}
+
+
+@router.patch("/catalog/series/{slug}/rights", tags=["catalog"])
+def set_series_rights(slug: str, request: Request = None, body: dict = Body(...),
+                      actor: Actor = Depends(require(Role.CONTENT))):
+    """Ownership + licence window (#039); expiring licences hit the attention
+    rail 30 days out."""
+    if not _series_exists(slug):
+        raise HTTPException(status_code=404, detail="series not found")
+    owner = (body.get("owner") or "").strip() or "Katha Originals"
+    until = (body.get("license_until") or "").strip()
+    if until:
+        from datetime import date
+        try:
+            date.fromisoformat(until)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="license_until must be YYYY-MM-DD")
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+    SHARED.kv_set(f"rights:{slug}", _json.dumps({"owner": owner,
+                                                 "license_until": until}))
+    audit(actor, "series.rights", slug, {"owner": owner, "until": until}, request)
+    return {"slug": slug, "owner": owner, "license_until": until}
+
+
+@router.post("/catalog/series", tags=["catalog"])
+def create_series(request: Request = None, body: dict = Body(...),
+                  actor: Actor = Depends(require(Role.CONTENT))):
+    """Draft a series in the panel (#043) — metadata first, media later. It
+    reaches the public catalog only when its status is flipped to live."""
+    import re as _re
+    slug = (body.get("slug") or "").strip().lower()
+    title = (body.get("title") or "").strip()
+    if not _re.fullmatch(r"[a-z0-9][a-z0-9-]{2,39}", slug):
+        raise HTTPException(status_code=400,
+                            detail="slug: 3-40 chars, a-z 0-9 and hyphens")
+    if not title:
+        raise HTTPException(status_code=400, detail="title required")
+    count = int(body.get("episode_count") or 0)
+    if not (1 <= count <= 200):
+        raise HTTPException(status_code=400, detail="episode_count must be 1-200")
+    if _series_exists(slug):
+        raise HTTPException(status_code=409, detail="slug already exists")
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+    draft = {
+        "title": title, "language": (body.get("language") or "hi"),
+        "genres": body.get("genres") or [], "synopsis": (body.get("synopsis") or ""),
+        "episode_count": count,
+        "coin_price": int(body.get("coin_price") or catalog.pricing()["episode_coin_price"]),
+        "free_episodes": int(body.get("free_episodes")
+                             if body.get("free_episodes") is not None
+                             else catalog.pricing()["free_episode_count"]),
+        "rating": body.get("rating") or "U/A 13+",
+        "created_by": actor.id, "created_at": now_iso(),
+    }
+    SHARED.kv_set(f"series:{slug}", _json.dumps(draft))
+    SHARED.kv_set(f"status:{slug}", "draft")
+    SHARED.kv_set(f"touched:{slug}", now_iso())
+    audit(actor, "series.create", slug,
+          {"title": title, "episodes": count}, request)
+    return {"slug": slug, "status": "draft", **draft}
+
+
+# ---- experiment registry (#061) ---------------------------------------------
+@router.get("/experiments", tags=["config"])
+def experiments(actor: Actor = Depends(require(Role.CONTENT, Role.FINANCE,
+                                               Role.ANALYST, Role.RO))):
+    if SHARED is None:
+        return {"experiments": []}
+    out = []
+    for key, raw in sorted(SHARED.kv_prefix("exp:").items()):
+        try:
+            out.append({"key": key, **_json.loads(raw)})
+        except ValueError:
+            continue
+    return {"experiments": out}
+
+
+@router.put("/experiments/{key}", tags=["config"])
+def set_experiment(key: str, request: Request = None, body: dict = Body(...),
+                   actor: Actor = Depends(require(Role.CONTENT))):
+    """Thin experiment registry (#061): variants with % splits, assigned by a
+    stable user hash and served to clients in /v1/config.experiments."""
+    import re as _re
+    if not _re.fullmatch(r"[a-z0-9][a-z0-9_.-]{2,39}", key):
+        raise HTTPException(status_code=400, detail="bad experiment key")
+    status = (body.get("status") or "draft").strip()
+    if status not in ("draft", "running", "stopped"):
+        raise HTTPException(status_code=400, detail="status: draft|running|stopped")
+    variants = body.get("variants") or []
+    total = 0
+    for v in variants:
+        pct = int(v.get("pct", 0))
+        if pct < 0 or not (v.get("name") or "").strip():
+            raise HTTPException(status_code=400, detail="each variant needs name + pct>=0")
+        total += pct
+    if total > 100:
+        raise HTTPException(status_code=400, detail="variant pcts exceed 100")
+    if status == "running" and not variants:
+        raise HTTPException(status_code=400, detail="running needs variants")
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+    record = {"hypothesis": (body.get("hypothesis") or "").strip(),
+              "variants": [{"name": v["name"].strip(), "pct": int(v.get("pct", 0))}
+                           for v in variants],
+              "status": status, "by": actor.id, "at": now_iso()}
+    SHARED.kv_set(f"exp:{key}", _json.dumps(record))
+    audit(actor, "experiment.set", key,
+          {"status": status, "variants": len(variants)}, request)
+    return {"key": key, **record}
+
+
+# ---- devices + sign-out-everywhere (#021) -----------------------------------
+@router.get("/users/{user_id}/devices", tags=["users"])
+def user_devices(user_id: str,
+                 actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,
+                                                Role.ANALYST))):
+    if SHARED is None:
+        return {"user_id": user_id, "devices": []}
+    return {"user_id": user_id, "devices": SHARED.devices(user_id)}
+
+
+@router.post("/users/{user_id}/signout-devices", tags=["users"])
+def user_signout_devices(user_id: str, request: Request = None,
+                         actor: Actor = Depends(require(Role.SUPPORT))):
+    """Account-takeover response (#021): bump the token version so every JWT
+    issued before now stops validating on core-api's next request."""
+    _step_up(request)
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+    ver = SHARED.bump_token_version(user_id)
+    if ver == 0:
+        raise HTTPException(status_code=404, detail="unknown user")
+    audit(actor, "user.signout_all", user_id, {"token_version": ver}, request)
+    return {"user_id": user_id, "token_version": ver}
+
+
+# ---- which views operators actually use (#112) ------------------------------
+UI_METRICS: dict = defaultdict(int)
+
+
+@router.post("/metrics/ui", tags=["ops"])
+def ui_ping(body: dict = Body(...),
+            actor: Actor = Depends(require(Role.CONTENT, Role.QC, Role.SUPPORT,
+                                           Role.FINANCE, Role.ANALYST, Role.RO))):
+    view = str(body.get("view", ""))[:40]
+    if view:
+        UI_METRICS[view] += 1
+    return {"ok": True}
 
 
 app.include_router(router)

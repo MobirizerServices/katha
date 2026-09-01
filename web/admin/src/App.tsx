@@ -5,9 +5,10 @@ import { Sidebar } from "./Sidebar";
 import { useStore } from "./store";
 import { canView, ROLE_NAMES } from "./auth/roles";
 import { ALL_NAV_ITEMS } from "./nav";
-import { api } from "./api/client";
+import { api, mutate } from "./api/client";
 import { Skeleton } from "./ui";
 import { Login } from "./views/Login";
+import { t } from "./i18n";
 
 const Overview = lazy(() => import("./views/Overview").then((m) => ({ default: m.Overview })));
 const Catalog = lazy(() => import("./views/Catalog").then((m) => ({ default: m.Catalog })));
@@ -193,9 +194,9 @@ function Topbar({ openPalette }: { openPalette: () => void }) {
   const status = !online ? "offline" : (health?.status ?? "…");
   const cls = status === "ok" ? "ok" : status === "…" ? "" : "bad";
   const label =
-    status === "ok" ? "All systems normal"
-    : status === "offline" ? "Server unreachable"
-    : status === "degraded" ? "Degraded" : status === "down" ? "Service down" : "Checking…";
+    status === "ok" ? t("All systems normal")
+    : status === "offline" ? t("Server unreachable")
+    : status === "degraded" ? t("Degraded") : status === "down" ? t("Service down") : t("Checking…");
   const detail = health
     ? Object.entries(health.checks).map(([k, v]) => `${k}: ${v}`).join(" · ")
     : "";
@@ -282,6 +283,11 @@ export default function App() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [nav]);
+
+  // Which views operators actually use (#112) — steers the roadmap.
+  useEffect(() => {
+    void mutate.uiPing(location.pathname.split("/")[1] || "overview");
+  }, [location.pathname]);
 
   // OIDC mode with no session: the whole panel is behind sign-in (#074).
   if (signedOut) {

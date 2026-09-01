@@ -30,7 +30,8 @@ def _signed_url(episode_id: str) -> str:
 @router.post("/series/{slug}/episodes/{number}/playback")
 def playback(slug: str, number: int, response: Response, user: str = Depends(current_user)):
     store.refresh_ledger()
-    series = catalog.get_series(slug)
+    from ..overrides import get_series
+    series = get_series(slug)
     if series is None or not (1 <= number <= series.episode_count):
         raise HTTPException(status_code=404, detail="episode not found")
 
@@ -39,6 +40,7 @@ def playback(slug: str, number: int, response: Response, user: str = Depends(cur
     entitled = is_free or store.ledger.is_entitled(user, eid)
 
     if entitled:
+        store.emit(user, "play_start", ref=eid)
         return {
             "locked": False,
             "episode_id": eid,
@@ -49,6 +51,7 @@ def playback(slug: str, number: int, response: Response, user: str = Depends(cur
             "captions": [{"lang": series.primary_language, "url": f".../{eid}/subs.vtt"}],
         }
 
+    store.emit(user, "paywall_view", ref=eid, value=series.episode_coin_price)
     remaining_locked = series.episode_count - series.free_episode_count
     return {
         "locked": True,

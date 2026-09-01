@@ -12,8 +12,8 @@ from sqlalchemy import func, select
 from katha_ledger import Transaction, TxType
 
 from .db import Database
-from .models import (AuditLogRow, CoinTransactionRow, EntitlementRow, GrievanceRow,
-                     KVRow, UserProfileRow, WalletRow)
+from .models import (AuditLogRow, CoinTransactionRow, DeviceRow, EntitlementRow,
+                     EventRow, GrievanceRow, KVRow, UserProfileRow, WalletRow)
 from .persistent_ledger import PersistentLedger
 
 
@@ -110,24 +110,37 @@ class SharedStore:
     def flag_overrides(self) -> dict[str, bool]:
         return self.db.run(self._flag_overrides())
 
-    async def _flag_overrides(self) -> dict[str, bool]:
+    async def _flag_overrides(self) -> dict:
+        import json as _json
         async with self.db.session_factory() as session:
             rows = (await session.execute(select(KVRow))).scalars().all()
-        return {
-            r.key.removeprefix("flag:"): r.value == "1"
-            for r in rows if r.key.startswith("flag:")
-        }
+        out: dict = {}
+        for r in rows:
+            if not r.key.startswith("flag:"):
+                continue
+            key = r.key.removeprefix("flag:")
+            if r.value in ("0", "1"):
+                out[key] = r.value == "1"
+            else:
+                try:  # {"enabled": bool, "pct": 0-100} — a ramp (#056)
+                    out[key] = _json.loads(r.value)
+                except ValueError:
+                    continue
+        return out
 
-    def set_flag(self, key: str, enabled: bool) -> None:
-        self.db.run(self._set_flag(key, enabled))
+    def set_flag(self, key: str, enabled: bool, pct: int = 100) -> None:
+        self.db.run(self._set_flag(key, enabled, pct))
 
-    async def _set_flag(self, key: str, enabled: bool) -> None:
+    async def _set_flag(self, key: str, enabled: bool, pct: int) -> None:
+        import json as _json
+        value = ("1" if enabled else "0") if pct >= 100 else _json.dumps(
+            {"enabled": enabled, "pct": max(0, int(pct))})
         async with self.db.session_factory() as session:
             row = await session.get(KVRow, f"flag:{key}")
             if row is None:
-                session.add(KVRow(key=f"flag:{key}", value="1" if enabled else "0"))
+                session.add(KVRow(key=f"flag:{key}", value=value))
             else:
-                row.value = "1" if enabled else "0"
+                row.value = value
             await session.commit()
 
     # ---- live overview counters -----------------------------------------
@@ -161,43 +174,69 @@ class SharedStore:
         return self.db.run(self._search_users(q, limit, offset, sort, segment))
 
     async def _search_users(self, q, limit, offset, sort, segment) -> dict:
-        async with self.db.session_factory() as s:
-            profiles = {p.user_id: p for p in (await s.execute(select(UserProfileRow))).scalars()}
-            wallets = {w.user_id: w for w in (await s.execute(select(WalletRow))).scalars()}
-            unlocked = dict((await s.execute(
-                select(EntitlementRow.user_id, func.count()).group_by(EntitlementRow.user_id)
-            )).all())
-        rows = []
-        for uid in set(profiles) | set(wallets):
-            p, w = profiles.get(uid), wallets.get(uid)
-            rows.append({
-                "user_id": uid,
-                "phone": p.phone if p else "",
-                "kind": p.kind if p else "guest",
-                "language": p.language if p else "hi",
-                "last_seen": (p.last_seen if p else "") or "",
-                "balance_bought": w.balance_bought if w else 0,
-                "balance_bonus": w.balance_bonus if w else 0,
-                "total": (w.balance_bought + w.balance_bonus) if w else 0,
-                "unlocked": int(unlocked.get(uid, 0)),
-            })
+        """One SQL query filters, sorts and pages (admin review #104); risk
+        flags (#022) derive from the ledger for the returned page."""
+        ids = select(UserProfileRow.user_id).union(
+            select(WalletRow.user_id)).subquery()
+        ent = (select(EntitlementRow.user_id, func.count().label("n"))
+               .group_by(EntitlementRow.user_id).subquery())
+        ref = (select(CoinTransactionRow.user_id, func.count().label("n"))
+               .where(CoinTransactionRow.type == "refund_clawback")
+               .group_by(CoinTransactionRow.user_id).subquery())
+        total_coins = (func.coalesce(WalletRow.balance_bought, 0)
+                       + func.coalesce(WalletRow.balance_bonus, 0))
+        base = (select(ids.c.user_id,
+                       func.coalesce(UserProfileRow.phone, "").label("phone"),
+                       func.coalesce(UserProfileRow.kind, "guest").label("kind"),
+                       func.coalesce(UserProfileRow.language, "hi").label("language"),
+                       func.coalesce(UserProfileRow.last_seen, "").label("last_seen"),
+                       func.coalesce(WalletRow.balance_bought, 0).label("bought"),
+                       func.coalesce(WalletRow.balance_bonus, 0).label("bonus"),
+                       func.coalesce(ent.c.n, 0).label("unlocked"),
+                       func.coalesce(ref.c.n, 0).label("refunds"))
+                .join_from(ids, UserProfileRow,
+                           UserProfileRow.user_id == ids.c.user_id, isouter=True)
+                .join(WalletRow, WalletRow.user_id == ids.c.user_id, isouter=True)
+                .join(ent, ent.c.user_id == ids.c.user_id, isouter=True)
+                .join(ref, ref.c.user_id == ids.c.user_id, isouter=True))
         if q:
-            needle = q.lower()
-            rows = [r for r in rows if needle in r["user_id"].lower() or needle in r["phone"]]
+            needle = f"%{q.lower()}%"
+            base = base.where(func.lower(ids.c.user_id).like(needle)
+                              | func.coalesce(UserProfileRow.phone, "").like(needle))
         if segment == "payers":
-            rows = [r for r in rows if r["balance_bought"] > 0 or r["unlocked"] > 0]
+            base = base.where((func.coalesce(WalletRow.balance_bought, 0) > 0)
+                              | (func.coalesce(ent.c.n, 0) > 0))
         elif segment == "guests":
-            rows = [r for r in rows if r["kind"] == "guest"]
+            base = base.where(func.coalesce(UserProfileRow.kind, "guest") == "guest")
         elif segment == "members":
-            rows = [r for r in rows if r["kind"] != "guest"]
+            base = base.where(func.coalesce(UserProfileRow.kind, "guest") != "guest")
         if sort == "balance":
-            rows.sort(key=lambda r: -r["total"])
+            base = base.order_by(total_coins.desc(), ids.c.user_id)
         elif sort == "unlocked":
-            rows.sort(key=lambda r: -r["unlocked"])
-        else:  # recent: newest last_seen first, never-seen last
-            rows.sort(key=lambda r: r["last_seen"], reverse=True)
-        total = len(rows)
-        return {"total": total, "users": rows[offset:offset + limit]}
+            base = base.order_by(func.coalesce(ent.c.n, 0).desc(), ids.c.user_id)
+        else:
+            base = base.order_by(func.coalesce(UserProfileRow.last_seen, "").desc(),
+                                 ids.c.user_id)
+        async with self.db.session_factory() as s:
+            total = (await s.execute(
+                select(func.count()).select_from(base.subquery()))).scalar() or 0
+            rows = (await s.execute(base.limit(limit).offset(offset))).all()
+        out = []
+        for r in rows:
+            flags = []
+            if r.refunds >= 2:
+                flags.append("repeat refunds")
+            if r.bought + r.bonus < 0:
+                flags.append("negative balance")
+            if r.kind == "erased":
+                flags.append("erased (DPDP)")
+            out.append({"user_id": r.user_id, "phone": r.phone, "kind": r.kind,
+                        "language": r.language, "last_seen": r.last_seen,
+                        "balance_bought": int(r.bought), "balance_bonus": int(r.bonus),
+                        "total": int(r.bought + r.bonus),
+                        "unlocked": int(r.unlocked), "refunds": int(r.refunds),
+                        "flags": flags})
+        return {"total": int(total), "users": out}
 
     def touch_last_seen(self, user_id: str, ts: str) -> None:
         self.db.run(self._touch_last_seen(user_id, ts))
@@ -410,3 +449,181 @@ class SharedStore:
             p.last_seen = ts
             await s.commit()
             return True
+
+    # ---- product events (admin review #011) ---------------------------------
+    def event_append(self, *, ts: str, user_id: str, name: str, ref: str = "",
+                     value: int = 0, channel: str = "") -> None:
+        self.db.run(self._event_append(ts, user_id, name, ref, value, channel))
+
+    async def _event_append(self, ts, user_id, name, ref, value, channel) -> None:
+        async with self.db.session_factory() as s:
+            s.add(EventRow(ts=ts, day=ts[:10], user_id=user_id, name=name,
+                           ref=ref, value=int(value), channel=channel))
+            await s.commit()
+
+    # ---- devices (admin review #021) ----------------------------------------
+    def device_touch(self, user_id: str, *, ua: str, ip: str, ts: str) -> None:
+        import hashlib
+        ua_hash = hashlib.sha256(ua.encode()).hexdigest()[:16]
+        self.db.run(self._device_touch(user_id, ua_hash, ua[:200], ip, ts))
+
+    async def _device_touch(self, user_id, ua_hash, ua, ip, ts) -> None:
+        async with self.db.session_factory() as s:
+            row = (await s.execute(select(DeviceRow)
+                   .where(DeviceRow.user_id == user_id,
+                          DeviceRow.ua_hash == ua_hash))).scalars().first()
+            if row is None:
+                s.add(DeviceRow(user_id=user_id, ua_hash=ua_hash, ua=ua, ip=ip,
+                                first_seen=ts, last_seen=ts))
+            else:
+                row.last_seen, row.ip = ts, ip
+            await s.commit()
+
+    def devices(self, user_id: str) -> list[dict]:
+        return self.db.run(self._devices(user_id))
+
+    async def _devices(self, user_id: str) -> list[dict]:
+        async with self.db.session_factory() as s:
+            rows = (await s.execute(select(DeviceRow)
+                    .where(DeviceRow.user_id == user_id)
+                    .order_by(DeviceRow.last_seen.desc()))).scalars().all()
+        return [{"ua": r.ua, "ip": r.ip, "first_seen": r.first_seen,
+                 "last_seen": r.last_seen} for r in rows]
+
+    # ---- token versions: "sign out all devices" (#021) ----------------------
+    def token_version(self, user_id: str) -> int:
+        return self.db.run(self._token_version(user_id))
+
+    async def _token_version(self, user_id: str) -> int:
+        async with self.db.session_factory() as s:
+            p = await s.get(UserProfileRow, user_id)
+        return int(getattr(p, "token_version", 0) or 0) if p else 0
+
+    def bump_token_version(self, user_id: str) -> int:
+        return self.db.run(self._bump_token_version(user_id))
+
+    async def _bump_token_version(self, user_id: str) -> int:
+        async with self.db.session_factory() as s:
+            p = await s.get(UserProfileRow, user_id)
+            if p is None:
+                return 0
+            p.token_version = int(p.token_version or 0) + 1
+            await s.commit()
+            return p.token_version
+
+    # ---- the analytics rollup (admin review #009-#015) ----------------------
+    def analytics(self, *, now: str, days: int = 30) -> dict:
+        return self.db.run(self._analytics(now, days))
+
+    async def _analytics(self, now: str, days: int) -> dict:
+        from datetime import date, timedelta
+        today = date.fromisoformat(now[:10])
+        span = [(today - timedelta(days=i)).isoformat() for i in range(days - 1, -1, -1)]
+        first_day = span[0]
+
+        async with self.db.session_factory() as s:
+            ev = (await s.execute(
+                select(EventRow.day, EventRow.name,
+                       func.count(), func.count(func.distinct(EventRow.user_id)),
+                       func.coalesce(func.sum(EventRow.value), 0))
+                .where(EventRow.day >= first_day)
+                .group_by(EventRow.day, EventRow.name))).all()
+            dau_rows = (await s.execute(
+                select(EventRow.day, func.count(func.distinct(EventRow.user_id)))
+                .where(EventRow.day >= first_day).group_by(EventRow.day))).all()
+            led = (await s.execute(
+                select(func.substr(CoinTransactionRow.created_at, 1, 10),
+                       CoinTransactionRow.type, CoinTransactionRow.reference_type,
+                       func.coalesce(func.sum(CoinTransactionRow.amount_bought), 0),
+                       func.coalesce(func.sum(CoinTransactionRow.amount_bonus), 0),
+                       func.count())
+                .group_by(func.substr(CoinTransactionRow.created_at, 1, 10),
+                          CoinTransactionRow.type,
+                          CoinTransactionRow.reference_type))).all()
+            new_users = dict((await s.execute(
+                select(func.substr(UserProfileRow.created_at, 1, 10), func.count())
+                .where(UserProfileRow.created_at != "")
+                .group_by(func.substr(UserProfileRow.created_at, 1, 10)))).all())
+            # funnel + windowed distinct users
+            fun = {}
+            for name in ("paywall_view", "purchase", "unlock"):
+                fun[name] = {d: set() for d in ("7d", "30d", "1d")}
+            frows = (await s.execute(
+                select(EventRow.day, EventRow.name, EventRow.user_id).distinct()
+                .where(EventRow.day >= first_day,
+                       EventRow.name.in_(["paywall_view", "purchase", "unlock"])))).all()
+            for day, name, uid in frows:
+                if day == now[:10]:
+                    fun[name]["1d"].add(uid)
+                if day in span[-7:]:
+                    fun[name]["7d"].add(uid)
+                fun[name]["30d"].add(uid)
+            # breakage: coins held by wallets not seen in 90 days
+            horizon = (today - timedelta(days=90)).isoformat()
+            dormant = (await s.execute(
+                select(func.coalesce(func.sum(WalletRow.balance_bought +
+                                              WalletRow.balance_bonus), 0))
+                .select_from(WalletRow)
+                .join(UserProfileRow, UserProfileRow.user_id == WalletRow.user_id,
+                      isouter=True)
+                .where(func.coalesce(UserProfileRow.last_seen, "") < horizon)
+            )).scalar() or 0
+
+        daily: dict[str, dict] = {d: {
+            "dau": 0, "paywall_views": 0, "purchases": 0, "unlocks": 0,
+            "checkins": 0, "watch_minutes": 0, "coins_purchased": 0,
+            "coins_iap": 0, "coins_web": 0, "coins_refunded": 0,
+            "coins_spent": 0, "new_users": int(new_users.get(d, 0)),
+        } for d in span}
+        for day, n in dau_rows:
+            if day in daily:
+                daily[day]["dau"] = int(n)
+        for day, name, cnt, _uniq, val in ev:
+            if day not in daily:
+                continue
+            b = daily[day]
+            if name == "paywall_view":
+                b["paywall_views"] = int(cnt)
+            elif name == "purchase":
+                b["purchases"] = int(cnt)
+            elif name == "unlock":
+                b["unlocks"] = int(cnt)
+            elif name == "checkin":
+                b["checkins"] = int(cnt)
+            elif name == "play_progress":
+                b["watch_minutes"] = int(val) // 60000
+        outstanding_delta: dict[str, int] = {}
+        for day, typ, ref_type, bought, bonus, _cnt in led:
+            delta = int(bought) + int(bonus)
+            outstanding_delta[day] = outstanding_delta.get(day, 0) + delta
+            if day not in daily:
+                continue
+            b = daily[day]
+            if typ == "purchase":
+                b["coins_purchased"] += int(bought)
+                if ref_type == "web_order":
+                    b["coins_web"] += int(bought)
+                else:
+                    b["coins_iap"] += int(bought)
+            elif typ == "refund_clawback":
+                b["coins_refunded"] += abs(delta)
+            elif typ == "unlock":
+                b["coins_spent"] += abs(delta)
+        # outstanding trend: cumulative net coins including days before the span
+        pre = sum(v for d, v in outstanding_delta.items() if d < first_day)
+        outstanding = []
+        running = pre
+        for d in span:
+            running += outstanding_delta.get(d, 0)
+            outstanding.append(running)
+        return {
+            "days": span,
+            "daily": [daily[d] for d in span],
+            "outstanding_trend": outstanding,
+            "breakage_dormant_coins": int(dormant),
+            "funnel": {w: {"paywall_view": len(fun["paywall_view"][w]),
+                           "purchase": len(fun["purchase"][w] & fun["paywall_view"][w]),
+                           "unlock": len(fun["unlock"][w] & fun["purchase"][w]
+                                         & fun["paywall_view"][w])}
+                       for w in ("1d", "7d", "30d")},
+        }

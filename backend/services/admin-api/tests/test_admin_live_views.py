@@ -82,7 +82,7 @@ def test_flags_read_toggle_and_audit():
 
     r = client.patch("/admin/v1/config/flags/rewards.referral_enabled",
                      headers=ADMIN, json={"enabled": True})
-    assert r.json() == {"key": "rewards.referral_enabled", "enabled": True}
+    assert r.json() == {"key": "rewards.referral_enabled", "enabled": True, "pct": 100}
     flags = {f["key"]: f for f in client.get("/admin/v1/config/flags", headers=ADMIN).json()}
     assert flags["rewards.referral_enabled"]["enabled"] is True
 

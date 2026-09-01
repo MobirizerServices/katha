@@ -8,6 +8,7 @@ import json as _json
 from katha_domain import catalog
 from katha_domain.schemas import HomeResponse, HomeRow, SeriesDetail, SeriesSummary
 
+from .. import overrides
 from ..store import store
 
 router = APIRouter(prefix="/v1", tags=["catalog"])
@@ -40,7 +41,7 @@ def _served(summaries: list[SeriesSummary]) -> list[SeriesSummary]:
 
 @router.get("/home", response_model=HomeResponse)
 def home(lang: str = "hi") -> HomeResponse:
-    served = _served(catalog.summaries())
+    served = _served(overrides.all_summaries())
     series = [s for s in served if s.primary_language == lang] or served
     trending = HomeRow(title=f"Trending in {lang}", series=series)
     new_row = HomeRow(title="New this week", series=list(reversed(series))[:5])
@@ -49,12 +50,12 @@ def home(lang: str = "hi") -> HomeResponse:
 
 @router.get("/series", response_model=list[SeriesSummary])
 def list_series() -> list[SeriesSummary]:
-    return _served(catalog.summaries())
+    return _served(overrides.all_summaries())
 
 
 @router.get("/series/{slug}", response_model=SeriesDetail)
 def series_detail(slug: str) -> SeriesDetail:
-    s = catalog.get_series(slug)
+    s = overrides.get_series(slug)
     status, ratings = _overrides()
     if s is None or status.get(slug, "live") != "live":
         raise HTTPException(status_code=404, detail="series not found")

@@ -380,6 +380,7 @@ def auth_callback(request: Request, code: str = "", state: str = "",
                     sign_payload({"email": email,
                                   "name": claims.get("name", ""),
                                   "sid": secrets.token_hex(8),
+                                  "iat": time.time(),
                                   "exp": time.time() + SESSION_TTL_S}),
                     max_age=SESSION_TTL_S, httponly=True, samesite="lax",
                     secure=_cookie_secure(), path="/")
@@ -404,7 +405,8 @@ def auth_me(request: Request):
         return {**base, "authenticated": False, "reason": "not_provisioned",
                 "email": ident["email"]}
     return {**base, "authenticated": True, "email": ident["email"],
-            "name": ident.get("name", ""), "role": role}
+            "name": ident.get("name", ""), "role": role,
+            "since": ident.get("iat", 0)}
 
 
 @router.post("/auth/logout")

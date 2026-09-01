@@ -361,3 +361,350 @@ def test_oidc_directory_persists_in_shared_kv(shared):
     # the tombstone survives later reads — a revoked operator never comes back
     active = {e for e, v in oidc.directory_all().items() if v.get("role")}
     assert "riya@katha.dev" not in active and "lead@katha.dev" in active
+
+
+# ===== the pending-findings wave: events, analytics, caps, catalog levers ====
+
+CORE = None  # per-test TestClient over core_app (fixture-fresh shared store)
+
+
+def _core():
+    return TestClient(core_app)
+
+
+def _admin():
+    return TestClient(admin_main.app)
+
+
+ADMIN_H = {"X-Actor-Id": "root@katha.dev", "X-Role": "admin"}
+FIN_H = {"X-Actor-Id": "farah", "X-Role": "finance"}
+
+
+def test_events_emitted_by_core_paths(shared):
+    core = _core()
+    # locked playback (no coins) → paywall_view; free episode → play_start
+    r = core.post("/v1/series/kaanch-ka-mahal/episodes/11/playback",
+                  headers={"Authorization": "Bearer ev-user"})
+    assert r.json()["locked"] is True
+    core.post("/v1/series/kaanch-ka-mahal/episodes/1/playback",
+              headers={"Authorization": "Bearer ev-user"})
+    core.post("/v1/iap/verify", headers={"Authorization": "Bearer ev-user"},
+              json={"sku": "coins_starter_in", "jws": "sig1"})
+    core.post("/v1/series/kaanch-ka-mahal/episodes/11/unlock",
+              headers={"Authorization": "Bearer ev-user"},
+              json={"idempotency_key": "ev-unlock-1"})
+    core.put("/v1/progress", headers={"Authorization": "Bearer ev-user"},
+             json={"items": [{"slug": "kaanch-ka-mahal", "number": 1,
+                              "position_ms": 9000, "duration_ms": 120000}]})
+    a = shared.analytics(now=T0, days=3)
+    today = a["daily"][-1]
+    assert today["paywall_views"] == 1 and today["purchases"] == 1
+    assert today["unlocks"] == 1 and today["dau"] == 1
+    assert today["watch_minutes"] == 0  # 9s clamps below one minute but counts
+    assert a["funnel"]["30d"] == {"paywall_view": 1, "purchase": 1, "unlock": 1}
+
+
+def test_analytics_windows_split_and_refund_ratio(shared):
+    pl = PersistentLedger(shared.db)
+    old = "2026-08-20T10:00:00+00:00"
+    pl.credit("w1", TxType.PURCHASE, coins=1000, reference_type="iap",
+              reference_id="s", idempotency_key="an1", created_at=old)
+    pl.credit("w2", TxType.PURCHASE, coins=500, reference_type="web_order",
+              reference_id="s", idempotency_key="an2", created_at=T0)
+    pl.refund_clawback("w2", coins=100, reference_type="gateway_refund",
+                       reference_id="rf", idempotency_key="an3", created_at=T0)
+    r = _admin().get("/admin/v1/analytics", headers=ADMIN_H)
+    assert r.status_code == 200
+    a = r.json()
+    t = a["windows"]["today"]["current"]
+    assert t["coins_purchased"] == 500 and t["coins_web"] == 500
+    assert t["coins_refunded"] == 100 and t["refund_ratio_pct"] == 20.0
+    m = a["windows"]["30d"]["current"]
+    assert m["coins_purchased"] == 1500 and m["coins_iap"] == 1000
+    assert len(a["spark"]["coins_purchased"]) == 30
+    assert len(a["outstanding_trend"]) == 30
+    # 1000 + 500 - 100 clawback = 1400 coins of liability
+    assert a["outstanding_trend"][-1] == 1400
+    assert a["outstanding_rupees"] == round(1400 * 0.15)
+
+
+def test_adjust_daily_cap(shared):
+    shared.kv_set("config:adjust.daily_cap", "100")
+    a = _admin()
+    r = a.post("/admin/v1/wallet/adjust", headers=ADMIN_H,
+               json={"user_id": "cap-u", "coins": 85, "reason_code": "goodwill"})
+    assert r.status_code == 200
+    r = a.post("/admin/v1/wallet/adjust", headers=ADMIN_H,
+               json={"user_id": "cap-u", "coins": 60, "reason_code": "goodwill"})
+    assert r.status_code == 409 and "daily adjustment cap" in r.json()["detail"]
+    # attention shows the cap warning at >=80%
+    items = a.get("/admin/v1/attention", headers=ADMIN_H).json()["items"]
+    assert any(i["id"] == "cap:root@katha.dev" for i in items)
+
+
+def test_series_pricing_override_reaches_money(shared):
+    a = _admin()
+    r = a.patch("/admin/v1/catalog/series/kaanch-ka-mahal/pricing", headers=FIN_H,
+                json={"coin_price": 40, "free_episodes": 5, "confirm": "kaanch-ka-mahal"})
+    assert r.status_code == 200
+    core = _core()
+    d = core.get("/v1/series/kaanch-ka-mahal").json()
+    assert d["episode_coin_price"] == 40 and d["free_episode_count"] == 5
+    # e6 is now paid (free window shrank) and the ledger charges 40
+    core.post("/v1/iap/verify", headers={"Authorization": "Bearer price-u"},
+              json={"sku": "coins_starter_in", "jws": "sig-price"})
+    r = core.post("/v1/series/kaanch-ka-mahal/episodes/6/unlock",
+                  headers={"Authorization": "Bearer price-u"},
+                  json={"idempotency_key": "pr-1"})
+    assert r.status_code == 200
+    assert r.json()["wallet"]["total"] == 560   # 600 bought - the overridden 40
+    # panel shows the override marker
+    det = a.get("/admin/v1/catalog/series/kaanch-ka-mahal", headers=ADMIN_H).json()
+    assert det["pricingOverridden"] is True and det["coinPrice"] == 40
+    assert det["episodes"][5]["isFree"] is False
+
+
+def test_create_series_draft_to_live(shared):
+    a = _admin()
+    r = a.post("/admin/v1/catalog/series", headers=ADMIN_H,
+               json={"slug": "naya-safar", "title": "Naya Safar",
+                     "episode_count": 2, "free_episodes": 1, "coin_price": 25})
+    assert r.status_code == 200 and r.json()["status"] == "draft"
+    # bad slugs and dupes refused
+    assert a.post("/admin/v1/catalog/series", headers=ADMIN_H,
+                  json={"slug": "X!", "title": "t", "episode_count": 1}).status_code == 400
+    assert a.post("/admin/v1/catalog/series", headers=ADMIN_H,
+                  json={"slug": "naya-safar", "title": "t",
+                        "episode_count": 1}).status_code == 409
+    # in the admin list as draft; NOT in the public catalog yet
+    rows = a.get("/admin/v1/catalog/series", headers=ADMIN_H).json()
+    mine = next(x for x in rows if x["slug"] == "naya-safar")
+    assert mine["status"] == "draft"
+    core = _core()
+    assert "naya-safar" not in [s["slug"] for s in core.get("/v1/series").json()]
+    # flip live → served, free e1 plays, e2 asks 25 coins
+    a.post("/admin/v1/catalog/series/naya-safar/status", headers=ADMIN_H,
+           json={"status": "live"})
+    assert "naya-safar" in [s["slug"] for s in core.get("/v1/series").json()]
+    p1 = core.post("/v1/series/naya-safar/episodes/1/playback",
+                   headers={"Authorization": "Bearer ns-u"}).json()
+    assert p1["locked"] is False
+    p2 = core.post("/v1/series/naya-safar/episodes/2/playback",
+                   headers={"Authorization": "Bearer ns-u"}).json()
+    assert p2["locked"] is True and p2["price_coins"] == 25
+
+
+def test_episode_retitle_and_rights_attention(shared):
+    a = _admin()
+    r = a.patch("/admin/v1/catalog/series/kaanch-ka-mahal/episodes/2",
+                headers=ADMIN_H, json={"title": "The Second Face"})
+    assert r.status_code == 200
+    det = a.get("/admin/v1/catalog/series/kaanch-ka-mahal", headers=ADMIN_H).json()
+    assert det["episodes"][1]["title"] == "The Second Face"
+    # the public catalog serves the retitle too
+    core_det = _core().get("/v1/series/kaanch-ka-mahal").json()
+    assert core_det["episodes"][1]["title"] == "The Second Face"
+    # rights with an imminent expiry → attention warn
+    r = a.patch("/admin/v1/catalog/series/kaanch-ka-mahal/rights", headers=ADMIN_H,
+                json={"owner": "Studio X", "license_until": "2026-09-10"})
+    assert r.status_code == 200
+    assert a.patch("/admin/v1/catalog/series/kaanch-ka-mahal/rights",
+                   headers=ADMIN_H,
+                   json={"license_until": "not-a-date"}).status_code == 400
+    items = a.get("/admin/v1/attention", headers=ADMIN_H).json()["items"]
+    lic = next(i for i in items if i["id"] == "license:kaanch-ka-mahal")
+    assert "Studio X" in lic["detail"]
+
+
+def test_flag_pct_rollout_and_experiments(shared):
+    from katha_domain.flags import bucket
+    a = _admin()
+    r = a.patch("/admin/v1/config/flags/rewards.referral_enabled", headers=ADMIN_H,
+                json={"enabled": True, "pct": 50})
+    assert r.status_code == 200 and r.json()["pct"] == 50
+    flags = {f["key"]: f for f in
+             a.get("/admin/v1/config/flags", headers=ADMIN_H).json()}
+    assert flags["rewards.referral_enabled"]["pct"] == 50
+    # pick users on both sides of the bucket boundary
+    inside = next(f"u{i}" for i in range(200)
+                  if bucket("rewards.referral_enabled", f"u{i}") < 50)
+    outside = next(f"u{i}" for i in range(200)
+                   if bucket("rewards.referral_enabled", f"u{i}") >= 50)
+    core = _core()
+    fin = core.get("/v1/config", headers={"Authorization": f"Bearer {inside}"}).json()
+    fout = core.get("/v1/config", headers={"Authorization": f"Bearer {outside}"}).json()
+    assert fin["flags"]["rewards.referral_enabled"] is True
+    assert fout["flags"]["rewards.referral_enabled"] is False
+    assert core.get("/v1/config").json()["flags"]["rewards.referral_enabled"] is False
+    # experiments: register + running assignment is stable per user
+    r = a.put("/admin/v1/experiments/free-count", headers=ADMIN_H,
+              json={"hypothesis": "8 free episodes converts better",
+                    "variants": [{"name": "control", "pct": 50},
+                                 {"name": "eight", "pct": 50}],
+                    "status": "running"})
+    assert r.status_code == 200
+    assert a.put("/admin/v1/experiments/free-count", headers=ADMIN_H,
+                 json={"variants": [{"name": "x", "pct": 200}],
+                       "status": "running"}).status_code == 400
+    got = [core.get("/v1/config",
+                    headers={"Authorization": "Bearer exp-u"}).json()["experiments"]
+           for _ in range(2)]
+    assert got[0] == got[1] and got[0]["free-count"] in ("control", "eight")
+    listed = a.get("/admin/v1/experiments", headers=ADMIN_H).json()["experiments"]
+    assert listed[0]["key"] == "free-count" and listed[0]["status"] == "running"
+
+
+def test_devices_recorded_and_signout_all(shared):
+    core = _core()
+    r = core.post("/v1/auth/guest")
+    token = r.json()["access_token"]
+    uid = r.json()["user"]["user_id"]
+    core.get("/v1/wallet", headers={"Authorization": f"Bearer {token}",
+                                    "User-Agent": "KathaApp/1.0 (iPhone16)"})
+    a = _admin()
+    devs = a.get(f"/admin/v1/users/{uid}/devices", headers=ADMIN_H).json()["devices"]
+    assert devs and devs[0]["ua"].startswith("KathaApp/1.0")
+    # sign out everywhere: the old JWT dies on the next request
+    r = a.post(f"/admin/v1/users/{uid}/signout-devices", headers=ADMIN_H)
+    assert r.status_code == 200 and r.json()["token_version"] == 1
+    core.store = None  # noqa - clarity only
+    r = core.get("/v1/wallet", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 401
+    # a fresh sign-in works and carries the new version
+    token2 = core.post("/v1/auth/otp/verify",
+                       json={"phone": "+911234509876", "code": "0000"}).json()
+    assert core.get("/v1/wallet",
+                    headers={"Authorization": f"Bearer {token2['access_token']}"}
+                    ).status_code == 200
+    assert a.post("/admin/v1/users/ghost-none/signout-devices",
+                  headers=ADMIN_H).status_code == 404
+
+
+def test_attention_ack_and_webhook(shared, monkeypatch):
+    sent = []
+
+    class _Resp:
+        status = 200
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+        def read(self):
+            return b"{}"
+
+    def fake_urlopen(req, timeout=0):
+        url = req if isinstance(req, str) else req.full_url
+        if "hooks.example" in url:
+            sent.append(json.loads(req.data))
+        return _Resp()
+
+    import urllib.request as _ur
+    monkeypatch.setattr(_ur, "urlopen", fake_urlopen)
+    monkeypatch.setenv("KATHA_ALERT_WEBHOOK", "https://hooks.example/alert")
+    a = _admin()
+    # a pending approval notifies the webhook (#053)
+    r = a.post("/admin/v1/wallet/adjust", headers=ADMIN_H,
+               json={"user_id": "hook-u", "coins": 900, "reason_code": "goodwill"})
+    assert r.status_code == 200 and r.json()["status"] == "pending_approval"
+    assert sent and "approval" in sent[0]["text"]
+    # a breached grievance (danger) mirrors once, not twice (#111)
+    shared.grievance_create(gid="G-HOOK1", user_id="u", contact="x@y", channel="app",
+                            subject="stuck payment", body="",
+                            created_at="2026-08-20T00:00:00+00:00")
+    before = len(sent)
+    a.get("/admin/v1/attention", headers=ADMIN_H)
+    a.get("/admin/v1/attention", headers=ADMIN_H)
+    assert len(sent) == before + 1
+    # acknowledge → the item carries the owner (#016)
+    r = a.post("/admin/v1/attention/G-HOOK1/ack", headers=ADMIN_H)
+    assert r.status_code == 200
+    items = a.get("/admin/v1/attention", headers=ADMIN_H).json()["items"]
+    g = next(i for i in items if i["id"] == "G-HOOK1")
+    assert g["ack"]["by"] == "root@katha.dev"
+
+
+def test_rupee_rate_and_ui_metrics(shared):
+    shared.kv_set("config:coin.rupee_rate", "0.2")
+    a = _admin()
+    pol = a.get("/admin/v1/config/policy", headers=ADMIN_H).json()
+    assert pol["coin_rupee_rate"] == 0.2
+    assert pol["adjust_daily_cap"] == 2000
+    assert pol["retention"]["events_days"] == 365
+    assert a.post("/admin/v1/metrics/ui", headers=ADMIN_H,
+                  json={"view": "overview"}).json() == {"ok": True}
+    assert a.get("/admin/v1/metrics").json()["ui"]["overview"] >= 1
+
+
+def test_rate_limit_trips(shared, monkeypatch):
+    monkeypatch.setenv("KATHA_ADMIN_RATE_LIMIT", "3")
+    admin_main.RATE_BUCKETS.clear()
+    a = _admin()
+    H = {"X-Actor-Id": "hammer", "X-Role": "admin"}
+    codes = [a.post("/admin/v1/metrics/ui", headers=H,
+                    json={"view": "x"}).status_code for _ in range(5)]
+    assert codes[:3] == [200, 200, 200] and 429 in codes[3:]
+    admin_main.RATE_BUCKETS.clear()
+
+
+def test_security_headers_present(shared):
+    r = _admin().get("/admin/v1/config/policy", headers=ADMIN_H)
+    assert r.headers["X-Frame-Options"] == "DENY"
+    assert r.headers["Content-Security-Policy"] == "default-src 'none'"
+
+
+def test_platform_error_paths(shared):
+    a = _admin()
+    # pricing: confirm + bounds
+    assert a.patch("/admin/v1/catalog/series/kaanch-ka-mahal/pricing",
+                   headers=FIN_H, json={"coin_price": 40}).status_code == 428
+    assert a.patch("/admin/v1/catalog/series/kaanch-ka-mahal/pricing",
+                   headers=FIN_H, json={"coin_price": 4000,
+                                        "confirm": "kaanch-ka-mahal"}).status_code == 400
+    assert a.patch("/admin/v1/catalog/series/kaanch-ka-mahal/pricing",
+                   headers=FIN_H, json={"free_episodes": 500,
+                                        "confirm": "kaanch-ka-mahal"}).status_code == 400
+    assert a.patch("/admin/v1/catalog/series/kaanch-ka-mahal/pricing",
+                   headers=FIN_H, json={"confirm": "kaanch-ka-mahal"}).status_code == 400
+    assert a.patch("/admin/v1/catalog/series/nope/pricing", headers=FIN_H,
+                   json={"coin_price": 40, "confirm": "nope"}).status_code == 404
+    # episodes: bounds + unknown series
+    assert a.patch("/admin/v1/catalog/series/nope/episodes/1", headers=ADMIN_H,
+                   json={"title": "x"}).status_code == 404
+    assert a.patch("/admin/v1/catalog/series/kaanch-ka-mahal/episodes/1",
+                   headers=ADMIN_H, json={"title": ""}).status_code == 400
+    # rights unknown series
+    assert a.patch("/admin/v1/catalog/series/nope/rights", headers=ADMIN_H,
+                   json={"owner": "X"}).status_code == 404
+    # create: bad count + missing title
+    assert a.post("/admin/v1/catalog/series", headers=ADMIN_H,
+                  json={"slug": "ok-slug", "title": "T",
+                        "episode_count": 0}).status_code == 400
+    assert a.post("/admin/v1/catalog/series", headers=ADMIN_H,
+                  json={"slug": "ok-slug", "title": "",
+                        "episode_count": 3}).status_code == 400
+    # experiments: bad key/status/variant
+    assert a.put("/admin/v1/experiments/BAD KEY", headers=ADMIN_H,
+                 json={"status": "draft"}).status_code == 400
+    assert a.put("/admin/v1/experiments/ok-exp", headers=ADMIN_H,
+                 json={"status": "sideways"}).status_code == 400
+    assert a.put("/admin/v1/experiments/ok-exp", headers=ADMIN_H,
+                 json={"status": "running", "variants": []}).status_code == 400
+    assert a.put("/admin/v1/experiments/ok-exp", headers=ADMIN_H,
+                 json={"status": "running",
+                       "variants": [{"name": "", "pct": 10}]}).status_code == 400
+    # flags: pct bounds
+    assert a.patch("/admin/v1/config/flags/rewards.referral_enabled",
+                   headers=ADMIN_H,
+                   json={"enabled": True, "pct": 140}).status_code == 400
+    # analytics needs a viewer role but works for RO
+    assert a.get("/admin/v1/analytics",
+                 headers={"X-Actor-Id": "view", "X-Role": "ro"}).status_code == 200
+    # rupee rate falls back on junk
+    shared.kv_set("config:coin.rupee_rate", "banana")
+    assert a.get("/admin/v1/config/policy",
+                 headers=ADMIN_H).json()["coin_rupee_rate"] == 0.15
+    # devices empty for unknown user; ui ping ignores blank view
+    assert a.get("/admin/v1/users/ghost/devices",
+                 headers=ADMIN_H).json()["devices"] == []
+    assert a.post("/admin/v1/metrics/ui", headers=ADMIN_H,
+                  json={}).json() == {"ok": True}

@@ -95,6 +95,7 @@ def iap_verify(req: IapVerifyRequest, user: str = Depends(current_user)) -> Wall
     txn = f"jws:{req.jws}"
     store.ledger.credit(user, TxType.PURCHASE, coins=pack["coins"], reference_type="iap",
                         reference_id=req.sku, idempotency_key=f"iap:{txn}", created_at=now_iso())
+    store.emit(user, "purchase", ref=req.sku, value=pack["coins"], channel="app")
     return _wallet_response(user)
 
 
@@ -117,13 +118,15 @@ def web_order(req: WebOrderRequest, user: str = Depends(current_user)) -> Wallet
         store.ledger.credit(user, TxType.BONUS, coins=web_bonus, reference_type="web_order",
                             reference_id=req.sku, idempotency_key=f"webbonus:{user}:{req.sku}",
                             created_at=now_iso())
+    store.emit(user, "purchase", ref=req.sku, value=pack["coins"], channel="web")
     return _wallet_response(user)
 
 
 @router.post("/series/{slug}/episodes/{number}/unlock", response_model=UnlockResponse)
 def unlock_episode(slug: str, number: int, req: UnlockRequest,
                    user: str = Depends(current_user)) -> UnlockResponse:
-    series = catalog.get_series(slug)
+    from ..overrides import get_series
+    series = get_series(slug)
     if series is None or not (1 <= number <= series.episode_count):
         raise HTTPException(status_code=404, detail="episode not found")
     eid = catalog.episode_id(slug, number)
@@ -133,13 +136,15 @@ def unlock_episode(slug: str, number: int, req: UnlockRequest,
                                   idempotency_key=req.idempotency_key, created_at=now_iso())
     except InsufficientCoins as e:
         raise HTTPException(status_code=402, detail=str(e))
+    store.emit(user, "unlock", ref=eid, value=res.spent_bonus + res.spent_bought)
     return UnlockResponse(episode_ids=[eid], spent_bonus=res.spent_bonus,
                           spent_bought=res.spent_bought, wallet=_wallet_response(user))
 
 
 @router.post("/series/{slug}/unlock-all", response_model=UnlockResponse)
 def unlock_all(slug: str, req: UnlockRequest, user: str = Depends(current_user)) -> UnlockResponse:
-    series = catalog.get_series(slug)
+    from ..overrides import get_series
+    series = get_series(slug)
     if series is None:
         raise HTTPException(status_code=404, detail="series not found")
     locked = [catalog.episode_id(slug, n)
@@ -155,5 +160,7 @@ def unlock_all(slug: str, req: UnlockRequest, user: str = Depends(current_user))
                                   source="bundle", total_cost=bundle_total)
     except InsufficientCoins as e:
         raise HTTPException(status_code=402, detail=str(e))
+    store.emit(user, "unlock", ref=f"bundle:{slug}",
+               value=res.spent_bonus + res.spent_bought)
     return UnlockResponse(episode_ids=locked, spent_bonus=res.spent_bonus,
                           spent_bought=res.spent_bought, wallet=_wallet_response(user))

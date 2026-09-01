@@ -33,7 +33,11 @@ def put_progress(body: ProgressBatchBody, user: str = Depends(current_user)) -> 
         series = catalog.get_series(it.slug)
         if series is None or not (1 <= it.number <= series.episode_count):
             raise HTTPException(status_code=404, detail=f"episode not found: {it.slug} e{it.number}")
+        eid = catalog.episode_id(it.slug, it.number)
+        delta = store.progress_delta(user, eid, it.position_ms)
         store.record_progress(user, it.slug, it.number, it.position_ms, it.duration_ms)
+        if delta > 0:
+            store.emit(user, "play_progress", ref=eid, value=delta)
     return _continue(user)
 
 
@@ -91,6 +95,8 @@ def checkin(user: str = Depends(current_user)) -> CheckinResponse:
                         reference_id=ist_day(), idempotency_key=key, created_at=now_iso())
     after = store.ledger.balance(user).total
     already = after == before
+    if not already:
+        store.emit(user, "checkin", ref=ist_day(), value=CHECKIN_COINS)
     return CheckinResponse(
         granted_coins=0 if already else CHECKIN_COINS,
         already_claimed=already, day=ist_day(), wallet=_wallet(user),
@@ -121,5 +127,6 @@ def file_grievance(g: GrievanceIn, user: str = Depends(current_user)) -> dict:
     store.shared.grievance_create(gid=gid, user_id=user, contact=g.contact.strip(),
                                   channel=g.channel, subject=g.subject.strip(),
                                   body=g.body.strip(), created_at=now_iso())
+    store.emit(user, "grievance", ref=gid)
     return {"id": gid, "status": "new",
             "promise": "acknowledged within 24 hours, resolved within 15 days"}

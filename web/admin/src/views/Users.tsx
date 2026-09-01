@@ -141,7 +141,7 @@ function AdjustDialog({ user, onClose, onApplied }: { user: AdminUser; onClose: 
   );
 }
 
-type Tab = "ledger" | "entitlements" | "timeline" | "data";
+type Tab = "ledger" | "entitlements" | "timeline" | "devices" | "data";
 
 function UserDialog({ user, onClose }: { user: AdminUser; onClose: () => void }) {
   const { role, online, showToast } = useStore();
@@ -156,11 +156,22 @@ function UserDialog({ user, onClose }: { user: AdminUser; onClose: () => void })
     void api.getUserLedger(user.id).then(setLedger);
   }, [user.id]);
 
+  const [devices, setDevices] = useState<
+    { ua: string; ip: string; first_seen: string; last_seen: string }[] | null>(null);
+
   useEffect(() => {
     loadLedger();
     void api.getEntitlements(user.id).then((r) => setEnts(r.entitlements));
     void api.getTimeline(user.id).then((r) => setTimeline(r.events));
+    void api.listDevices(user.id).then((r) => setDevices(r.devices));
   }, [user.id, loadLedger]);
+
+  async function signOutAll() {
+    const res = await mutate.signoutDevices(user.id);
+    if ("offline" in res) return showToast("Offline — nothing signed out", "error");
+    if (res.error) return showToast(`Not signed out: ${res.error}`, "error");
+    showToast("All devices signed out — every existing token is now invalid");
+  }
 
   // Running balance, oldest → newest, rendered newest first (#024).
   const rows = useMemo(() => {
@@ -212,7 +223,7 @@ function UserDialog({ user, onClose }: { user: AdminUser; onClose: () => void })
       footer={<button className="btn s" onClick={onClose}>Close</button>}
     >
       <div className="tabs" role="tablist">
-        {(["ledger", "entitlements", "timeline", "data"] as Tab[]).map((t) => (
+        {(["ledger", "entitlements", "timeline", "devices", "data"] as Tab[]).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t}
                   className={tab === t ? "tab on" : "tab"} onClick={() => setTab(t)}>
             {t === "data" ? "Data & erasure" : t[0].toUpperCase() + t.slice(1)}
@@ -302,6 +313,41 @@ function UserDialog({ user, onClose }: { user: AdminUser; onClose: () => void })
               </li>
             ))}
           </ul>
+        )
+      ) : null}
+
+      {tab === "devices" ? (
+        devices === null ? (
+          <Skeleton />
+        ) : (
+          <>
+            {devices.length === 0 ? (
+              <p className="tiny">No devices observed yet — rows appear with
+                authenticated traffic.</p>
+            ) : (
+              <table className="table">
+                <thead><tr><th>Device</th><th>IP</th><th>First seen</th><th>Last seen</th></tr></thead>
+                <tbody>
+                  {devices.map((d) => (
+                    <tr key={d.ua + d.first_seen}>
+                      <td className="mono" title={d.ua}>{d.ua.slice(0, 42)}</td>
+                      <td className="mono">{d.ip}</td>
+                      <td><IsoTime iso={d.first_seen} /></td>
+                      <td><IsoTime iso={d.last_seen} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <p className="tiny muted">
+              Tokens are stateless, so sign-out works account-wide: every token
+              issued before now stops validating on the next request.
+            </p>
+            <button className="btn danger" disabled={!online || !canAct(role, "support")}
+                    onClick={() => void signOutAll()}>
+              Sign out all devices
+            </button>
+          </>
         )
       ) : null}
 
@@ -426,6 +472,14 @@ export function Users() {
                       <td>
                         <b>{u.name !== "—" ? u.name : u.id}</b>
                         <small className="muted"> ({u.payer === "—" ? "guest" : u.payer}) · {u.id}</small>
+                        {u.flags.length > 0 ? (
+                          <span style={{ display: "block", marginTop: 2 }}>
+                            {u.flags.map((f) => (
+                              <span key={f} className="sev sev-warn"
+                                    style={{ marginRight: 6 }}>{f}</span>
+                            ))}
+                          </span>
+                        ) : null}
                       </td>
                       <td>{u.languages}</td>
                       <td style={{ textAlign: "right" }} className="mono">

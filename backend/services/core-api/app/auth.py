@@ -17,7 +17,7 @@ import os
 import time
 
 import jwt
-from fastapi import Header
+from fastapi import Header, HTTPException, Request
 
 JWT_SECRET = os.environ.get(
     "KATHA_JWT_SECRET", "dev-katha-secret-not-for-prod-please-override-in-env-0123456789"
@@ -39,27 +39,40 @@ def user_id_for_apple(sub: str) -> str:
 
 def issue_token(user_id: str, *, now: int | None = None) -> str:
     iat = int(now if now is not None else time.time())
-    payload = {"sub": user_id, "iat": iat, "exp": iat + JWT_TTL_SECONDS}
+    # "ver" is the user's token_version (#021): bumping it in the back office
+    # ("sign out all devices") invalidates every token issued before the bump.
+    from .store import store
+    ver = store.shared.token_version(user_id) if store.shared is not None else 0
+    payload = {"sub": user_id, "iat": iat, "exp": iat + JWT_TTL_SECONDS, "ver": ver}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
 
 
-def decode_token(token: str) -> str | None:
+def decode_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
     except jwt.PyJWTError:
         return None
-    sub = payload.get("sub")
-    return sub if isinstance(sub, str) else None
+    return payload if isinstance(payload.get("sub"), str) else None
 
 
-def current_user(authorization: str | None = Header(default=None)) -> str:
+def current_user(request: Request,
+                 authorization: str | None = Header(default=None)) -> str:
+    from .store import store
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1].strip()
-        sub = decode_token(token)
-        # Dev fallback: a non-JWT bearer value is treated as the raw user id.
-        user = sub if sub is not None else token
+        payload = decode_token(token)
+        if payload is not None:
+            user = payload["sub"]
+            if store.shared is not None and \
+                    store.shared.token_version(user) > int(payload.get("ver", 0)):
+                raise HTTPException(status_code=401,
+                                    detail="signed out — please sign in again")
+        else:
+            # Dev fallback: a non-JWT bearer value is treated as the raw user id.
+            user = token
     else:
         user = "guest-dev"
-    from .store import store
-    store.touch_seen(user)          # back-office "last active" (admin review #020)
+    store.touch_seen(user,
+                     ua=request.headers.get("user-agent", ""),
+                     ip=request.client.host if request.client else "")
     return user
