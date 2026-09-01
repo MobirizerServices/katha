@@ -1,62 +1,122 @@
 import SwiftUI
 import KathaKit
 
-/// Series detail — synopsis, tropes, and the episode grid with free/locked pips
-/// (mockup §2/§3). Tapping a locked episode opens the player, which gates.
+/// Series detail (mockup 2.4): billboard, rating badge, one primary job —
+/// get the viewer into E1 or back where they left off — plus the episode grid.
 struct SeriesView: View {
     let slug: String
     @Environment(AppModel.self) private var model
     @State private var detail: SeriesDetail?
     @State private var error: String?
 
+    /// Where the viewer left off in THIS series, if anywhere.
+    private var continuePoint: ContinueItem? {
+        model.continueItems.first { $0.slug == slug }
+    }
+
     var body: some View {
         ScrollView {
             if let d = detail {
                 content(d)
-            } else if let error {
-                Text(error).foregroundStyle(Katha.Color.danger).padding()
+            } else if error != nil {
+                FeedErrorState(detail: error) { await load() }
+                    .frame(minHeight: 400)
             } else {
                 ProgressView().tint(Katha.Color.accent).padding(40)
             }
         }
         .background(Katha.Color.bg)
         .navigationBarTitleDisplayMode(.inline)
-        // At the view level, not inside the LazyVGrid, so every episode tap navigates.
-        .navigationDestination(for: EpisodeRoute.self) { route in
-            PlayerView(slug: route.slug, number: route.number,
-                       bundleDiscountPct: detail?.bundleDiscountPct ?? 25,
-                       remainingLocked: detail.map { $0.episodeCount - $0.freeEpisodeCount } ?? 0)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await model.toggleMyList(slug: slug) }
+                } label: {
+                    Image(systemName: model.myListSlugs.contains(slug) ? "bookmark.fill" : "bookmark")
+                        .foregroundStyle(model.myListSlugs.contains(slug)
+                                         ? Katha.Color.accent : Katha.Color.text)
+                }
+            }
         }
         .task { await load() }
     }
 
     private func content(_ d: SeriesDetail) -> some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
-            RoundedRectangle(cornerRadius: 0)
-                .fill(Katha.Color.raised)
-                .frame(height: 220)
-                .overlay(alignment: .bottomLeading) {
-                    Text(d.title)
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(Katha.Color.text)
-                        .padding(Katha.Spacing.lg)
-                }
+            // Billboard
+            ZStack(alignment: .bottomLeading) {
+                LinearGradient(colors: [Katha.Color.raised, Katha.Color.bg],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: 230)
+                Text(d.title)
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(Katha.Color.text)
+                    .padding(Katha.Spacing.lg)
+            }
 
             VStack(alignment: .leading, spacing: Katha.Spacing.md) {
-                Text(d.genres.joined(separator: " · "))
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Katha.Color.accent)
+                // Chips: language · genre · RATING (IT Rules badge) · count
+                HStack(spacing: 8) {
+                    chip(d.primaryLanguage.uppercased())
+                    if let g = d.genres.first { chip(g) }
+                    if !d.contentRating.isEmpty {
+                        Text(d.contentRating)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Katha.Color.text)
+                            .padding(.horizontal, 7)
+                            .frame(height: 20)
+                            .overlay(RoundedRectangle(cornerRadius: 5)
+                                .strokeBorder(Katha.Color.text2, lineWidth: 1))
+                    }
+                    chip("\(d.episodeCount) episodes")
+                }
+
                 Text(d.synopsis)
                     .font(.system(size: 15))
                     .foregroundStyle(Katha.Color.text2)
-                Text("Free · \(d.freeEpisodeCount) episodes, then \(d.episodeCoinPrice) coins each")
+
+                Text("Free · \(d.freeEpisodeCount) episodes, then \(d.episodeCoinPrice) coins (≈ ₹\(rupees(d.episodeCoinPrice))) each")
                     .font(.system(size: 13))
                     .foregroundStyle(Katha.Color.text2)
+
+                // The screen's one job: into the story in a single tap.
+                if let cp = continuePoint {
+                    NavigationLink(value: EpisodeRoute(slug: slug, number: cp.number)) {
+                        primaryCTA("Continue E\(cp.number)")
+                    }
+                } else {
+                    NavigationLink(value: EpisodeRoute(slug: slug, number: 1)) {
+                        primaryCTA("Play episode 1")
+                    }
+                }
             }
             .padding(.horizontal, Katha.Spacing.lg)
 
             episodeGrid(d)
         }
+    }
+
+    private func primaryCTA(_ title: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "play.fill")
+            Text(title)
+        }
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundStyle(Katha.Color.text)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(Katha.Color.accent)
+        .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
+    }
+
+    private func chip(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Katha.Color.text2)
+            .padding(.horizontal, 8)
+            .frame(height: 20)
+            .background(Katha.Color.surface)
+            .clipShape(Capsule())
     }
 
     private func episodeGrid(_ d: SeriesDetail) -> some View {
@@ -86,12 +146,15 @@ struct SeriesView: View {
     }
 
     private func load() async {
-        do { detail = try await model.api.seriesDetail(slug: slug) }
-        catch { self.error = String(describing: error) }
+        do {
+            detail = try await model.api.seriesDetail(slug: slug)
+            error = nil
+        } catch { self.error = String(describing: error) }
     }
 }
 
-struct EpisodeRoute: Hashable {
-    let slug: String
-    let number: Int
+/// Rupee display helper (30 coins ≈ ₹4.5 — PDD "Honest coins" principle).
+func rupees(_ coins: Int) -> String {
+    let value = CoinMath.rupees(forCoins: coins)
+    return value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
 }

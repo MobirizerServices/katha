@@ -17,6 +17,7 @@ class SeriesSummary(BaseModel):
     genres: list[str]
     episode_count: int
     primary_language: str
+    content_rating: str = "U/A 16+"   # IT Rules 2021 self-classification
 
 
 class SeriesDetail(SeriesSummary):

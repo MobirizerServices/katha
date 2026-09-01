@@ -36,6 +36,7 @@ def all_series() -> list[SeriesDetail]:
                 genres=s.get("genres", []),
                 episode_count=s["episode_count"],
                 primary_language=s.get("primary_language", "hi"),
+                content_rating=s.get("content_rating", "U/A 16+"),
                 synopsis=s["synopsis"],
                 tropes=s.get("tropes", []),
                 free_episode_count=prof["free_episode_count"],

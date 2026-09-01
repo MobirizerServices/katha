@@ -10,6 +10,7 @@ public struct SeriesSummary: Codable, Hashable, Identifiable, Sendable {
     public let genres: [String]
     public let episodeCount: Int
     public let primaryLanguage: String
+    public let contentRating: String   // IT Rules self-classification, e.g. "U/A 16+"
 
     public var id: String { slug }
 
@@ -17,11 +18,24 @@ public struct SeriesSummary: Codable, Hashable, Identifiable, Sendable {
         case slug, title, genres
         case episodeCount = "episode_count"
         case primaryLanguage = "primary_language"
+        case contentRating = "content_rating"
     }
 
-    public init(slug: String, title: String, genres: [String], episodeCount: Int, primaryLanguage: String) {
+    public init(slug: String, title: String, genres: [String], episodeCount: Int,
+                primaryLanguage: String, contentRating: String = "") {
         self.slug = slug; self.title = title; self.genres = genres
         self.episodeCount = episodeCount; self.primaryLanguage = primaryLanguage
+        self.contentRating = contentRating
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        slug = try c.decode(String.self, forKey: .slug)
+        title = try c.decode(String.self, forKey: .title)
+        genres = try c.decode([String].self, forKey: .genres)
+        episodeCount = try c.decode(Int.self, forKey: .episodeCount)
+        primaryLanguage = try c.decode(String.self, forKey: .primaryLanguage)
+        contentRating = try c.decodeIfPresent(String.self, forKey: .contentRating) ?? ""
     }
 }
 
@@ -50,6 +64,7 @@ public struct SeriesDetail: Codable, Hashable, Identifiable, Sendable {
     public let genres: [String]
     public let episodeCount: Int
     public let primaryLanguage: String
+    public let contentRating: String   // IT Rules self-classification badge
     public let synopsis: String
     public let tropes: [String]
     public let freeEpisodeCount: Int
@@ -63,6 +78,7 @@ public struct SeriesDetail: Codable, Hashable, Identifiable, Sendable {
         case slug, title, genres, synopsis, tropes, episodes
         case episodeCount = "episode_count"
         case primaryLanguage = "primary_language"
+        case contentRating = "content_rating"
         case freeEpisodeCount = "free_episode_count"
         case episodeCoinPrice = "episode_coin_price"
         case bundleDiscountPct = "bundle_discount_pct"
@@ -71,15 +87,16 @@ public struct SeriesDetail: Codable, Hashable, Identifiable, Sendable {
     public init(slug: String, title: String, genres: [String], episodeCount: Int,
                 primaryLanguage: String, synopsis: String, tropes: [String],
                 freeEpisodeCount: Int, episodeCoinPrice: Int, bundleDiscountPct: Int,
-                episodes: [Episode]) {
+                episodes: [Episode], contentRating: String = "") {
         self.slug = slug; self.title = title; self.genres = genres
         self.episodeCount = episodeCount; self.primaryLanguage = primaryLanguage
+        self.contentRating = contentRating
         self.synopsis = synopsis; self.tropes = tropes
         self.freeEpisodeCount = freeEpisodeCount; self.episodeCoinPrice = episodeCoinPrice
         self.bundleDiscountPct = bundleDiscountPct; self.episodes = episodes
     }
 
-    // Custom decoding to tolerate the optional `tropes` field (defaults to []).
+    // Custom decoding to tolerate optional fields (tropes, content_rating).
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         slug = try c.decode(String.self, forKey: .slug)
@@ -87,6 +104,7 @@ public struct SeriesDetail: Codable, Hashable, Identifiable, Sendable {
         genres = try c.decode([String].self, forKey: .genres)
         episodeCount = try c.decode(Int.self, forKey: .episodeCount)
         primaryLanguage = try c.decode(String.self, forKey: .primaryLanguage)
+        contentRating = try c.decodeIfPresent(String.self, forKey: .contentRating) ?? ""
         synopsis = try c.decode(String.self, forKey: .synopsis)
         tropes = try c.decodeIfPresent([String].self, forKey: .tropes) ?? []
         freeEpisodeCount = try c.decode(Int.self, forKey: .freeEpisodeCount)

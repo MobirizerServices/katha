@@ -40,6 +40,76 @@ public actor KathaAPIClient {
         self.authToken = token
     }
 
+    // MARK: - Auth & identity
+
+    /// Request an OTP for a phone number (no auth required).
+    public func requestOtp(phone: String) async throws -> OtpRequest {
+        try await send("/v1/auth/otp/request", method: "POST", body: PhoneBody(phone: phone))
+    }
+
+    /// Verify the OTP; the returned token is stored on the client for later calls.
+    public func verifyOtp(phone: String, code: String) async throws -> AuthToken {
+        let token: AuthToken = try await send("/v1/auth/otp/verify", method: "POST",
+                                              body: OtpVerifyBody(phone: phone, code: code))
+        authToken = token.accessToken
+        return token
+    }
+
+    public func guestLogin() async throws -> AuthToken {
+        let token: AuthToken = try await send("/v1/auth/guest", method: "POST",
+                                              body: Optional<Empty>.none)
+        authToken = token.accessToken
+        return token
+    }
+
+    public func appleLogin(identityToken: String, fullName: String? = nil) async throws -> AuthToken {
+        let token: AuthToken = try await send("/v1/auth/apple", method: "POST",
+                                              body: AppleBody(identityToken: identityToken, fullName: fullName))
+        authToken = token.accessToken
+        return token
+    }
+
+    public func me() async throws -> UserProfile {
+        try await get("/v1/me")
+    }
+
+    public func updateMe(language: String? = nil, displayName: String? = nil) async throws -> UserProfile {
+        try await send("/v1/me", method: "PATCH",
+                       body: MePatchBody(language: language, displayName: displayName))
+    }
+
+    /// Account deletion (App Store requirement). Clears the client token on success.
+    public func deleteMe() async throws {
+        let _: Ack = try await send("/v1/me", method: "DELETE", body: Optional<Empty>.none)
+        authToken = nil
+    }
+
+    // MARK: - Engagement
+
+    public func reportProgress(_ items: [ProgressReport]) async throws {
+        let _: Ack = try await send("/v1/progress", method: "PUT", body: ProgressBody(items: items))
+    }
+
+    public func continueWatching() async throws -> ContinueList {
+        try await get("/v1/me/continue")
+    }
+
+    public func myList() async throws -> MyList {
+        try await get("/v1/me/list")
+    }
+
+    public func addToList(slug: String) async throws -> MyList {
+        try await send("/v1/me/list/\(slug)", method: "PUT", body: Optional<Empty>.none)
+    }
+
+    public func removeFromList(slug: String) async throws -> MyList {
+        try await send("/v1/me/list/\(slug)", method: "DELETE", body: Optional<Empty>.none)
+    }
+
+    public func checkin() async throws -> CheckinResult {
+        try await send("/v1/rewards/checkin", method: "POST", body: Optional<Empty>.none)
+    }
+
     // MARK: - Catalog
 
     public func home(lang: String = "hi") async throws -> HomeResponse {
@@ -64,6 +134,10 @@ public actor KathaAPIClient {
 
     public func wallet() async throws -> Wallet {
         try await get("/v1/wallet")
+    }
+
+    public func walletTransactions() async throws -> [LedgerEntry] {
+        try await get("/v1/wallet/transactions")
     }
 
     public func packs(storefront: String = "IN") async throws -> [CoinPack] {
@@ -155,6 +229,37 @@ private struct IapVerifyBody: Encodable {
 private struct UnlockBody: Encodable {
     let idempotencyKey: String
     enum CodingKeys: String, CodingKey { case idempotencyKey = "idempotency_key" }
+}
+
+private struct PhoneBody: Encodable {
+    let phone: String
+}
+
+private struct OtpVerifyBody: Encodable {
+    let phone: String
+    let code: String
+}
+
+private struct AppleBody: Encodable {
+    let identityToken: String
+    let fullName: String?
+    enum CodingKeys: String, CodingKey {
+        case identityToken = "identity_token"
+        case fullName = "full_name"
+    }
+}
+
+private struct MePatchBody: Encodable {
+    let language: String?
+    let displayName: String?
+    enum CodingKeys: String, CodingKey {
+        case language
+        case displayName = "display_name"
+    }
+}
+
+private struct ProgressBody: Encodable {
+    let items: [ProgressReport]
 }
 
 /// A standalone decoder usable without an actor instance (handy in tests).

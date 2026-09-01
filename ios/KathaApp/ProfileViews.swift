@@ -1,0 +1,401 @@
+import SwiftUI
+import KathaKit
+
+// Account section (mockup §4): Profile (member/guest), Settings, Parental lock,
+// Help & grievance, Delete account.
+
+// MARK: - 4.1 Profile
+
+struct ProfileView: View {
+    @Environment(AppModel.self) private var model
+    @State private var showLogin = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Katha.Spacing.xl) {
+                identityCard
+
+                VStack(spacing: 0) {
+                    row("creditcard.fill", "Wallet",
+                        value: "\(model.wallet.total) coins") { WalletView() }
+                    row("bookmark.fill", "My list",
+                        value: "\(model.myListSeries.count)") { MyListView() }
+                    row("gearshape.fill", "Settings") { SettingsView() }
+                    row("questionmark.circle.fill", "Help & grievance") { HelpView() }
+                }
+                .background(Katha.Color.surface)
+                .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
+
+                if model.isSignedIn {
+                    Button("Sign out") { Task { await model.signOut() } }
+                        .font(.system(size: 15))
+                        .foregroundStyle(Katha.Color.danger)
+                        .frame(maxWidth: .infinity)
+                }
+
+                Text("Version 1.0.0 (dev)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Katha.Color.text2)
+                    .frame(maxWidth: .infinity)
+            }
+            .padding(Katha.Spacing.lg)
+        }
+        .background(Katha.Color.bg)
+        .navigationTitle("Profile")
+        .toolbarBackground(Katha.Color.bg, for: .navigationBar)
+        .sheet(isPresented: $showLogin) { LoginSheet().environment(model) }
+    }
+
+    /// Members see their identity; guests see exactly what an account protects.
+    private var identityCard: some View {
+        HStack(spacing: Katha.Spacing.md) {
+            ZStack {
+                Circle().fill(Katha.Color.accent.opacity(0.2)).frame(width: 52, height: 52)
+                Text(model.isSignedIn ? String((model.profile?.displayName.first ?? "K")) : "👋")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Katha.Color.accent)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                if model.isSignedIn {
+                    Text(model.profile?.displayName.isEmpty == false
+                         ? model.profile!.displayName : "Katha member")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Katha.Color.text)
+                    Text(masked(model.profile?.phone))
+                        .font(.system(size: 13))
+                        .foregroundStyle(Katha.Color.text2)
+                } else {
+                    Text("You're browsing as a guest")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Katha.Color.text)
+                    Text("Create an account to keep your coins and progress.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Katha.Color.text2)
+                }
+            }
+            Spacer()
+            if !model.isSignedIn {
+                Button("Sign in") { showLogin = true }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Katha.Color.text)
+                    .padding(.horizontal, 14)
+                    .frame(height: 34)
+                    .background(Katha.Color.accent)
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(Katha.Spacing.lg)
+        .background(Katha.Color.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
+    }
+
+    private func masked(_ phone: String?) -> String {
+        guard let phone, phone.count > 4 else { return "Signed in" }
+        return String(phone.prefix(phone.count - 4)).replacingOccurrences(
+            of: "[0-9]", with: "•", options: .regularExpression) + phone.suffix(4)
+    }
+
+    private func row<D: View>(_ icon: String, _ title: String, value: String = "",
+                              @ViewBuilder destination: @escaping () -> D) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            HStack(spacing: Katha.Spacing.md) {
+                Image(systemName: icon)
+                    .frame(width: 24)
+                    .foregroundStyle(Katha.Color.accent)
+                Text(title)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Katha.Color.text)
+                Spacer()
+                Text(value)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Katha.Color.text2)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Katha.Color.text2)
+            }
+            .padding(.horizontal, Katha.Spacing.lg)
+            .frame(height: 52)
+        }
+    }
+}
+
+// MARK: - 4.2 Settings
+
+struct SettingsView: View {
+    @Environment(AppModel.self) private var model
+    @State private var showPinSetup = false
+    @State private var showDelete = false
+
+    var body: some View {
+        @Bindable var model = model
+        List {
+            Section("Language") {
+                Picker("Content language", selection: $model.contentLanguage) {
+                    Text("हिन्दी").tag("hi")
+                    Text("தமிழ்").tag("ta")
+                    Text("తెలుగు").tag("te")
+                }
+                .onChange(of: model.contentLanguage) { _, lang in
+                    Task { await model.loadHome(lang: lang) }
+                }
+            }
+            Section {
+                Toggle("Data saver", isOn: $model.dataSaver)
+                Toggle("Auto-unlock next episodes", isOn: $model.autoUnlock)
+            } header: { Text("Playback") } footer: {
+                Text("Data saver caps streaming quality on mobile data. Auto-unlock charges coins only when an episode starts.")
+            }
+            Section {
+                Button(model.parentalPin == nil ? "Set parental lock" : "Change parental lock") {
+                    showPinSetup = true
+                }
+                if model.parentalPin != nil {
+                    Button("Remove parental lock", role: .destructive) {
+                        model.parentalPin = nil
+                    }
+                }
+            } header: { Text("Parental lock") } footer: {
+                Text("A PIN is asked before playing U/A 16+ and A-rated titles (IT Rules 2021).")
+            }
+            Section("About") {
+                NavigationLink("Help & grievance") { HelpView() }
+                Link("Terms · Privacy Notice", destination: URL(string: "https://katha.example/legal")!)
+                Button("Delete account", role: .destructive) { showDelete = true }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Katha.Color.bg)
+        .navigationTitle("Settings")
+        .sheet(isPresented: $showPinSetup) {
+            PinSetupSheet()
+        }
+        .sheet(isPresented: $showDelete) {
+            DeleteAccountSheet()
+        }
+    }
+}
+
+// MARK: - 4.3 Parental lock
+
+struct PinSetupSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var pin = ""
+
+    var body: some View {
+        VStack(spacing: Katha.Spacing.lg) {
+            Text("Set a parental PIN")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Katha.Color.text)
+            Text("Asked before U/A 16+ and A-rated titles play.")
+                .font(.system(size: 13))
+                .foregroundStyle(Katha.Color.text2)
+            PinDots(filled: pin.count)
+            PinPad { digit in
+                if digit == -1 { if !pin.isEmpty { pin.removeLast() } }
+                else if pin.count < 4 {
+                    pin.append(String(digit))
+                    if pin.count == 4 {
+                        model.parentalPin = pin
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .padding(Katha.Spacing.xl)
+        .presentationDetents([.large])
+        .presentationBackground(Katha.Color.surface)
+    }
+}
+
+/// The in-player gate for rated titles.
+struct PinGateView: View {
+    let onSuccess: () -> Void
+    let onCancel: () -> Void
+    @Environment(AppModel.self) private var model
+    @State private var pin = ""
+    @State private var wrong = false
+
+    var body: some View {
+        VStack(spacing: Katha.Spacing.lg) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 40))
+                .foregroundStyle(Katha.Color.accent)
+            Text("Parental lock")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Katha.Color.text)
+            Text(wrong ? "Wrong PIN — try again." : "This title is rated for older viewers.")
+                .font(.system(size: 13))
+                .foregroundStyle(wrong ? Katha.Color.danger : Katha.Color.text2)
+            PinDots(filled: pin.count)
+            PinPad { digit in
+                if digit == -1 { if !pin.isEmpty { pin.removeLast() } }
+                else if pin.count < 4 {
+                    pin.append(String(digit))
+                    if pin.count == 4 {
+                        if pin == model.parentalPin { onSuccess() }
+                        else { pin = ""; wrong = true }
+                    }
+                }
+            }
+            Button("Go back") { onCancel() }
+                .font(.system(size: 14))
+                .foregroundStyle(Katha.Color.text2)
+        }
+        .padding(Katha.Spacing.xl)
+    }
+}
+
+struct PinDots: View {
+    let filled: Int
+    var body: some View {
+        HStack(spacing: 18) {
+            ForEach(0..<4, id: \.self) { i in
+                Circle()
+                    .strokeBorder(Katha.Color.text2, lineWidth: 2)
+                    .background(Circle().fill(i < filled ? Katha.Color.text : .clear))
+                    .frame(width: 16, height: 16)
+            }
+        }
+    }
+}
+
+struct PinPad: View {
+    let onKey: (Int) -> Void
+    private let rows: [[Int]] = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [-2, 0, -1]]
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ForEach(rows, id: \.self) { row in
+                HStack(spacing: 10) {
+                    ForEach(row, id: \.self) { key in
+                        Button {
+                            if key >= -1 { onKey(key) }
+                        } label: {
+                            Group {
+                                if key == -1 { Image(systemName: "delete.left") }
+                                else if key == -2 { Color.clear }
+                                else { Text("\(key)") }
+                            }
+                            .font(.system(size: 22, weight: .medium))
+                            .foregroundStyle(Katha.Color.text)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .background(key == -2 ? .clear : Katha.Color.raised)
+                            .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.sm))
+                        }
+                        .disabled(key == -2)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: 280)
+    }
+}
+
+// MARK: - 4.6 Help & grievance
+
+struct HelpView: View {
+    private let faqs: [(q: String, a: String)] = [
+        ("How do coins work?",
+         "The first 10 episodes of every series are free. After that, each episode costs 30 coins (about ₹4.5). Buy packs once — coins never expire."),
+        ("I paid but didn't get my coins",
+         "Pull to refresh your Wallet, then tap Restore purchases. If the coins still haven't landed within a few minutes, contact support — verified failed transactions are re-credited."),
+        ("Refunds and cancellations",
+         "App Store purchases are refunded by Apple under Apple's policy (reportaproblem.apple.com). Coins bought on the web are refundable within 7 days if unspent."),
+        ("Parental controls",
+         "Set a PIN in Settings → Parental lock. U/A 16+ and A-rated titles then require it before playing."),
+    ]
+
+    var body: some View {
+        List {
+            Section("Common questions") {
+                ForEach(faqs, id: \.q) { faq in
+                    DisclosureGroup(faq.q) {
+                        Text(faq.a)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Katha.Color.text2)
+                    }
+                }
+            }
+            Section {
+                Link("help@katha.example", destination: URL(string: "mailto:help@katha.example")!)
+                Link("grievance@katha.example", destination: URL(string: "mailto:grievance@katha.example")!)
+            } header: { Text("Contact") } footer: {
+                Text("Complaints are acknowledged within 24 hours and resolved within 15 days, as required under the IT Rules, 2021. Support hours 9 am–9 pm IST.")
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Katha.Color.bg)
+        .navigationTitle("Help & grievance")
+    }
+}
+
+// MARK: - 4.7 Delete account
+
+struct DeleteAccountSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var understood = false
+    @State private var working = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
+            Text("Delete your account?")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(Katha.Color.text)
+
+            VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
+                bullet("trash", "Your coins and unlocked episodes are removed.")
+                bullet("clock", "Your phone number and watch history are deleted within 30 days.")
+                bullet("creditcard", "Purchases made through Apple follow Apple's refund policy.")
+            }
+
+            Toggle(isOn: $understood) {
+                Text("I understand my coins won't be refunded.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Katha.Color.text)
+            }
+            .tint(Katha.Color.danger)
+
+            Button {
+                Task {
+                    working = true
+                    await model.deleteAccount()
+                    working = false
+                    dismiss()
+                }
+            } label: {
+                Text(working ? "Deleting…" : "Delete account")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(understood ? Katha.Color.danger : Katha.Color.raised)
+                    .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md))
+            }
+            .disabled(!understood || working)
+
+            Button("Keep my account") { dismiss() }
+                .font(.system(size: 15))
+                .foregroundStyle(Katha.Color.text2)
+                .frame(maxWidth: .infinity)
+        }
+        .padding(Katha.Spacing.xl)
+        .presentationDetents([.medium])
+        .presentationBackground(Katha.Color.surface)
+    }
+
+    private func bullet(_ icon: String, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .frame(width: 20)
+                .foregroundStyle(Katha.Color.text2)
+            Text(text)
+                .font(.system(size: 14))
+                .foregroundStyle(Katha.Color.text2)
+        }
+    }
+}

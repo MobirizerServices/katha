@@ -29,6 +29,17 @@ def wallet(user: str = Depends(current_user)) -> WalletResponse:
     return _wallet_response(user)
 
 
+@router.get("/wallet/transactions")
+def wallet_transactions(user: str = Depends(current_user)) -> list[dict]:
+    """The user's own ledger history, newest first (PDD §12.5)."""
+    return [
+        {"id": t.id, "type": t.type.value, "amount_bought": t.amount_bought,
+         "amount_bonus": t.amount_bonus, "reference_type": t.reference_type,
+         "reference_id": t.reference_id, "created_at": t.created_at}
+        for t in reversed(store.ledger.transactions(user))
+    ]
+
+
 @router.get("/iap/packs", response_model=list[CoinPack])
 def packs(storefront: str = "IN") -> list[CoinPack]:
     return [

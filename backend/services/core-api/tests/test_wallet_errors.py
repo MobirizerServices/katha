@@ -91,3 +91,12 @@ def test_playback_unknown_series_is_404():
 def test_playback_bad_episode_number_is_404():
     r = client.post("/v1/series/kaanch-ka-mahal/episodes/0/playback", headers=AUTH)
     assert r.status_code == 404
+
+
+def test_wallet_transactions_newest_first():
+    client.post("/v1/web/orders", headers=AUTH, json={"sku": "coins_popular_in"})
+    client.post("/v1/series/kaanch-ka-mahal/episodes/11/unlock", headers=AUTH,
+                json={"idempotency_key": "tx-hist"})
+    rows = client.get("/v1/wallet/transactions", headers=AUTH).json()
+    assert [r["type"] for r in rows][:2] == ["unlock", "bonus"]   # newest first
+    assert rows[-1]["type"] == "purchase"

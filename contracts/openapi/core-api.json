@@ -254,6 +254,56 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Delete Me",
+        "description": "Account deletion (App Store requirement; PDD \u00a715 DPDP).\n\nDev slice: PII (profile) and engagement projections are removed immediately;\nthe coin ledger is retained as a pseudonymous financial record (\u00a712.7).\nProduction adds the 7-day grace window and warehouse/vector propagation.",
+        "operationId": "delete_me_v1_me_delete",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Me V1 Me Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/home": {
@@ -785,6 +835,61 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/WalletResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/wallet/transactions": {
+      "get": {
+        "tags": [
+          "wallet"
+        ],
+        "summary": "Wallet Transactions",
+        "description": "The user's own ledger history, newest first (PDD \u00a712.5).",
+        "operationId": "wallet_transactions_v1_wallet_transactions_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Wallet Transactions V1 Wallet Transactions Get"
                 }
               }
             }
@@ -1577,6 +1682,11 @@
             "type": "string",
             "title": "Primary Language"
           },
+          "content_rating": {
+            "type": "string",
+            "title": "Content Rating",
+            "default": "U/A 16+"
+          },
           "synopsis": {
             "type": "string",
             "title": "Synopsis"
@@ -1647,6 +1757,11 @@
           "primary_language": {
             "type": "string",
             "title": "Primary Language"
+          },
+          "content_rating": {
+            "type": "string",
+            "title": "Content Rating",
+            "default": "U/A 16+"
           }
         },
         "type": "object",

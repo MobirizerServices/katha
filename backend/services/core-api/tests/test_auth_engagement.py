@@ -110,3 +110,21 @@ def test_checkin_is_idempotent_per_day_and_grants_bonus():
     r2 = client.post("/v1/rewards/checkin", headers=AUTH).json()
     assert r2["already_claimed"] is True and r2["granted_coins"] == 0
     assert r2["wallet"]["balance_bonus"] == 5  # not double-credited
+
+
+def test_series_carries_content_rating():
+    r = client.get("/v1/series/kaanch-ka-mahal")
+    assert r.status_code == 200
+    assert r.json()["content_rating"].startswith("U/A")
+
+
+def test_delete_me_removes_profile_but_not_ledger():
+    h = {"Authorization": "Bearer del-user"}
+    client.patch("/v1/me", headers=h, json={"display_name": "Meera"})
+    client.post("/v1/rewards/checkin", headers=h)                 # puts coins in the ledger
+    r = client.delete("/v1/me", headers=h)
+    assert r.status_code == 200 and r.json()["status"] == "deleted"
+    # Profile is reset (a fresh default is created on next touch)...
+    assert client.get("/v1/me", headers=h).json()["display_name"] == ""
+    # ...but the ledger survives as a financial record.
+    assert client.get("/v1/wallet", headers=h).json()["total"] == 5

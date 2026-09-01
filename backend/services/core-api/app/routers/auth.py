@@ -88,3 +88,17 @@ def patch_me(body: UserProfilePatch, user: str = Depends(current_user)) -> UserP
             raise HTTPException(status_code=400, detail="language must be hi | ta | te")
         u.language = body.language
     return _profile_response(user)
+
+
+@router.delete("/me")
+def delete_me(user: str = Depends(current_user)) -> dict:
+    """Account deletion (App Store requirement; PDD §15 DPDP).
+
+    Dev slice: PII (profile) and engagement projections are removed immediately;
+    the coin ledger is retained as a pseudonymous financial record (§12.7).
+    Production adds the 7-day grace window and warehouse/vector propagation.
+    """
+    store.users.pop(user, None)
+    store.engagement.pop(user, None)
+    return {"status": "deleted", "user_id": user,
+            "note": "coins are not refunded; ledger retained as a financial record"}
