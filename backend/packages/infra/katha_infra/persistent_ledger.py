@@ -45,6 +45,9 @@ class PersistentLedger:
     def is_entitled(self, user_id: str, episode_id: str) -> bool:
         return self._inner.is_entitled(user_id, episode_id)
 
+    def entitlements(self, user_id: str):
+        return self._inner.entitlements(user_id)
+
     def transactions(self, user_id: str) -> list[Transaction]:
         return self._inner.transactions(user_id)
 

@@ -32,6 +32,7 @@ export async function generateMetadata({
   return {
     title: s.title,
     description: s.synopsis,
+    alternates: { canonical: `/series/${slug}` },
     openGraph: {
       title: s.title,
       description: s.synopsis,
@@ -49,9 +50,24 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
 
   const bundle = bundleCost(s);
   const full = fullLockedCost(s);
+  const ld = {
+    "@context": "https://schema.org",
+    "@type": "TVSeries",
+    name: s.title,
+    description: s.synopsis,
+    inLanguage: s.language,
+    genre: s.genres,
+    numberOfEpisodes: s.episodeCount,
+    contentRating: s.rating,
+    image: `${API_BASE}/media/${s.slug}/og_1200x630.jpg`,
+  };
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }}
+      />
       <section className="billboard">
         <div
           className="art"

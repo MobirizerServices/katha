@@ -34,8 +34,16 @@ struct WalletView: View {
                         Text("History")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(Katha.Color.text)
-                        ForEach(history) { row in
-                            historyRow(row)
+                        ForEach(groupedHistory, id: \.day) { group in
+                            Text(dayLabel(group.day))
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Katha.Color.text2)
+                                .textCase(.uppercase)
+                                .kerning(0.6)
+                                .padding(.top, 6)
+                            ForEach(group.rows) { row in
+                                historyRow(row)
+                            }
                         }
                     }
                 }
@@ -59,13 +67,25 @@ struct WalletView: View {
     private var balanceCard: some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
             Text("Balance")
-                .font(.system(size: 13))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Katha.Color.text2)
             HStack(spacing: Katha.Spacing.sm) {
-                Circle().fill(Katha.Color.coin).frame(width: 28, height: 28)
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(colors: [Katha.Color.coin,
+                                                      Katha.Color.coin.opacity(0.5)],
+                                             startPoint: .topLeading,
+                                             endPoint: .bottomTrailing))
+                        .frame(width: 34, height: 34)
+                    Image(systemName: "indianrupeesign")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Katha.Color.bg)
+                }
                 Text("\(model.wallet.total)")
-                    .font(.system(size: 34, weight: .bold))
+                    .font(.system(size: 40, weight: .heavy).monospacedDigit())
                     .foregroundStyle(Katha.Color.text)
+                    .contentTransition(.numericText())
+                    .animation(Katha.Motion.spring, value: model.wallet.total)
                 Text("≈ ₹\(rupees(model.wallet.total, rate: model.rupeeRate))")
                     .font(.system(size: 14))
                     .foregroundStyle(Katha.Color.text2)
@@ -76,8 +96,13 @@ struct WalletView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Katha.Spacing.lg)
-        .background(Katha.Color.surface)
+        .background {
+            LinearGradient(colors: [Katha.Color.raised, Katha.Color.surface],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+        }
         .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous)
+            .strokeBorder(Katha.Color.coin.opacity(0.2), lineWidth: 1))
     }
 
     private func historyRow(_ row: LedgerEntry) -> some View {
@@ -123,9 +148,32 @@ struct WalletView: View {
     private func sub(for row: LedgerEntry) -> String {
         switch row.type {
         case "purchase": return row.referenceType == "web_order" ? "Web store" : "App Store"
-        case "unlock": return row.referenceId.replacingOccurrences(of: ":", with: " · ")
+        case "unlock": return prettyRef(row.referenceId)
         default: return row.referenceId
         }
+    }
+
+    /// "kaanch-ka-mahal:e11" → "Kaanch Ka Mahal · E11" — the ledger speaks in
+    /// ids; the history speaks the viewer's language.
+    private func prettyRef(_ ref: String) -> String {
+        let parts = ref.split(separator: ":", maxSplits: 1)
+        let title = parts[0].split(separator: "-").map(\.capitalized).joined(separator: " ")
+        guard parts.count == 2 else { return title }
+        return "\(title) · \(parts[1].uppercased())"
+    }
+
+    private var groupedHistory: [(day: String, rows: [LedgerEntry])] {
+        let byDay = Dictionary(grouping: history) { String($0.createdAt.prefix(10)) }
+        return byDay.keys.sorted(by: >).map { (day: $0, rows: byDay[$0] ?? []) }
+    }
+
+    private func dayLabel(_ day: String) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        guard let date = f.date(from: day) else { return day }
+        if Calendar.current.isDateInToday(date) { return "Today" }
+        if Calendar.current.isDateInYesterday(date) { return "Yesterday" }
+        return date.formatted(.dateTime.day().month(.wide))
     }
 
     private func reload() async {

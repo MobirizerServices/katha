@@ -79,7 +79,10 @@ struct FeedView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Katha.Spacing.xl) {
-                    if !model.checkinClaimedToday { checkinCard }
+                    if !model.checkinClaimedToday {
+                        checkinCard
+                            .transition(.scale(scale: 0.92).combined(with: .opacity))
+                    }
                     if let hero = model.feed.rows.first?.series.first { HeroCard(series: hero) }
                     if !model.continueItems.isEmpty { continueRow }
                     ForEach(model.feed.rows) { row in
@@ -87,6 +90,7 @@ struct FeedView: View {
                     }
                 }
                 .padding(.vertical, Katha.Spacing.lg)
+                .animation(Katha.Motion.spring, value: model.checkinClaimedToday)
             }
             .refreshable { await model.loadHome(); await model.loadEngagement() }
         }
@@ -96,7 +100,16 @@ struct FeedView: View {
 
     private var checkinCard: some View {
         HStack(spacing: Katha.Spacing.md) {
-            Circle().fill(Katha.Color.coin).frame(width: 28, height: 28)
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(colors: [Katha.Color.coin,
+                                                  Katha.Color.coin.opacity(0.55)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 34, height: 34)
+                Image(systemName: "indianrupeesign")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Katha.Color.bg)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text("Daily check-in")
                     .font(.system(size: 15, weight: .semibold))
@@ -107,7 +120,10 @@ struct FeedView: View {
             }
             Spacer()
             Button {
-                Task { claimedToast = await model.claimCheckin() }
+                Task {
+                    claimedToast = await model.claimCheckin()
+                    if claimedToast != nil { Haptics.success() }
+                }
             } label: {
                 Text("Claim")
                     .font(.system(size: 14, weight: .semibold))
@@ -117,11 +133,15 @@ struct FeedView: View {
                     .background(Katha.Color.accent)
                     .clipShape(Capsule())
             }
+            .buttonStyle(PressableStyle())
         }
         .padding(Katha.Spacing.lg)
         .background(Katha.Color.surface)
         .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous)
+            .strokeBorder(Katha.Color.coin.opacity(0.25), lineWidth: 1))
         .padding(.horizontal, Katha.Spacing.lg)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: continue watching
@@ -148,11 +168,13 @@ struct FeedView: View {
                                                 .shadow(radius: 4)
                                         }
                                     GeometryReader { geo in
-                                        Rectangle().fill(Katha.Color.accent)
-                                            .frame(width: geo.size.width * CGFloat(item.percent) / 100,
-                                                   height: 3)
+                                        Capsule().fill(Katha.Color.accent)
+                                            .frame(width: max(8, geo.size.width * CGFloat(item.percent) / 100),
+                                                   height: 4)
                                     }
-                                    .frame(height: 3)
+                                    .frame(height: 4)
+                                    .padding(.horizontal, 6)
+                                    .padding(.bottom, 5)
                                 }
                                 Text("E\(item.number) · \(item.slug.replacingOccurrences(of: "-", with: " ").capitalized)")
                                     .font(.system(size: 12, weight: .semibold))
@@ -160,7 +182,9 @@ struct FeedView: View {
                                     .lineLimit(1)
                                     .frame(width: 168, alignment: .leading)
                             }
+                            .accessibilityElement(children: .combine)
                         }
+                        .buttonStyle(PressableStyle())
                     }
                 }
                 .padding(.horizontal, Katha.Spacing.lg)
@@ -185,6 +209,11 @@ private struct HeroCard: View {
                                        startPoint: .center, endPoint: .bottom)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
+                    // The art drifts slower than the scroll — quiet depth.
+                    .visualEffect { content, proxy in
+                        let minY = proxy.frame(in: .scrollView).minY
+                        return content.offset(y: minY < 0 ? -minY * 0.18 : 0)
+                    }
                 VStack(alignment: .leading, spacing: 8) {
                     Text(series.title)
                         .font(.system(size: 30, weight: .heavy))
@@ -226,8 +255,11 @@ private struct HeroCard: View {
                 .padding(Katha.Spacing.md)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableStyle())
+        .zoomSource(id: series.slug)
         .padding(.horizontal, Katha.Spacing.lg)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(series.title), featured story")
     }
 }
 
@@ -236,17 +268,34 @@ struct SearchRoute: Hashable {}
 private struct FeedRow: View {
     let row: HomeRow
 
+    /// The personalized rail gets a spark so "picked for you" reads at a glance.
+    private var isPersonal: Bool { row.title.hasPrefix("Because you watched") }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
-            Text(row.title)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Katha.Color.text)
-                .padding(.horizontal, Katha.Spacing.lg)
+            HStack(spacing: 6) {
+                if isPersonal {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Katha.Color.accent)
+                }
+                Text(row.title)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Katha.Color.text)
+            }
+            .padding(.horizontal, Katha.Spacing.lg)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Katha.Spacing.md) {
                     ForEach(row.series) { series in
                         NavigationLink(value: series.slug) {
                             PosterCard(series: series)
+                        }
+                        .buttonStyle(PressableStyle())
+                        // Cards ease in from the rail's edges.
+                        .scrollTransition(axis: .horizontal) { content, phase in
+                            content
+                                .opacity(phase.isIdentity ? 1 : 0.6)
+                                .scaleEffect(phase.isIdentity ? 1 : 0.94)
                         }
                     }
                 }
@@ -285,14 +334,18 @@ struct PosterCard: View {
             CoverImage(url: series.coverUrl)
                 .frame(width: 124, height: 176)
                 .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous)
+                    .strokeBorder(.white.opacity(0.07), lineWidth: 1))
                 .overlay(alignment: .bottomLeading) {
                     Text(series.primaryLanguage.uppercased())
                         .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Katha.Color.text)
                         .padding(4)
                         .background(Katha.Color.bg.opacity(0.6))
                         .clipShape(Capsule())
                         .padding(6)
                 }
+                .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
             Text(series.title)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Katha.Color.text)
@@ -302,6 +355,8 @@ struct PosterCard: View {
                 .font(.system(size: 11))
                 .foregroundStyle(Katha.Color.text2)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(series.title), \(series.episodeCount) episodes")
     }
 }
 
@@ -360,15 +415,27 @@ struct FeedErrorState: View {
     }
 }
 
+/// Skeleton of the real layout — the screen never blanks, it sketches itself
+/// in and then fills with content.
 struct FeedLoadingState: View {
     var body: some View {
-        VStack(spacing: Katha.Spacing.md) {
-            ProgressView().tint(Katha.Color.accent)
-            Text("Loading stories…")
-                .font(.system(size: 15))
-                .foregroundStyle(Katha.Color.text2)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Katha.Spacing.xl) {
+                SkeletonBlock(height: 74, radius: Katha.Radius.lg)
+                SkeletonBlock(height: 420, radius: Katha.Radius.lg)
+                VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
+                    SkeletonBlock(width: 140, height: 18, radius: 6)
+                    HStack(spacing: Katha.Spacing.md) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            SkeletonBlock(width: 124, height: 176)
+                        }
+                    }
+                }
+            }
+            .padding(Katha.Spacing.lg)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .scrollDisabled(true)
         .background(Katha.Color.bg)
+        .accessibilityLabel("Loading stories")
     }
 }

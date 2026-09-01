@@ -10,11 +10,11 @@ Five surfaces built, tested, coverage-gated and verified end-to-end. The 112-fin
 
 | Surface | What runs | Tests · coverage (gate) |
 |---|---|---|
-| `backend` — core-api :8799 + admin-api :8800 over one shared ledger DB | catalog/playback auth/wallet/IAP/web orders/unlocks · events pipeline · grievances · full back-office API (analytics, approvals, refunds, DPDP, catalog levers, experiments) | **179 · 100%** (≥98) |
-| `web/admin` — React 19 + Vite back office | OIDC sign-in (dev IdP or Google Workspace), business analytics board, users/money desk, catalog lifecycle + drafts, rollouts & experiments, hash-chained audit, grievance queue | **218 · 98.9 / 95.6 / 97.2** (98/95/96) + **2 Playwright e2e** |
-| `web/site` — Next.js 15 public site + web watch app | landing + series pages, hls.js player, UPI coin store wired to the live ledger | **76 · 98.9 / 95.1 / 97.9** (98/95/96) |
-| `ios/KathaKit` + `ios/KathaApp` | all 23 design-board screens: feed, player (capture shield, auto-unlock), paywall, wallet, check-in, notifications, parental PIN | **77 · 100%** (≥98) + **12-flow XCUITest suite** (green on simulator *and* a physical iPhone 16) |
-| `contracts/` | OpenAPI: core-api **24 paths**, admin-api **51 paths** — drift-gated in CI on both server and client | generator: `tools/gen_admin_types.py` |
+| `backend` — core-api :8799 + admin-api :8800 over one shared ledger DB | catalog/playback auth/wallet/IAP/web orders/unlocks · guest→member merge · personalized home rails (events-ranked trending + "Because you watched") · OTP rate limiting · events pipeline · grievances · GST invoices + outbox comms · full back-office API (analytics, approvals, refunds, DPDP, catalog levers, experiments, invoice register/CSV, outbox retry) | **204 · 100%** (≥98) |
+| `web/admin` — React 19 + Vite back office | OIDC sign-in (dev IdP or Google Workspace), business analytics board, users/money desk, catalog lifecycle + drafts, rollouts & experiments, hash-chained audit, grievance queue, outbox + invoice register | **222 · 99.0 / 95.3 / 96.4** (98/95/96) + **2 Playwright e2e** |
+| `web/site` — Next.js 15 public site + web watch app | landing + series pages (og:image, JSON-LD, sitemap/robots), hls.js player, UPI coin store wired to the live ledger, invoice email at checkout | **78 · 98.9 / 95.1 / 97.9** (98/95/96) |
+| `ios/KathaKit` + `ios/KathaApp` | all 23 design-board screens: feed (parallax hero, zoom transitions, skeletons), player (capture shield, auto-unlock), paywall, wallet, check-in, notifications, parental PIN, in-app grievance form, invoices · haptics + Reduce-Motion support · privacy manifest | **84 · 99.8%** (≥98) + **12-flow XCUITest suite** (green on simulator *and* a physical iPhone 16) |
+| `contracts/` | OpenAPI: core-api **26 paths**, admin-api **56 paths** — drift-gated in CI on both server and client | generator: `tools/gen_admin_types.py` |
 
 Proven live, not just in tests: guest → buy pack → unlock E11 → HLS plays (iOS device + web browser); admin adjusts a wallet → visible in the app without restart; a series drafted in the panel → published → served → its paywall charges the drafted price; OIDC sign-in with server-side roles; the audit chain flags tampering.
 

@@ -44,10 +44,11 @@ export const api = {
 
   async otpLogin(phone: string, code = "1234"): Promise<string> {
     await call("/v1/auth/otp/request", { method: "POST", body: JSON.stringify({ phone }) }, false);
+    // Verify WITH the current (guest) bearer: the server folds that guest's
+    // coins, unlocks and progress into the member account on sign-in.
     const r = await call<{ access_token: string }>(
       "/v1/auth/otp/verify",
-      { method: "POST", body: JSON.stringify({ phone, code }) },
-      false
+      { method: "POST", body: JSON.stringify({ phone, code }) }
     );
     setToken(r.access_token);
     return r.access_token;

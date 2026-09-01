@@ -1,7 +1,7 @@
-"""Catalog + home feed (public reads)."""
+"""Catalog + home feed (public reads; home personalizes with a bearer)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 
 import json as _json
 
@@ -39,13 +39,34 @@ def _served(summaries: list[SeriesSummary]) -> list[SeriesSummary]:
     return out
 
 
+def _bearer_user(authorization: str | None) -> str | None:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    from ..auth import decode_token
+    token = authorization.split(" ", 1)[1].strip()
+    payload = decode_token(token)
+    return payload["sub"] if payload else token
+
+
 @router.get("/home", response_model=HomeResponse)
-def home(lang: str = "hi") -> HomeResponse:
+def home(lang: str = "hi",
+         authorization: str | None = Header(default=None)) -> HomeResponse:
+    """The home rails. Anonymous callers get catalog order; a bearer gets
+    events-ranked Trending plus a "Because you watched" rail scored off the
+    viewer's own progress (see app/recs.py)."""
+    from .. import recs
     served = _served(overrides.all_summaries())
     series = [s for s in served if s.primary_language == lang] or served
-    trending = HomeRow(title=f"Trending in {lang}", series=series)
-    new_row = HomeRow(title="New this week", series=list(reversed(series))[:5])
-    return HomeResponse(rows=[trending, new_row])
+    rows = [HomeRow(title=f"Trending in {lang}", series=recs.rank_trending(series))]
+    user = _bearer_user(authorization)
+    if user:
+        byw = recs.because_you_watched(user, served)
+        if byw is not None:
+            seed_title, sims = byw
+            rows.append(HomeRow(title=f"Because you watched {seed_title}",
+                                series=sims))
+    rows.append(HomeRow(title="New this week", series=list(reversed(series))[:5]))
+    return HomeResponse(rows=rows)
 
 
 @router.get("/series", response_model=list[SeriesSummary])

@@ -348,6 +348,7 @@
           "catalog"
         ],
         "summary": "Home",
+        "description": "The home rails. Anonymous callers get catalog order; a bearer gets\nevents-ranked Trending plus a \"Because you watched\" rail scored off the\nviewer's own progress (see app/recs.py).",
         "operationId": "home_v1_home_get",
         "parameters": [
           {
@@ -358,6 +359,22 @@
               "type": "string",
               "default": "hi",
               "title": "Lang"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
             }
           }
         ],

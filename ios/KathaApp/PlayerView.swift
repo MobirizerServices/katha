@@ -226,6 +226,7 @@ struct PlayerView: View {
                                label: liked ? "Liked" : "Like",
                                tint: liked ? Katha.Color.accent : .white) {
                         liked.toggle()
+                        if liked { Haptics.tap() }
                     }
                     railButton(icon: "square.stack.3d.down.right", label: "E\(current)", tint: .white) {
                         showDrawer = true
@@ -353,8 +354,13 @@ struct PlayerView: View {
         DragGesture(minimumDistance: 60)
             .onEnded { g in
                 guard abs(g.translation.height) > abs(g.translation.width) else { return }
-                if g.translation.height < -60 { Task { await advance(to: current + 1) } }
-                else if g.translation.height > 60, current > 1 { Task { await advance(to: current - 1) } }
+                if g.translation.height < -60 {
+                    Haptics.tap()
+                    Task { await advance(to: current + 1) }
+                } else if g.translation.height > 60, current > 1 {
+                    Haptics.tap()
+                    Task { await advance(to: current - 1) }
+                }
             }
     }
 
@@ -390,6 +396,7 @@ struct PlayerView: View {
                     slug: slug, number: current, idempotencyKey: UUID().uuidString) {
                     model.wallet.reconcile(with: res.wallet)
                     toast = "−\(price) coins · E\(current) unlocked"
+                    Haptics.success()
                     pb = try await model.api.playback(slug: slug, number: current)
                 }
             }
@@ -401,6 +408,7 @@ struct PlayerView: View {
                 engine.load(url: url, resumeMs: pb.resumePositionMs ?? 0)
             } else {
                 engine.stop()
+                Haptics.warning()
                 showPaywall = true
             }
         } catch {

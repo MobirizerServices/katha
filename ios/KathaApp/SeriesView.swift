@@ -22,20 +22,32 @@ struct SeriesView: View {
                 FeedErrorState(detail: error) { await load() }
                     .frame(minHeight: 400)
             } else {
-                ProgressView().tint(Katha.Color.accent).padding(40)
+                VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
+                    SkeletonBlock(height: 260, radius: 0)
+                    VStack(alignment: .leading, spacing: Katha.Spacing.md) {
+                        SkeletonBlock(width: 220, height: 20, radius: 6)
+                        SkeletonBlock(height: 60)
+                        SkeletonBlock(height: 48)
+                    }
+                    .padding(.horizontal, Katha.Spacing.lg)
+                }
             }
         }
         .background(Katha.Color.bg)
         .navigationBarTitleDisplayMode(.inline)
+        .zoomDestination(id: slug)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    Haptics.tap()
                     Task { await model.toggleMyList(slug: slug) }
                 } label: {
                     Image(systemName: model.myListSlugs.contains(slug) ? "bookmark.fill" : "bookmark")
-                        .accessibilityLabel("Save to My list")
+                        .accessibilityLabel(model.myListSlugs.contains(slug)
+                                            ? "Remove from My list" : "Save to My list")
                         .foregroundStyle(model.myListSlugs.contains(slug)
                                          ? Katha.Color.accent : Katha.Color.text)
+                        .symbolEffect(.bounce, value: model.myListSlugs.contains(slug))
                 }
             }
         }
@@ -44,10 +56,10 @@ struct SeriesView: View {
 
     private func content(_ d: SeriesDetail) -> some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
-            // Billboard
+            // Billboard — stretches under an over-pull, drifts on scroll.
             ZStack(alignment: .bottomLeading) {
                 CoverImage(url: d.coverWideUrl)
-                    .frame(height: 230)
+                    .frame(height: 260)
                     .overlay {
                         // Scrim strong enough that the title reads over any key art
                         // (dev placeholder covers carry baked-in text of their own).
@@ -57,8 +69,14 @@ struct SeriesView: View {
                             .init(color: Katha.Color.bg.opacity(0.98), location: 1),
                         ], startPoint: .top, endPoint: .bottom)
                     }
+                    .visualEffect { content, proxy in
+                        let minY = proxy.frame(in: .scrollView).minY
+                        return content
+                            .offset(y: minY > 0 ? -minY : 0)
+                            .scaleEffect(minY > 0 ? 1 + minY / 500 : 1, anchor: .top)
+                    }
                 Text(d.title)
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.system(size: 28, weight: .heavy))
                     .foregroundStyle(Katha.Color.text)
                     .shadow(color: .black.opacity(0.6), radius: 6, y: 1)
                     .padding(Katha.Spacing.lg)
@@ -94,10 +112,12 @@ struct SeriesView: View {
                     NavigationLink(value: EpisodeRoute(slug: slug, number: cp.number)) {
                         primaryCTA("Continue E\(cp.number)")
                     }
+                    .buttonStyle(PressableStyle())
                 } else {
                     NavigationLink(value: EpisodeRoute(slug: slug, number: 1)) {
                         primaryCTA("Play episode 1")
                     }
+                    .buttonStyle(PressableStyle())
                 }
             }
             .padding(.horizontal, Katha.Spacing.lg)
@@ -115,7 +135,8 @@ struct SeriesView: View {
         .foregroundStyle(Katha.Color.text)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(Katha.Color.accent)
+        .background(LinearGradient(colors: [Katha.Color.accent, Katha.Color.accentPressed],
+                                   startPoint: .top, endPoint: .bottom))
         .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
     }
 
@@ -131,16 +152,26 @@ struct SeriesView: View {
 
     private func episodeGrid(_ d: SeriesDetail) -> some View {
         let cols = Array(repeating: GridItem(.flexible(), spacing: Katha.Spacing.sm), count: 5)
+        let currentEp = continuePoint?.number
         return LazyVGrid(columns: cols, spacing: Katha.Spacing.sm) {
             ForEach(d.episodes) { ep in
                 NavigationLink(value: EpisodeRoute(slug: d.slug, number: ep.number)) {
                     ZStack {
                         RoundedRectangle(cornerRadius: Katha.Radius.sm, style: .continuous)
-                            .fill(Katha.Color.surface)
+                            .fill(ep.number == currentEp
+                                  ? Katha.Color.accent.opacity(0.18) : Katha.Color.surface)
                         Text("\(ep.number)")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Katha.Color.text)
-                        if !ep.isFree {
+                            .foregroundStyle(ep.isFree || ep.number == currentEp
+                                             ? Katha.Color.text : Katha.Color.text2)
+                        if ep.number == currentEp {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Katha.Color.accent)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                                       alignment: .bottomTrailing)
+                                .padding(4)
+                        } else if !ep.isFree {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 9))
                                 .foregroundStyle(Katha.Color.coin)
@@ -149,7 +180,12 @@ struct SeriesView: View {
                         }
                     }
                     .frame(height: 48)
+                    .overlay(RoundedRectangle(cornerRadius: Katha.Radius.sm, style: .continuous)
+                        .strokeBorder(ep.number == currentEp ? Katha.Color.accent : .clear,
+                                      lineWidth: 1))
+                    .accessibilityLabel("Episode \(ep.number)\(ep.isFree ? ", free" : ", locked")\(ep.number == currentEp ? ", continue here" : "")")
                 }
+                .buttonStyle(PressableStyle())
             }
         }
         .padding(.horizontal, Katha.Spacing.lg)

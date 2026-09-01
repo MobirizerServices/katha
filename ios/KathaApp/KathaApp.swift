@@ -404,11 +404,15 @@ struct RootView: View {
 struct MainTabView: View {
     @Environment(AppModel.self) private var model
     @State private var homePath = NavigationPath()
+    /// Hero → series container zoom (scoped to the Home stack only, so a rail
+    /// card in another tab never matches the hero's transition source).
+    @Namespace private var heroZoom
 
     var body: some View {
         ZStack(alignment: .top) {
             TabView {
                 tabStack(path: $homePath) { FeedView() }
+                    .environment(\.zoomNamespace, heroZoom)
                     .tabItem { Label("Home", systemImage: "play.rectangle.fill") }
                 tabStack { BrowseView() }
                     .tabItem { Label("Browse", systemImage: "square.grid.2x2.fill") }

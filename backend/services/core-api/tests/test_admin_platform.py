@@ -1140,3 +1140,210 @@ def test_guest_merge_carries_bonus_coins(shared):
     w = core.get("/v1/wallet",
                  headers={"Authorization": f"Bearer {m['access_token']}"}).json()
     assert w["balance_bought"] == 1300 and w["balance_bonus"] == 130
+
+
+# ---- OTP abuse guard ---------------------------------------------------------
+
+def _otp_reset():
+    from app.routers import auth as auth_router
+    auth_router._otp_hits.clear()
+
+
+def test_otp_request_rate_limited_per_phone(shared):
+    _otp_reset()
+    shared.kv_set("config:otp.limits",
+                  json.dumps({"phone": 2, "verify": 3, "ip": 100, "window_s": 600}))
+    for _ in range(2):
+        assert core.post("/v1/auth/otp/request",
+                         json={"phone": "+919000000001"}).status_code == 200
+    r = core.post("/v1/auth/otp/request", json={"phone": "+919000000001"})
+    assert r.status_code == 429 and int(r.headers["Retry-After"]) >= 1
+    # A different phone from the same IP is still fine (ip cap is 100).
+    assert core.post("/v1/auth/otp/request",
+                     json={"phone": "+919000000002"}).status_code == 200
+
+
+def test_otp_verify_rate_limited_and_ip_cap(shared):
+    _otp_reset()
+    shared.kv_set("config:otp.limits",
+                  json.dumps({"phone": 100, "verify": 2, "ip": 3, "window_s": 600}))
+    ok = core.post("/v1/auth/otp/verify",
+                   json={"phone": "+919000000003", "code": "1234"})
+    assert ok.status_code == 200
+    core.post("/v1/auth/otp/verify", json={"phone": "+919000000003", "code": "1234"})
+    r = core.post("/v1/auth/otp/verify",
+                  json={"phone": "+919000000003", "code": "1234"})
+    assert r.status_code == 429                      # verify cap (2) tripped
+    # The IP window (3) is also exhausted now — a fresh phone gets 429 too.
+    r2 = core.post("/v1/auth/otp/verify",
+                   json={"phone": "+919000000004", "code": "1234"})
+    assert r2.status_code == 429
+
+
+def test_otp_window_prunes_and_malformed_kv_falls_back(shared):
+    import time as _time
+    from app.routers import auth as auth_router
+    _otp_reset()
+    shared.kv_set("config:otp.limits", json.dumps({"phone": 1, "ip": 100}))
+    # A full window of ANCIENT hits must not count against the caller.
+    auth_router._otp_hits["phone:p:+919000000005"] = [_time.monotonic() - 9999.0]
+    assert core.post("/v1/auth/otp/request",
+                     json={"phone": "+919000000005"}).status_code == 200
+    # Garbage KV (both non-JSON and non-dict JSON) → generous defaults apply.
+    for garbage in ("not json", "[1,2]"):
+        _otp_reset()
+        shared.kv_set("config:otp.limits", garbage)
+        assert core.post("/v1/auth/otp/request",
+                         json={"phone": "+919000000006"}).status_code == 200
+
+
+# ---- outbox retry + invoice CSV ---------------------------------------------
+
+def test_outbox_retry_email_lifecycle(shared, monkeypatch):
+    rid = shared.outbox_append(kind="email", recipient="meera@example.com",
+                               subject="Your invoice", body="<b>hi</b>", now=T0)
+    shared.outbox_mark(rid, "failed", detail="boom")
+    pid = shared.outbox_append(kind="push", recipient="ccecaee4…",
+                               subject="drop", body="{}", now=T0)
+
+    # No SMTP configured → an honest 409, nothing pretends to send.
+    r = admin.post(f"/admin/v1/outbox/{rid}/retry", headers=SUPPORT)
+    assert r.status_code == 409 and "KATHA_SMTP_URL" in r.json()["detail"]
+
+    monkeypatch.setenv("KATHA_SMTP_URL", "smtp://u:p@mail.test:587")
+    from katha_infra import comms
+    sent_to = []
+    monkeypatch.setattr(comms, "_smtp_deliver",
+                        lambda to, subject, body: sent_to.append(to))
+    r = admin.post(f"/admin/v1/outbox/{rid}/retry", headers=SUPPORT)
+    assert r.status_code == 200 and r.json()["status"] == "sent"
+    assert sent_to == ["meera@example.com"]
+    assert shared.outbox_get(rid)["status"] == "sent"
+    assert any(row["action"] == "outbox.retry"
+               for row in shared.audit_list(limit=10)["rows"])
+
+    assert admin.post(f"/admin/v1/outbox/{rid}/retry",
+                      headers=SUPPORT).status_code == 409   # already sent
+    assert admin.post(f"/admin/v1/outbox/{pid}/retry",
+                      headers=SUPPORT).status_code == 409   # push rows can't
+    assert admin.post("/admin/v1/outbox/99999/retry",
+                      headers=SUPPORT).status_code == 404
+    assert admin.post(f"/admin/v1/outbox/{rid}/retry",
+                      headers=QC).status_code == 403
+
+
+def test_outbox_retry_records_a_fresh_failure(shared, monkeypatch):
+    rid = shared.outbox_append(kind="email", recipient="x@y.z",
+                               subject="s", body="b", now=T0)
+    monkeypatch.setenv("KATHA_SMTP_URL", "smtp://u:p@mail.test:587")
+    from katha_infra import comms
+    def _blow(to, subject, body):
+        raise RuntimeError("mailbox on fire")
+    monkeypatch.setattr(comms, "_smtp_deliver", _blow)
+    r = admin.post(f"/admin/v1/outbox/{rid}/retry", headers=SUPPORT)
+    assert r.status_code == 200 and r.json()["status"] == "failed"
+    assert "mailbox on fire" in shared.outbox_get(rid)["detail"]
+
+
+def test_invoice_csv_export(shared):
+    shared.invoice_create(
+        id="KATHA-INV-2627-000007", user_id="u_csv", order_ref="web:u_csv:sku",
+        sku="coins_web_popular_in", coins=1300, bonus_coins=130,
+        total_minor=19900, taxable_minor=16864, gst_minor=3036,
+        gst_rate_pct=18, seller_gstin="27ABCDE1234F1Z5", created_at=T0)
+    r = admin.get("/admin/v1/invoices.csv", headers=FINANCE)
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    assert "attachment" in r.headers["content-disposition"]
+    lines = r.text.strip().splitlines()
+    assert lines[0].startswith("invoice_no,date,buyer")
+    assert "KATHA-INV-2627-000007" in r.text and "16864,3036,19900" in r.text
+    assert admin.get("/admin/v1/invoices.csv", headers=SUPPORT).status_code == 403
+
+
+# ---- home personalization ----------------------------------------------------
+
+def test_home_trending_ranks_by_recent_play_starts(shared):
+    from katha_domain.timeutil import now_iso
+    now = now_iso()
+    for _ in range(3):
+        shared.event_append(ts=now, user_id="v1", name="play_start",
+                            ref="ceo-sahab:e1")
+    shared.event_append(ts=now, user_id="v2", name="play_start",
+                        ref="kaanch-ka-mahal:e1")
+    # Ancient traffic must not count toward the 7-day window.
+    for _ in range(9):
+        shared.event_append(ts="2020-01-01T00:00:00+00:00", user_id="v3",
+                            name="play_start", ref="prema-pariksha:e1")
+    rows = core.get("/v1/home").json()["rows"]
+    trending = rows[0]
+    assert trending["series"][0]["slug"] == "ceo-sahab"
+    assert trending["series"][1]["slug"] == "kaanch-ka-mahal"
+    assert trending["series"][2]["slug"] != "prema-pariksha"
+
+
+def test_home_because_you_watched_rail(shared):
+    tok = core.post("/v1/auth/guest").json()["access_token"]
+    hdr = {"Authorization": f"Bearer {tok}"}
+    core.put("/v1/progress", headers=hdr, json={"items": [
+        {"slug": "kaanch-ka-mahal", "number": 1, "position_ms": 30000,
+         "duration_ms": 90000},
+        {"slug": "kaanch-ka-mahal", "number": 2, "position_ms": 1000,
+         "duration_ms": 90000},
+    ]})
+    rows = core.get("/v1/home", headers=hdr).json()["rows"]
+    titles = [r["title"] for r in rows]
+    byw = next(r for r in rows if r["title"].startswith("Because you watched"))
+    assert "Kaanch Ka Mahal" in byw["title"]
+    assert titles[-1] == "New this week"                  # rail order kept
+    slugs = [s["slug"] for s in byw["series"]]
+    assert "kaanch-ka-mahal" not in slugs and len(slugs) >= 1
+    # Anonymous callers never get the personal rail.
+    anon = core.get("/v1/home").json()["rows"]
+    assert not any(r["title"].startswith("Because") for r in anon)
+
+
+def test_recs_edge_paths(shared):
+    from app import recs
+    from app.store import ProgressItem, UserEngagement
+    from katha_domain import catalog as dom_catalog
+    served = [s for s in dom_catalog.summaries()]
+    # Seed series that vanished from the catalog → no rail.
+    core_store.engagement["u_ghost"] = UserEngagement(progress={
+        "ghost:e1": ProgressItem(slug="ghost", number=1, episode_id="ghost:e1")})
+    assert recs.because_you_watched("u_ghost", served) is None
+    # Nothing else to score against → no rail.
+    core_store.engagement["u_solo"] = UserEngagement(progress={
+        served[0].slug + ":e1": ProgressItem(
+            slug=served[0].slug, number=1, episode_id=served[0].slug + ":e1")})
+    assert recs.because_you_watched("u_solo", [served[0]]) is None
+    # A candidate with no catalog detail (panel draft) still scores by genre.
+    from katha_domain.schemas import SeriesSummary
+    hand = SeriesSummary(slug="hand-made", title="Hand Made",
+                         genres=list(served[0].genres),
+                         episode_count=12, primary_language="hi")
+    got = recs.because_you_watched("u_solo", [served[0], hand])
+    assert got is not None and got[1][0].slug == "hand-made"
+
+
+def test_guest_merge_over_persistent_ledger(shared):
+    """Regression from the device suite: merge crashed with AttributeError on
+    PersistentLedger (missing .entitlements) — every other test swaps in the
+    pure in-memory ledger, so run the whole login-merge over the real one."""
+    core_store.ledger = PersistentLedger(shared.db)
+    try:
+        g = core.post("/v1/auth/guest").json()
+        gtok, gid = g["access_token"], g["user"]["user_id"]
+        core.post("/v1/iap/verify",
+                  json={"jws": "dev-jws-merge-pl", "sku": "coins_starter_in"},
+                  headers={"Authorization": f"Bearer {gtok}"})
+        m = core.post("/v1/auth/otp/verify",
+                      headers={"Authorization": f"Bearer {gtok}"},
+                      json={"phone": "+915550001111", "code": "1234"})
+        assert m.status_code == 200
+        w = core.get("/v1/wallet",
+                     headers={"Authorization": f"Bearer {m.json()['access_token']}"}).json()
+        assert w["total"] > 0                      # coins survived the merge
+        assert core_store.ledger.balance(gid).total == 0   # guest zeroed
+    finally:
+        core_store.ledger = Ledger()

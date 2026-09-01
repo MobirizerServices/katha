@@ -129,6 +129,22 @@ def send_push(shared: SharedStore, *, device_token: str, title: str, body: str,
     return row_id
 
 
+def retry_email(shared: SharedStore, row: dict) -> tuple[bool, str]:
+    """Re-attempt delivery of a queued/failed email outbox row (admin Retry).
+
+    Returns (sent, detail). Push rows can't be retried from the outbox — the
+    row keeps only a truncated token; re-trigger the drop from the catalog.
+    """
+    try:
+        _smtp_deliver(row["recipient"], row["subject"], row["body"])
+        shared.outbox_mark(row["id"], "sent")
+        return True, ""
+    except Exception as exc:
+        detail = str(exc)[:200]
+        shared.outbox_mark(row["id"], "failed", detail=detail)
+        return False, detail
+
+
 # --- GST invoice for web (UPI) purchases -------------------------------------
 
 GST_RATE_PCT = 18

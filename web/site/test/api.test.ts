@@ -83,6 +83,17 @@ describe("otpLogin", () => {
     expect(JSON.parse(verInit.body as string)).toEqual({ phone: "+91 99999 00000", code: "1234" });
   });
 
+  it("sends the guest bearer on verify so the server merges the wallet", async () => {
+    localStorage.setItem(TOKEN_KEY, "guest-tok");
+    fetchMock
+      .mockResolvedValueOnce(okJson({})) // otp/request
+      .mockResolvedValueOnce(okJson({ access_token: "member-tok" }));
+    await api.otpLogin("+91 2");
+    const headers = callArgs(1)[1].headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe("Bearer guest-tok");
+    expect(getToken()).toBe("member-tok"); // guest token replaced after merge
+  });
+
   it("passes a custom OTP code through to verify", async () => {
     fetchMock
       .mockResolvedValueOnce(okJson({}))

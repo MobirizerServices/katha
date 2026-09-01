@@ -462,6 +462,18 @@ class SharedStore:
                      value: int = 0, channel: str = "") -> None:
         self.db.run(self._event_append(ts, user_id, name, ref, value, channel))
 
+    def event_counts(self, name: str, since_day: str) -> dict[str, int]:
+        """Per-ref counts of one event since a UTC date — feeds trending."""
+        return self.db.run(self._event_counts(name, since_day))
+
+    async def _event_counts(self, name, since_day) -> dict[str, int]:
+        async with self.db.session_factory() as s:
+            rows = (await s.execute(
+                select(EventRow.ref, func.count())
+                .where(EventRow.name == name, EventRow.day >= since_day)
+                .group_by(EventRow.ref))).all()
+        return {ref: n for ref, n in rows}
+
     async def _event_append(self, ts, user_id, name, ref, value, channel) -> None:
         async with self.db.session_factory() as s:
             s.add(EventRow(ts=ts, day=ts[:10], user_id=user_id, name=name,
@@ -693,6 +705,19 @@ class SharedStore:
                 row.status, row.detail = status, detail
                 await s.commit()
 
+    def outbox_get(self, row_id: int) -> dict | None:
+        return self.db.run(self._outbox_get(row_id))
+
+    async def _outbox_get(self, row_id) -> dict | None:
+        from .models import OutboxRow
+        async with self.db.session_factory() as s:
+            r = await s.get(OutboxRow, row_id)
+        if r is None:
+            return None
+        return {"id": r.id, "kind": r.kind, "recipient": r.recipient,
+                "subject": r.subject, "body": r.body, "status": r.status,
+                "detail": r.detail, "created_at": r.created_at}
+
     def outbox_list(self, *, kind: str = "", limit: int = 100) -> list[dict]:
         return self.db.run(self._outbox_list(kind, limit))
 
@@ -754,6 +779,7 @@ class SharedStore:
                  "coins": r.coins, "bonus_coins": r.bonus_coins,
                  "total_minor": r.total_minor, "taxable_minor": r.taxable_minor,
                  "gst_minor": r.gst_minor, "gst_rate_pct": r.gst_rate_pct,
+                 "seller_gstin": r.seller_gstin,
                  "created_at": r.created_at} for r in rows]
 
     def invoice_by_order(self, order_ref: str) -> dict | None:

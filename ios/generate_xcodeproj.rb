@@ -24,6 +24,10 @@ assets_path = File.join(here, 'KathaApp', 'Assets.xcassets')
 assets_ref = group.new_reference('Assets.xcassets')
 target.resources_build_phase.add_file_reference(assets_ref, true)
 
+# App Store privacy manifest — bundled as a resource so App Review sees it.
+privacy_ref = group.new_reference('PrivacyInfo.xcprivacy')
+target.resources_build_phase.add_file_reference(privacy_ref, true)
+
 # Local Swift package dependency on ../KathaKit (path is relative to the project dir).
 local = project.new(Xcodeproj::Project::Object::XCLocalSwiftPackageReference)
 local.relative_path = 'KathaKit'

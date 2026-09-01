@@ -73,6 +73,7 @@ struct DropBanner: View {
     let drop: DropAlert
     let watch: () -> Void
     let dismiss: () -> Void
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -95,15 +96,24 @@ struct DropBanner: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(Katha.Color.text2)
+                        .accessibilityLabel("Dismiss")
                 }
             }
-            Text(drop.title)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Katha.Color.text)
-            Text(drop.body)
-                .font(.system(size: 13))
-                .foregroundStyle(Katha.Color.text2)
-                .lineLimit(2)
+            HStack(alignment: .top, spacing: Katha.Spacing.md) {
+                CoverImage(url: model.coverURL(forSlug: drop.slug, wide: false))
+                    .frame(width: 44, height: 62)
+                    .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.sm,
+                                                style: .continuous))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(drop.title)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Katha.Color.text)
+                    Text(drop.body)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Katha.Color.text2)
+                        .lineLimit(2)
+                }
+            }
             Button(action: watch) {
                 Text("Watch now")
                     .font(.system(size: 13, weight: .semibold))
@@ -113,6 +123,7 @@ struct DropBanner: View {
                     .background(Katha.Color.accent)
                     .clipShape(Capsule())
             }
+            .buttonStyle(PressableStyle())
             .padding(.top, 2)
         }
         .padding(Katha.Spacing.md)

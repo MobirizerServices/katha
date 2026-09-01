@@ -63,6 +63,8 @@ struct PaywallView: View {
                         Text("You have \(balance)")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Katha.Color.text)
+                            .contentTransition(.numericText())
+                            .animation(Katha.Motion.spring, value: balance)
                     }
                     .padding(.horizontal, 10)
                     .frame(height: 28)
@@ -108,6 +110,7 @@ struct PaywallView: View {
                         .background(Katha.Color.raised)
                         .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
                     }
+                    .buttonStyle(PressableStyle())
                     .disabled(working || balance < bundle)
                     .opacity(balance >= bundle ? 1 : 0.55)
                 }
@@ -165,6 +168,7 @@ struct PaywallView: View {
         .background(Katha.Color.surface)
         .presentationDetents(canAfford ? [.medium, .large] : [.large])
         .presentationBackground(Katha.Color.surface)
+        .presentationCornerRadius(24)
         .task {
             if packs.isEmpty {
                 packs = ((try? await model.api.packs(storefront: "IN")) ?? [])
@@ -181,10 +185,12 @@ struct PaywallView: View {
             let res = try await model.api.unlockEpisode(
                 slug: slug, number: episodeNumber, idempotencyKey: UUID().uuidString)
             model.wallet.reconcile(with: res.wallet)
+            Haptics.success()
             await onUnlocked()
             dismiss()
         } catch {
             await model.refreshWallet()
+            Haptics.warning()
             errorText = "The unlock didn't go through. You weren't charged twice — try again."
         }
     }
@@ -194,10 +200,12 @@ struct PaywallView: View {
         do {
             let res = try await model.api.unlockAll(slug: slug, idempotencyKey: UUID().uuidString)
             model.wallet.reconcile(with: res.wallet)
+            Haptics.success()
             await onUnlocked()
             dismiss()
         } catch {
             await model.refreshWallet()
+            Haptics.warning()
             errorText = "The unlock didn't go through. You weren't charged twice — try again."
         }
     }
@@ -208,8 +216,10 @@ struct PaywallView: View {
         do {
             let w = try await model.api.verifyIAP(jws: "dev-jws-\(pack.sku)-\(UUID().uuidString)", sku: pack.sku)
             model.wallet.reconcile(with: w)
+            Haptics.success()
             errorText = nil
         } catch {
+            Haptics.warning()
             errorText = "Payment didn't go through. You weren't charged."
         }
     }
@@ -293,6 +303,9 @@ struct PackRow: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
         }
+        .buttonStyle(PressableStyle())
         .disabled(buying)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(pack.totalCoins) coins for ₹\(Int(pack.priceMajor))")
     }
 }

@@ -1379,6 +1379,57 @@ def outbox(kind: str = "", limit: int = 100,
                            "push": comms.push_configured()}}
 
 
+@router.post("/outbox/{row_id}/retry", tags=["ops"])
+def outbox_retry(row_id: int, request: Request,
+                 actor: Actor = Depends(require(Role.SUPPORT))):
+    """Re-attempt a queued/failed email. Push rows can't be retried here —
+    the outbox keeps only a truncated device token; re-send the drop from
+    the catalog instead."""
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+    from katha_infra import comms
+    row = SHARED.outbox_get(row_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="no such outbox row")
+    if row["kind"] != "email":
+        raise HTTPException(status_code=409,
+                            detail="only email rows retry from the outbox — "
+                                   "re-send pushes from the catalog's Notify drop")
+    if row["status"] == "sent":
+        raise HTTPException(status_code=409, detail="already sent")
+    if not comms.email_configured():
+        raise HTTPException(status_code=409,
+                            detail="no SMTP transport configured (KATHA_SMTP_URL)")
+    sent, detail = comms.retry_email(SHARED, row)
+    audit(actor, "outbox.retry", str(row_id),
+          {"outcome": "sent" if sent else "failed", "detail": detail}, request)
+    return {"id": row_id, "status": "sent" if sent else "failed", "detail": detail}
+
+
+@router.get("/invoices.csv", tags=["ops"])
+def invoices_csv(actor: Actor = Depends(require(Role.FINANCE, Role.ANALYST,
+                                                Role.RO))):
+    """The register as CSV — what actually gets attached to the GST filing."""
+    import csv
+    import io
+    from fastapi.responses import PlainTextResponse
+    rows = SHARED.invoices_all() if SHARED is not None else []
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["invoice_no", "date", "buyer", "sku", "coins", "bonus_coins",
+                "taxable_minor", "gst_minor", "total_minor", "gst_rate_pct",
+                "seller_gstin"])
+    for r in rows:
+        w.writerow([r["id"], r["created_at"][:10], r["user_id"], r["sku"],
+                    r["coins"], r["bonus_coins"], r["taxable_minor"],
+                    r["gst_minor"], r["total_minor"], r["gst_rate_pct"],
+                    r["seller_gstin"]])
+    return PlainTextResponse(
+        buf.getvalue(), media_type="text/csv",
+        headers={"Content-Disposition":
+                 'attachment; filename="katha-invoices.csv"'})
+
+
 @router.post("/catalog/series/{slug}/notify-drop", tags=["catalog"])
 def notify_drop(slug: str, request: Request = None, body: dict = Body(...),
                 actor: Actor = Depends(require(Role.CONTENT))):

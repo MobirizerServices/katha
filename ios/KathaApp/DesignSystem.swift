@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // Katha design tokens — dark, video-first (PDD design system, matching
 // docs/Katha_iOS_Design_v0.3.html). Single source of truth for the app's look.
@@ -32,6 +33,116 @@ public enum Katha {
         public static let lg: CGFloat = 16
         public static let xl: CGFloat = 24
     }
+
+    /// One spring vocabulary for the whole app — every animated state change
+    /// uses these, so the app moves like one object, not twelve screens.
+    public enum Motion {
+        public static let spring = Animation.spring(response: 0.38, dampingFraction: 0.82)
+        public static let snappy = Animation.spring(response: 0.26, dampingFraction: 0.86)
+    }
+}
+
+/// Physical feedback on the moments that matter: taps confirm, money succeeds,
+/// gates warn. Coalesced here so screens never construct generators inline.
+enum Haptics {
+    static func tap() { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+    static func success() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+    static func warning() { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+}
+
+/// Cards and posters compress slightly under the finger — the touch feel that
+/// separates a native app from a web view. Honors Reduce Motion.
+struct PressableStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.965 : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(Katha.Motion.snappy, value: configuration.isPressed)
+    }
+}
+
+// MARK: - Loading shimmer
+
+/// A soft highlight sweeping across skeleton blocks while content loads.
+/// Static under Reduce Motion.
+struct Shimmer: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase: CGFloat = -1
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if !reduceMotion {
+                GeometryReader { geo in
+                    LinearGradient(colors: [.clear, .white.opacity(0.07), .clear],
+                                   startPoint: .leading, endPoint: .trailing)
+                        .frame(width: geo.size.width * 0.7)
+                        .offset(x: phase * geo.size.width * 1.7)
+                }
+                .allowsHitTesting(false)
+                .onAppear {
+                    withAnimation(.linear(duration: 1.15).repeatForever(autoreverses: false)) {
+                        phase = 1
+                    }
+                }
+            }
+        }
+        .clipped()
+    }
+}
+
+/// One grey placeholder block of the skeleton screens.
+struct SkeletonBlock: View {
+    var width: CGFloat? = nil
+    var height: CGFloat
+    var radius: CGFloat = Katha.Radius.md
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
+            .fill(Katha.Color.surface)
+            .frame(width: width, height: height)
+            .modifier(Shimmer())
+    }
+}
+
+// MARK: - Hero → series zoom (iOS 18+, standard push everywhere else)
+
+extension EnvironmentValues {
+    /// Namespace shared between the Home hero (source) and SeriesView
+    /// (destination) for the container zoom transition.
+    @Entry var zoomNamespace: Namespace.ID?
+}
+
+private struct ZoomSourceModifier: ViewModifier {
+    let id: String
+    @Environment(\.zoomNamespace) private var ns
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *), let ns {
+            content.matchedTransitionSource(id: id, in: ns)
+        } else {
+            content
+        }
+    }
+}
+
+private struct ZoomDestinationModifier: ViewModifier {
+    let id: String
+    @Environment(\.zoomNamespace) private var ns
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *), let ns {
+            content.navigationTransition(.zoom(sourceID: id, in: ns))
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func zoomSource(id: String) -> some View { modifier(ZoomSourceModifier(id: id)) }
+    func zoomDestination(id: String) -> some View { modifier(ZoomDestinationModifier(id: id)) }
 }
 
 extension Color {
@@ -62,9 +173,18 @@ struct KathaPrimaryButton: View {
                 .foregroundStyle(Katha.Color.text)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(enabled ? Katha.Color.accent : Katha.Color.raised)
+                .background {
+                    if enabled {
+                        LinearGradient(colors: [Katha.Color.accent,
+                                                Katha.Color.accentPressed],
+                                       startPoint: .top, endPoint: .bottom)
+                    } else {
+                        Katha.Color.raised
+                    }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
         }
+        .buttonStyle(PressableStyle())
         .disabled(!enabled)
     }
 }

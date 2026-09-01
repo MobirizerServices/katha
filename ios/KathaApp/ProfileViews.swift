@@ -102,9 +102,14 @@ struct ProfileView: View {
             destination()
         } label: {
             HStack(spacing: Katha.Spacing.md) {
-                Image(systemName: icon)
-                    .frame(width: 24)
-                    .foregroundStyle(Katha.Color.accent)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Katha.Color.accent.opacity(0.16))
+                        .frame(width: 30, height: 30)
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Katha.Color.accent)
+                }
                 Text(title)
                     .font(.system(size: 15))
                     .foregroundStyle(Katha.Color.text)
@@ -118,7 +123,9 @@ struct ProfileView: View {
             }
             .padding(.horizontal, Katha.Spacing.lg)
             .frame(height: 52)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(PressableStyle())
     }
 }
 

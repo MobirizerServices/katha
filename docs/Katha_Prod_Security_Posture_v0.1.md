@@ -68,6 +68,17 @@ Transports activate purely by env:
 | `KATHA_APNS_KEY_P8` (path), `KATHA_APNS_KEY_ID`, `KATHA_APNS_TEAM_ID`, `KATHA_APNS_TOPIC`, `KATHA_APNS_ENV=prod` | Episode-drop pushes deliver to APNs over HTTP/2 with an ES256 provider token. The .p8 lives in the secret manager, never the repo. |
 | `KATHA_GSTIN` | Printed on every web-purchase tax invoice (default marks registration pending). |
 
+## 6. OTP abuse guard (added 2 Sep 2026)
+
+`/v1/auth/otp/request` and `/verify` run a sliding-window limiter per phone
+AND per client IP (429 + `Retry-After` when tripped). Defaults
+(request 30/phone, verify 60/phone, 240/IP per 10 min) are sized so humans and
+the UI test suites never trip while SMS-pumping scripts hit the wall fast;
+tune live via KV `config:otp.limits`
+(`{"phone":30,"verify":60,"ip":240,"window_s":600}`). The window is
+in-process per instance — multi-instance production keeps a gateway limit in
+front as the first layer, this one as the backstop.
+
 Invoices: GST @18% carved out of the GST-inclusive pack price, numbered
 `KATHA-INV-<FY>-NNNNNN` per financial year, emailed on the web (UPI) order and
 listed in-app (`GET /v1/me/invoices`). Apple invoices IAP purchases itself.

@@ -371,6 +371,7 @@ export const mutate = {
   refund: (userId: string, txId: string) =>
     send("/wallet/refund", "POST", { user_id: userId, tx_id: txId }),
   erase: (userId: string) => send(`/users/${userId}/erase`, "POST"),
+  outboxRetry: (id: number) => send(`/outbox/${id}/retry`, "POST"),
   approve: (id: string) => send(`/approvals/${id}/approve`, "POST"),
   reject: (id: string, note = "") => send(`/approvals/${id}/reject`, "POST", { note }),
   setFlag: (key: string, enabled: boolean, pct = 100, confirm?: string) =>

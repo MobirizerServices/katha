@@ -56,9 +56,11 @@ struct BrowseView: View {
                               spacing: Katha.Spacing.lg) {
                         ForEach(filtered) { s in
                             NavigationLink(value: s.slug) { PosterCard(series: s) }
+                                .buttonStyle(PressableStyle())
                         }
                     }
                     .padding(.horizontal, Katha.Spacing.lg)
+                    .animation(Katha.Motion.snappy, value: filtered.map(\.slug))
                 }
             }
             .padding(.vertical, Katha.Spacing.lg)
@@ -135,13 +137,23 @@ struct SearchView: View {
                         Text("Recent")
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(Katha.Color.text)
-                        ForEach(recents, id: \.self) { r in
-                            Button { query = r } label: {
-                                HStack {
-                                    Image(systemName: "clock").foregroundStyle(Katha.Color.text2)
-                                    Text(r).foregroundStyle(Katha.Color.text)
-                                    Spacer()
+                        FlowLayout(spacing: 8, lineSpacing: 8) {
+                            ForEach(recents, id: \.self) { r in
+                                Button { query = r } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "clock")
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(Katha.Color.text2)
+                                        Text(r)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(Katha.Color.text)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 32)
+                                    .background(Katha.Color.surface)
+                                    .clipShape(Capsule())
                                 }
+                                .buttonStyle(PressableStyle())
                             }
                         }
                     }
@@ -157,7 +169,9 @@ struct SearchView: View {
                                 Text("\(s.episodeCount) eps")
                                     .font(.system(size: 12)).foregroundStyle(Katha.Color.text2)
                             }
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(PressableStyle())
                     }
                 } else if results.isEmpty {
                     emptyState("No results for “\(query)”",
@@ -183,6 +197,7 @@ struct SearchView: View {
                                     .font(.system(size: 12)).foregroundStyle(Katha.Color.text2)
                             }
                         }
+                        .buttonStyle(PressableStyle())
                         .simultaneousGesture(TapGesture().onEnded { remember(query) })
                     }
                 }
@@ -213,16 +228,27 @@ struct MyListView: View {
         ScrollView {
             if model.myListSeries.isEmpty {
                 emptyState("Nothing saved yet",
-                           "Tap the bookmark on any series and it lands here.")
+                           "Tap the bookmark on any series and it lands here.",
+                           icon: "bookmark")
                     .padding(.top, 120)
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 124), spacing: 12)],
                           spacing: Katha.Spacing.lg) {
                     ForEach(model.myListSeries) { s in
                         NavigationLink(value: s.slug) { PosterCard(series: s) }
+                            .buttonStyle(PressableStyle())
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    Haptics.tap()
+                                    Task { await model.toggleMyList(slug: s.slug) }
+                                } label: {
+                                    Label("Remove from My list", systemImage: "bookmark.slash")
+                                }
+                            }
                     }
                 }
                 .padding(Katha.Spacing.lg)
+                .animation(Katha.Motion.spring, value: model.myListSeries.map(\.slug))
             }
         }
         .background(Katha.Color.bg)
@@ -234,9 +260,10 @@ struct MyListView: View {
 
 // MARK: - shared empty state
 
-func emptyState(_ title: String, _ subtitle: String) -> some View {
+func emptyState(_ title: String, _ subtitle: String,
+                icon: String = "sparkles") -> some View {
     VStack(spacing: 8) {
-        Image(systemName: "sparkles")
+        Image(systemName: icon)
             .font(.system(size: 34))
             .foregroundStyle(Katha.Color.text2)
         Text(title)

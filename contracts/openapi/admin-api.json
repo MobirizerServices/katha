@@ -2718,6 +2718,70 @@
         ]
       }
     },
+    "/admin/v1/invoices.csv": {
+      "get": {
+        "description": "The register as CSV \u2014 what actually gets attached to the GST filing.",
+        "operationId": "invoices_csv_admin_v1_invoices_csv_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-actor-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Invoices Csv",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
     "/admin/v1/metrics": {
       "get": {
         "operationId": "metrics_admin_v1_metrics_get",
@@ -2891,6 +2955,79 @@
           }
         },
         "summary": "Outbox",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/admin/v1/outbox/{row_id}/retry": {
+      "post": {
+        "description": "Re-attempt a queued/failed email. Push rows can't be retried here \u2014\nthe outbox keeps only a truncated device token; re-send the drop from\nthe catalog instead.",
+        "operationId": "outbox_retry_admin_v1_outbox__row_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "row_id",
+            "required": true,
+            "schema": {
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-actor-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Outbox Retry",
         "tags": [
           "ops"
         ]

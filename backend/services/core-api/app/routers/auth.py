@@ -3,9 +3,11 @@ the dev slice: any 4-digit OTP verifies, any Apple identity token is accepted.
 Both mint a real signed Katha JWT that the rest of the API verifies."""
 from __future__ import annotations
 
+import json
+import time
 import uuid
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from katha_domain.schemas import (
     AppleAuthBody,
@@ -20,6 +22,48 @@ from ..auth import current_user, issue_token, user_id_for_apple, user_id_for_pho
 from ..store import store
 
 router = APIRouter(prefix="/v1", tags=["auth"])
+
+# --- OTP abuse guard (SMS pumping / brute force). Sliding window per phone
+# and per client IP; defaults are sized so real users and the UI test suites
+# never trip them, while a pumping script (hundreds/min) hits 429 fast.
+# KV `config:otp.limits` ({"phone","verify","ip","window_s"}) tunes them live.
+_OTP_DEFAULTS = {"phone": 30, "verify": 60, "ip": 240, "window_s": 600}
+_otp_hits: dict[str, list[float]] = {}
+
+
+def _otp_limits() -> dict:
+    raw = store.kv("config:otp.limits")
+    if not raw:
+        return _OTP_DEFAULTS
+    try:
+        over = json.loads(raw)
+        return {k: int(over.get(k, v)) for k, v in _OTP_DEFAULTS.items()}
+    except (ValueError, TypeError, AttributeError):
+        return _OTP_DEFAULTS
+
+
+def _otp_throttle(key: str, cap: int, window_s: float) -> int:
+    """Record a hit; returns seconds to wait (0 = allowed)."""
+    now = time.monotonic()
+    hits = [t for t in _otp_hits.get(key, []) if now - t < window_s]
+    if len(hits) >= cap:
+        _otp_hits[key] = hits
+        return max(1, int(window_s - (now - hits[0])) + 1)
+    hits.append(now)
+    _otp_hits[key] = hits
+    return 0
+
+
+def _otp_guard(request: Request, phone: str, *, kind: str) -> None:
+    lim = _otp_limits()
+    ip = getattr(request.client, "host", "unknown")
+    window = float(lim["window_s"])
+    wait = max(_otp_throttle(f"{kind}:p:{phone}", lim[kind], window),
+               _otp_throttle(f"otp:ip:{ip}", lim["ip"], window))
+    if wait:
+        raise HTTPException(status_code=429,
+                            detail="too many OTP attempts — try again later",
+                            headers={"Retry-After": str(wait)})
 
 
 def _profile_response(user_id: str) -> UserProfileResponse:
@@ -46,18 +90,20 @@ def _merge_guest_from(authorization: str | None, *, into: str) -> None:
 
 
 @router.post("/auth/otp/request", response_model=OtpRequestResponse)
-def otp_request(body: OtpRequestBody) -> OtpRequestResponse:
+def otp_request(body: OtpRequestBody, request: Request) -> OtpRequestResponse:
     if not body.phone.strip():
         raise HTTPException(status_code=400, detail="phone required")
+    _otp_guard(request, body.phone.strip(), kind="phone")
     return OtpRequestResponse(request_id=f"otp_{uuid.uuid4().hex[:12]}", phone=body.phone)
 
 
 @router.post("/auth/otp/verify", response_model=AuthToken)
-def otp_verify(body: OtpVerifyBody,
+def otp_verify(body: OtpVerifyBody, request: Request,
                authorization: str | None = Header(default=None)) -> AuthToken:
     code = body.code.strip()
     if not (code.isdigit() and len(code) == 4):
         raise HTTPException(status_code=400, detail="invalid code (dev: any 4 digits)")
+    _otp_guard(request, body.phone.strip(), kind="verify")
     user_id = user_id_for_phone(body.phone)
     u = store.get_or_create_user(user_id, kind="phone", phone=body.phone)
     u.kind, u.phone = "phone", body.phone

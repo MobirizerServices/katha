@@ -773,3 +773,49 @@ describe("invoice register (finance)", () => {
     expect(screen.getByText("1,300 +130 coins")).toBeInTheDocument();
   });
 });
+
+describe("outbox retry + CSV export", () => {
+  it("re-sends a failed email, reports failed-again truth, links the CSV", async () => {
+    const { Outbox } = await import("../src/views/Outbox");
+    let attempt = 0;
+    const calls = stub({
+      "/retry": () => (attempt++ === 0
+        ? { id: 1, status: "sent", detail: "" }
+        : { id: 1, status: "failed", detail: "relay refused" }),
+      ...SIGNALS,
+      "/attention": () => ({ items: [] }),
+      "/approvals": () => [],
+      "/audit": () => ({ rows: [], chain_ok: true, total: 0 }),
+      "/config/flags": () => [],
+      "/invoices": () => ({ totals: { count: 0, gross_minor: 0, gst_minor: 0 },
+                            rows: [] }),
+      "/outbox": () => ({
+        transports: { email: true, push: false },
+        rows: [
+          { id: 1, kind: "email", recipient: "meera@example.com", subject: "Invoice",
+            body: "<b>", status: "failed", detail: "boom",
+            created_at: "2026-09-01T09:00:00+00:00" },
+          { id: 2, kind: "push", recipient: "tok…", subject: "Drop",
+            body: "{}", status: "queued", detail: "",
+            created_at: "2026-09-01T09:00:00+00:00" }],
+      }),
+    });
+    renderWithStore(<Outbox />);
+    await screen.findByText("meera@example.com");
+    await online();
+    // Only the email row offers Retry — pushes re-send from the catalog.
+    expect(screen.getAllByText("Retry")).toHaveLength(1);
+    fireEvent.click(screen.getByText("Retry"));
+    await waitFor(() => expect(getStore().toasts.some((t) =>
+      t.text.includes("#1 delivered"))).toBe(true));
+    const post = calls.find((c) =>
+      c.url.includes("/outbox/1/retry") && c.init?.method === "POST");
+    expect(post).toBeTruthy();
+    // The server failing again is surfaced honestly, never swallowed.
+    fireEvent.click(screen.getAllByText("Retry")[0]);
+    await waitFor(() => expect(getStore().toasts.some((t) =>
+      t.text.includes("failed again: relay refused"))).toBe(true));
+    expect(screen.getByText("Export CSV").getAttribute("href"))
+      .toContain("/invoices.csv");
+  });
+});

@@ -268,3 +268,18 @@ def test_invoice_register_and_merge_without_persistence():
     assert admin.get("/admin/v1/invoices", headers=ADMIN).json()["totals"]["count"] == 0
     # merging into oneself is a no-op
     assert core_store.merge_guest("guest-dev", "guest-dev") is None
+
+
+def test_retry_and_recs_without_persistence():
+    # Outbox retry needs the shared store.
+    assert admin.post("/admin/v1/outbox/1/retry",
+                      headers=ADMIN).status_code == 503
+    # CSV register is just the header line without persistence.
+    csv = admin.get("/admin/v1/invoices.csv", headers=ADMIN)
+    assert csv.status_code == 200 and csv.text.strip().count("\n") == 0
+    # A signed-in viewer with no watch history gets no personal rail,
+    # and trending falls back to catalog order (no events store).
+    tok = core.post("/v1/auth/guest").json()["access_token"]
+    rows = core.get("/v1/home",
+                    headers={"Authorization": f"Bearer {tok}"}).json()["rows"]
+    assert [r["title"] for r in rows] == ["Trending in hi", "New this week"]

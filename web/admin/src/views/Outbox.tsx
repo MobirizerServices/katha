@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../api/client";
+import { BASE_URL, api, mutate } from "../api/client";
+import { useStore } from "../store";
 import { Empty, IsoTime, PageHeader, Sev, Skeleton, fmtN } from "../ui";
 
 type InvoiceRow = {
@@ -29,7 +30,10 @@ function InvoiceRegister() {
         <h3>Tax invoices (web/UPI)</h3>
         <span className="muted">
           {fmtN(data.totals.count)} invoices · gross {paise(data.totals.gross_minor)} ·
-          GST {paise(data.totals.gst_minor)}
+          GST {paise(data.totals.gst_minor)}{" "}
+          <a className="btn s" href={`${BASE_URL}/invoices.csv`} download>
+            Export CSV
+          </a>
         </span>
       </header>
       {data.rows.length === 0 ? (
@@ -72,10 +76,12 @@ type Row = {
 /** Every email + push the system produced, whatever the transport (comms are
  * outbox-first). Dev shows queued rows; production shows sent/failed truth. */
 export function Outbox() {
+  const { role, online, showToast } = useStore();
   const [kind, setKind] = useState("");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [transports, setTransports] = useState({ email: false, push: false });
   const [open, setOpen] = useState<number | null>(null);
+  const [retrying, setRetrying] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const r = await api.outbox(kind);
@@ -83,6 +89,19 @@ export function Outbox() {
     setTransports(r.transports);
   }, [kind]);
   useEffect(() => { void load(); }, [load]);
+
+  const canRetry = role === "admin" || role === "support";
+
+  async function retry(id: number) {
+    setRetrying(id);
+    const res = await mutate.outboxRetry(id);
+    setRetrying(null);
+    if ("offline" in res) return showToast("Offline — nothing re-sent", "error");
+    if (res.error) return showToast(`Retry refused: ${res.error}`, "error");
+    if (res.status === "sent") showToast(`#${id} delivered · audited`);
+    else showToast(`#${id} failed again: ${res.detail}`, "error");
+    void load();
+  }
 
   const sev = (s: string) =>
     s === "sent" ? "ok" : s === "failed" ? "danger" : "info";
@@ -139,7 +158,19 @@ export function Outbox() {
                       </div>
                     ) : null}
                   </td>
-                  <td><Sev level={sev(r.status)}>{r.status}</Sev></td>
+                  <td>
+                    <Sev level={sev(r.status)}>{r.status}</Sev>
+                    {canRetry && r.kind === "email" && r.status !== "sent" ? (
+                      <button className="btn s" style={{ marginLeft: 8 }}
+                              disabled={!online || retrying === r.id}
+                              title={transports.email
+                                ? "Attempt delivery again over SMTP"
+                                : "Needs KATHA_SMTP_URL — dev has no transport"}
+                              onClick={(e) => { e.stopPropagation(); void retry(r.id); }}>
+                        {retrying === r.id ? "Retrying…" : "Retry"}
+                      </button>
+                    ) : null}
+                  </td>
                   <td><IsoTime iso={r.created_at} /></td>
                 </tr>
               ))}
