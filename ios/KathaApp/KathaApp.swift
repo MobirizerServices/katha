@@ -251,9 +251,11 @@ struct RootView: View {
 }
 
 struct MainTabView: View {
+    @State private var homePath = NavigationPath()
+
     var body: some View {
         TabView {
-            tabStack { FeedView() }
+            tabStack(path: $homePath) { FeedView() }
                 .tabItem { Label("Home", systemImage: "play.rectangle.fill") }
             tabStack { BrowseView() }
                 .tabItem { Label("Browse", systemImage: "square.grid.2x2.fill") }
@@ -263,19 +265,37 @@ struct MainTabView: View {
                 .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
         }
         .background(Katha.Color.bg)
+        .task {
+            // Dev/UI-test hook: KATHA_AUTOPLAY="slug:number" jumps straight into
+            // the player (headless simctl can't tap; Xcode runs ignore it).
+            if let spec = ProcessInfo.processInfo.environment["KATHA_AUTOPLAY"] {
+                let parts = spec.split(separator: ":")
+                if parts.count == 2, let n = Int(parts[1]) {
+                    homePath.append(EpisodeRoute(slug: String(parts[0]), number: n))
+                }
+            }
+        }
     }
 
     /// Every tab shares the two typed destinations (registered at stack level —
     /// never inside lazy containers, where SwiftUI ignores them).
-    private func tabStack<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        NavigationStack {
-            content()
-                .navigationDestination(for: String.self) { slug in
-                    SeriesView(slug: slug)
-                }
-                .navigationDestination(for: EpisodeRoute.self) { route in
-                    PlayerView(slug: route.slug, number: route.number)
-                }
+    private func tabStack<Content: View>(
+        path: Binding<NavigationPath>? = nil,
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        let destinations = content()
+            .navigationDestination(for: String.self) { slug in
+                SeriesView(slug: slug)
+            }
+            .navigationDestination(for: EpisodeRoute.self) { route in
+                PlayerView(slug: route.slug, number: route.number)
+            }
+        return Group {
+            if let path {
+                NavigationStack(path: path) { destinations }
+            } else {
+                NavigationStack { destinations }
+            }
         }
     }
 }
