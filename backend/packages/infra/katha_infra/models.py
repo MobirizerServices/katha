@@ -41,6 +41,19 @@ class WalletRow(Base):
     balance_bonus: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
+class UserProfileRow(Base):
+    """Lightweight identity persisted by core-api so the back office can list and
+    look up real users (phone/name) alongside the shared ledger."""
+
+    __tablename__ = "user_profile"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    phone: Mapped[str] = mapped_column(String, nullable=False, default="")
+    kind: Mapped[str] = mapped_column(String, nullable=False, default="guest")  # guest | phone | apple
+    language: Mapped[str] = mapped_column(String, nullable=False, default="hi")
+    created_at: Mapped[str] = mapped_column(String, nullable=False, default="")
+
+
 class EntitlementRow(Base):
     """One (user, episode) grant. `source` is free | unlock | bundle | promo."""
 

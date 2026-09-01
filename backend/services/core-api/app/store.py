@@ -70,6 +70,12 @@ class Store:
         self.ledger = _build_ledger()
         self.users: dict[str, UserProfile] = {}
         self.engagement: dict[str, UserEngagement] = {}
+        # In persist mode, share the ledger's DB so user identities land in the
+        # same store the back office reads (SharedStore) — makes the surfaces one system.
+        self.shared = None
+        if os.environ.get("KATHA_PERSIST") == "1":
+            from katha_infra import SharedStore
+            self.shared = SharedStore(db=getattr(self.ledger, "_db", None))
 
     # ---- users ----------------------------------------------------------
     def get_or_create_user(self, user_id: str, **defaults) -> UserProfile:
@@ -77,7 +83,17 @@ class Store:
         if u is None:
             u = UserProfile(user_id=user_id, **defaults)
             self.users[user_id] = u
+        self.persist_profile(user_id)
         return u
+
+    def persist_profile(self, user_id: str) -> None:
+        """Upsert the user's identity into the shared store (no-op off persist mode)."""
+        if self.shared is None:
+            return
+        u = self.users.get(user_id)
+        if u is not None:
+            self.shared.upsert_profile(user_id, phone=u.phone or "", kind=u.kind,
+                                       language=u.language, created_at=CLOCK)
 
     # ---- engagement -----------------------------------------------------
     def _eng(self, user_id: str) -> UserEngagement:

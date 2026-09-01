@@ -6,9 +6,11 @@ writes an audit row.
 """
 from __future__ import annotations
 
+import os
 import uuid
 
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from katha_domain import catalog
 
@@ -21,8 +23,43 @@ app = FastAPI(
     description="Back-office API. RBAC-gated, every mutation is audited; coin "
                 "adjustments over ±500 require a second approver.",
 )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.environ.get(
+        "KATHA_ADMIN_CORS", "http://localhost:5173,http://localhost:5174"
+    ).split(","),
+    allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+)
+
+# In persist mode, admin-api reads/writes the SAME ledger DB core-api writes,
+# fresh per request — so a purchase in the app/web is visible in the back office.
+SHARED = None
+if os.environ.get("KATHA_PERSIST") == "1":
+    from katha_infra import SharedStore
+    SHARED = SharedStore()
 
 router = APIRouter(prefix="/admin/v1")
+
+
+def _rupees(coins: int) -> str:
+    return f"₹{round(coins * 0.15):,}"
+
+
+def _admin_user_view(u: dict) -> dict:
+    """Map a shared-store user row to the AdminUser shape the web/admin client renders."""
+    total = u["balance_bought"] + u["balance_bonus"]
+    return {
+        "id": u["user_id"],
+        "phone": u.get("phone") or "(guest)",
+        "name": "—",
+        "languages": u.get("language", "hi"),
+        "wallet": {"bought": u["balance_bought"], "bonus": u["balance_bonus"],
+                   "unlocked": u.get("unlocked", 0), "ltv": _rupees(total)},
+        "lastActive": "recently",
+        "flags": [],
+        "devices": [],
+        "payer": "web/app" if u["balance_bought"] > 0 else "—",
+    }
 
 
 @app.get("/health", tags=["ops"])
@@ -47,6 +84,8 @@ def _approval_view(ap) -> dict:
 
 
 def _wallet_view(user_id: str) -> dict:
+    if SHARED is not None:
+        return SHARED.wallet(user_id)
     w = store.ledger.balance(user_id)
     return {"user_id": user_id, "balance_bought": w.balance_bought,
             "balance_bonus": w.balance_bonus, "total": w.total}
@@ -54,10 +93,15 @@ def _wallet_view(user_id: str) -> dict:
 
 def _apply_adjust(user_id: str, coins: int, reason_code: str, ref_id: str) -> None:
     store.note_user(user_id)
-    store.ledger.admin_adjust(
-        user_id, coins=coins, reference_type=f"admin_adjust:{reason_code}",
-        reference_id=ref_id, idempotency_key=ref_id, created_at=CLOCK,
-    )
+    if SHARED is not None:
+        # Writes to the same ledger core-api reads (idempotent by ref_id).
+        SHARED.admin_adjust(user_id, coins=coins, reason_code=reason_code,
+                            ref_id=ref_id, created_at=CLOCK)
+    else:
+        store.ledger.admin_adjust(
+            user_id, coins=coins, reference_type=f"admin_adjust:{reason_code}",
+            reference_id=ref_id, idempotency_key=ref_id, created_at=CLOCK,
+        )
 
 
 # ---- catalog ---------------------------------------------------------------
@@ -82,19 +126,34 @@ def publish_series(slug: str, actor: Actor = Depends(require(Role.CONTENT))):
 # ---- users -----------------------------------------------------------------
 @router.get("/users", tags=["users"])
 def list_users(actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE, Role.ANALYST))):
-    return [_wallet_view(u) for u in sorted(store.known_users)]
+    # Live (shared DB): the real users core-api created, in the web-client shape.
+    if SHARED is not None:
+        return [_admin_user_view(u) for u in SHARED.list_users()]
+    # In-memory (unit tests): the users this admin process has touched.
+    return [_admin_user_view({"user_id": u, "phone": "", "kind": "guest",
+                              "language": "hi", "balance_bought": store.ledger.balance(u).balance_bought,
+                              "balance_bonus": store.ledger.balance(u).balance_bonus, "unlocked": 0})
+            for u in sorted(store.known_users)]
 
 
 @router.get("/users/{user_id}/ledger", tags=["users"])
 def user_ledger(user_id: str,
                 actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE, Role.ANALYST))):
+    if SHARED is not None:
+        w = SHARED.wallet(user_id)
+        txs = SHARED.transactions(user_id)
+    else:
+        wv = store.ledger.balance(user_id)
+        w = {"user_id": user_id, "balance_bought": wv.balance_bought,
+             "balance_bonus": wv.balance_bonus, "total": wv.total}
+        txs = store.ledger.transactions(user_id)
     txns = [
         {"id": t.id, "type": t.type.value, "amount_bought": t.amount_bought,
          "amount_bonus": t.amount_bonus, "reference_type": t.reference_type,
          "reference_id": t.reference_id, "created_at": t.created_at}
-        for t in store.ledger.transactions(user_id)
+        for t in txs
     ]
-    return {"user_id": user_id, "wallet": _wallet_view(user_id), "transactions": txns}
+    return {"user_id": user_id, "wallet": w, "transactions": txns}
 
 
 # ---- wallet adjustments (dual approval > threshold) ------------------------

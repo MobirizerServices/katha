@@ -49,6 +49,7 @@ def otp_verify(body: OtpVerifyBody) -> AuthToken:
     user_id = user_id_for_phone(body.phone)
     u = store.get_or_create_user(user_id, kind="phone", phone=body.phone)
     u.kind, u.phone = "phone", body.phone
+    store.persist_profile(user_id)   # persist the phone identity to the shared store
     return _token(user_id)
 
 

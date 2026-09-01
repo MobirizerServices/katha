@@ -64,8 +64,15 @@ class Database:
         return create_async_engine(self.url, future=True)
 
     async def _create_all(self) -> None:
-        async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        # checkfirst=True, but two services can still race on a fresh shared DB —
+        # tolerate "table already exists" from a concurrent creator.
+        from sqlalchemy.exc import OperationalError
+        try:
+            async with self.engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+        except OperationalError as e:
+            if "already exists" not in str(e):
+                raise
 
     def run(self, coro: Awaitable[T]) -> T:
         return self.runner.run(coro)

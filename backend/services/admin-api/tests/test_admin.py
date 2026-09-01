@@ -141,4 +141,4 @@ def test_users_list_reflects_adjusted_users():
     client.post("/admin/v1/wallet/adjust", headers=SUPPORT,
                 json={"user_id": "u1", "coins": 50, "reason_code": "g"})
     users = client.get("/admin/v1/users", headers=FINANCE).json()
-    assert any(u["user_id"] == "u1" for u in users)
+    assert any(u["id"] == "u1" for u in users)          # AdminUser shape (id, wallet, ...)
