@@ -1,8 +1,11 @@
 # --- Dev media: the generated HLS placeholder catalog (534MB) is regenerable, never committed
 media/
 *.mp4
-*.ts
 *.m3u8
+# NOTE: never ignore bare *.ts — HLS segments share the extension with
+# TypeScript, and a global rule silently drops web source files. Segments
+# only ever live under media/, which is ignored above.
+media/**/*.ts
 
 # --- Python
 .venv/

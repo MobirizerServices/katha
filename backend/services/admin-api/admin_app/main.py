@@ -782,3 +782,7 @@ def audit_log(actor: str = "", q: str = "", limit: int = 100,
 
 
 app.include_router(router)
+
+from . import oidc as _oidc  # noqa: E402  (needs `audit` + SHARED defined above)
+
+app.include_router(_oidc.router)

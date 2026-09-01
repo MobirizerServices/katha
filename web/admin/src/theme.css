@@ -188,11 +188,12 @@ aside.side {
   padding: 12px 8px 0;
   border-top: 1px solid var(--side3);
   display: grid;
-  grid-template-columns: 30px 1fr;
+  grid-template-columns: 30px 1fr auto;
   gap: 6px 10px;
   font-size: 13px;
   align-items: center;
 }
+.me .btn.s { white-space: nowrap; }
 .me .av {
   width: 30px;
   height: 30px;
@@ -961,3 +962,15 @@ table.t tbody tr.link:hover td {
 table.table td,.mono{font-variant-numeric:tabular-nums}
 tr[tabindex]:focus-visible{outline:2px solid #f65428;outline-offset:-2px}
 .covermini{width:34px;height:48px;border-radius:6px;object-fit:cover;background:#232129}
+
+/* ---- sign-in (#074) ---- */
+.loginwrap { min-height: 100vh; display: grid; place-items: center;
+  background: var(--bg); padding: 24px; }
+.logincard { background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 30px; width: 400px; max-width: 92vw; }
+.loginnote { background: var(--bg2, rgba(255,255,255,.04));
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+  font-size: 13px; margin-bottom: 14px; }
+.loginnote.err { border-color: var(--bad, #E5484D); }
+.btn.signin { display: block; text-align: center; text-decoration: none;
+  font-weight: 700; padding: 11px; }

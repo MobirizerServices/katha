@@ -8,7 +8,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { api, isOnline, mutate, onOnlineChange } from "./api/client";
-import type { AttentionItem, Health, MutationResult } from "./api/client";
+import type { AttentionItem, Health, Identity, MutationResult } from "./api/client";
 import type { Approval, AuditEntry, FeatureFlag } from "./api/types";
 import { ROLE_NAMES } from "./auth/roles";
 import type { Role } from "./auth/roles";
@@ -24,6 +24,9 @@ export interface ToastMsg {
 interface Store {
   role: Role;
   setRole: (r: Role) => void;
+  identity: Identity | null;
+  signedOut: boolean;
+  logout: () => Promise<void>;
   online: boolean;
   health: Health | null;
   attention: AttentionItem[];
@@ -46,6 +49,7 @@ let toastSeq = 1;
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [role, setRoleRaw] = useState<Role>("admin");
+  const [identity, setIdentity] = useState<Identity | null>(null);
   const [online, setOnlineState] = useState(isOnline());
   const [health, setHealth] = useState<Health | null>(null);
   const [attention, setAttention] = useState<AttentionItem[]>([]);
@@ -66,6 +70,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void api.attention().then((a) => setAttention(a.items));
   }, []);
 
+  // Identity is fetched once at boot (a sign-in navigates the whole page, so a
+  // fresh session always re-boots the app) and re-checked after sign-out.
+  const refreshIdentity = useCallback(async () => {
+    const me = await api.authMe();
+    setIdentity(me);
+    if (me?.mode === "oidc" && me.authenticated && me.role) {
+      setRoleRaw(me.role as Role); // the server's answer wins — no previewing
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    const res = await mutate.logout();
+    if ("offline" in res) {
+      showToast("Offline — could not reach the server to sign out", "error");
+      return;
+    }
+    await refreshIdentity();
+    showToast("Signed out");
+  }, [refreshIdentity, showToast]);
+
   const reloadApprovals = useCallback(async (status = "pending") => {
     setApprovals(await api.listApprovals(status));
   }, []);
@@ -74,6 +98,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void reloadApprovals();
     void api.listAudit({}).then((a) => setAudit(a.rows));
     void api.listFlags().then(setFlags);
+    void refreshIdentity();
     refreshSignals();
     const t = window.setInterval(refreshSignals, 60_000);
     const off = onOnlineChange(setOnlineState);
@@ -81,7 +106,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearInterval(t);
       off();
     };
-  }, [refreshSignals, reloadApprovals]);
+  }, [refreshSignals, reloadApprovals, refreshIdentity]);
 
   const setRole = useCallback(
     (r: Role) => {
@@ -148,15 +173,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [flags, showToast]
   );
 
+  const signedOut = identity?.mode === "oidc" && !identity.authenticated;
+
   const value = useMemo<Store>(
     () => ({
-      role, setRole, online, health, attention, refreshSignals,
-      approvals, reloadApprovals, addApproval, resolveApproval,
+      role, setRole, identity, signedOut, logout, online, health, attention,
+      refreshSignals, approvals, reloadApprovals, addApproval, resolveApproval,
       audit, addAudit, flags, toggleFlag, toasts, showToast,
     }),
-    [role, setRole, online, health, attention, refreshSignals, approvals,
-     reloadApprovals, addApproval, resolveApproval, audit, addAudit, flags,
-     toggleFlag, toasts, showToast]
+    [role, setRole, identity, signedOut, logout, online, health, attention,
+     refreshSignals, approvals, reloadApprovals, addApproval, resolveApproval,
+     audit, addAudit, flags, toggleFlag, toasts, showToast]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

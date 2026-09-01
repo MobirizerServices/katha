@@ -20,7 +20,7 @@ function uid(): string {
 
 function AdjustDialog({ user, onClose, onApplied }: { user: AdminUser; onClose: () => void;
                                                       onApplied: () => void }) {
-  const { role, online, addApproval, addAudit, showToast } = useStore();
+  const { role, addApproval, addAudit, showToast } = useStore();
   const [dir, setDir] = useState<"Credit" | "Debit">("Credit");
   const [amount, setAmount] = useState(30);
   const [reason, setReason] = useState(REASONS[0]);
@@ -330,7 +330,7 @@ function UserDialog({ user, onClose }: { user: AdminUser; onClose: () => void })
 }
 
 export function Users() {
-  const { role, showToast } = useStore();
+  const { role } = useStore();
   const [params] = useSearchParams();
   const [q, setQ] = useState("");
   const [sort, setSort] = useState(params.get("sort") ?? "recent");

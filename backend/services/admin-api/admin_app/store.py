@@ -55,6 +55,8 @@ class AdminStore:
     published: set[str] = field(default_factory=set)
     flag_overrides: dict[str, bool] = field(default_factory=dict)
     known_users: set[str] = field(default_factory=set)
+    # email → {role, by, at}; the OIDC sign-in directory when persistence is off
+    admin_users: dict[str, dict] = field(default_factory=dict)
 
     # ---- audit (append-only, hash-chained; persisted via SharedStore when
     # persistence is on — this in-memory path serves unit tests) ------------

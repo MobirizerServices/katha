@@ -4,7 +4,8 @@ import { ROLE_NAMES, ROLE_ORDER, canView, type Role } from "./auth/roles";
 import { useStore } from "./store";
 
 export function Sidebar() {
-  const { role, setRole, approvals } = useStore();
+  const { role, setRole, approvals, identity, logout } = useStore();
+  const oidc = identity?.mode === "oidc" && identity.authenticated;
 
   const counts: Record<string, { n: number; cls?: string }> = {
     approvals: { n: approvals.length, cls: "w" },
@@ -57,24 +58,42 @@ export function Sidebar() {
         </div>
       ))}
 
-      <div className="me">
-        <div className="av">R</div>
-        <div>
-          <div style={{ color: "#fff", fontWeight: 600 }}>Riya Menon</div>
-          <div className="tiny">{ROLE_NAMES[role]}</div>
+      {oidc ? (
+        // The real signed-in operator — role comes from the server directory.
+        <div className="me">
+          <div className="av">{(identity.email ?? "?")[0].toUpperCase()}</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: "#fff", fontWeight: 600, overflow: "hidden",
+                          textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                 title={identity.email}>
+              {identity.name || identity.email}
+            </div>
+            <div className="tiny">{ROLE_NAMES[role] ?? role}</div>
+          </div>
+          <button className="btn s" onClick={() => void logout()}>
+            Sign out
+          </button>
         </div>
-        <select
-          aria-label="Preview as role"
-          value={role}
-          onChange={(e) => setRole(e.target.value as Role)}
-        >
-          {ROLE_ORDER.map((r) => (
-            <option key={r} value={r}>
-              Preview as {ROLE_NAMES[r]}
-            </option>
-          ))}
-        </select>
-      </div>
+      ) : (
+        <div className="me">
+          <div className="av">R</div>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 600 }}>Riya Menon</div>
+            <div className="tiny">{ROLE_NAMES[role]} · dev auth</div>
+          </div>
+          <select
+            aria-label="Preview as role"
+            value={role}
+            onChange={(e) => setRole(e.target.value as Role)}
+          >
+            {ROLE_ORDER.map((r) => (
+              <option key={r} value={r}>
+                Preview as {ROLE_NAMES[r]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </aside>
   );
 }

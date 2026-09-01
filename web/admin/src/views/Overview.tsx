@@ -16,7 +16,7 @@ const KPI_LINKS: Record<string, string> = {
 };
 
 export function Overview() {
-  const { attention, refreshSignals } = useStore();
+  const { attention, refreshSignals, identity } = useStore();
   const [data, setData] = useState<OverviewData | null>(null);
   const [fetchedAt, setFetchedAt] = useState<number>(0);
   const [tick, setTick] = useState(0);
@@ -43,13 +43,16 @@ export function Overview() {
   });
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const who = identity?.authenticated
+    ? (identity.name || identity.email || ME).split(" ")[0].toLowerCase()
+    : ME;
   const agoS = fetchedAt ? Math.max(0, Math.round((Date.now() - fetchedAt) / 1000)) : null;
   void tick;
 
   if (!data) {
     return (
       <>
-        <PageHeader title={`${greeting}, ${ME}`} subtitle="Loading dashboard…" />
+        <PageHeader title={`${greeting}, ${who}`} subtitle="Loading dashboard…" />
         <Skeleton rows={4} />
       </>
     );
@@ -58,7 +61,7 @@ export function Overview() {
   return (
     <>
       <PageHeader
-        title={`${greeting}, ${ME}`}
+        title={`${greeting}, ${who}`}
         subtitle={`${today} · refreshes every minute${agoS === null ? "" : ` · updated ${agoS}s ago`}`}
       />
 

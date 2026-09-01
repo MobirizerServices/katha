@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, waitFor as _wf } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { Access } from "../src/views/Access";
 import { PERMISSION_MATRIX, ROLE_NAMES } from "../src/auth/roles";
+import { renderWithStore } from "./helpers";
+
+// The People panel needs the store, so every render goes through the provider.
+const render = (ui: React.ReactElement) => renderWithStore(ui);
 
 describe("Access view — permission matrix", () => {
   it("renders a header for every role", () => {

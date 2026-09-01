@@ -7,6 +7,7 @@ import { canView, ROLE_NAMES } from "./auth/roles";
 import { ALL_NAV_ITEMS } from "./nav";
 import { api } from "./api/client";
 import { Skeleton } from "./ui";
+import { Login } from "./views/Login";
 
 const Overview = lazy(() => import("./views/Overview").then((m) => ({ default: m.Overview })));
 const Catalog = lazy(() => import("./views/Catalog").then((m) => ({ default: m.Catalog })));
@@ -245,6 +246,7 @@ export default function App() {
   const [palette, setPalette] = useState(false);
   const nav = useNavigate();
   const location = useLocation();
+  const { signedOut } = useStore();
 
   // ⌘K + g-shortcuts (#086/#087)
   useEffect(() => {
@@ -280,6 +282,16 @@ export default function App() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [nav]);
+
+  // OIDC mode with no session: the whole panel is behind sign-in (#074).
+  if (signedOut) {
+    return (
+      <>
+        <Login />
+        <Toasts />
+      </>
+    );
+  }
 
   return (
     <div className="app">

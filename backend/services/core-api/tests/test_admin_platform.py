@@ -335,3 +335,29 @@ def test_last_seen_touch_via_core(shared):
     core.get("/v1/wallet", headers={"Authorization": "Bearer u_seen"})
     seen = shared.search_users(q="u_seen")["users"][0]["last_seen"]
     assert seen != ""                                       # #020
+
+
+def test_oidc_directory_persists_in_shared_kv(shared):
+    """Provisioning lives in the shared DB: grant via the API → adminuser: KV
+    row; revoke leaves a tombstone that never resurrects the bootstrap seed."""
+    from admin_app import oidc
+
+    admin_client = TestClient(admin_main.app)
+    ADMIN = {"X-Actor-Id": "root@katha.dev", "X-Role": "admin"}
+    r = admin_client.put("/admin/v1/access/users/riya@katha.dev",
+                         headers=ADMIN, json={"role": "support"})
+    assert r.status_code == 200
+    row = json.loads(shared.kv_get("adminuser:riya@katha.dev"))
+    assert row["role"] == "support" and row["by"] == "root@katha.dev"
+    assert oidc.directory_role("riya@katha.dev") == "support"
+
+    # a second admin so the revoke below is not "the last admin"
+    admin_client.put("/admin/v1/access/users/lead@katha.dev", headers=ADMIN,
+                     json={"role": "admin", "confirm": "lead@katha.dev"})
+    assert admin_client.delete("/admin/v1/access/users/riya@katha.dev",
+                               headers=ADMIN).status_code == 200
+    assert oidc.directory_role("riya@katha.dev") is None
+    assert json.loads(shared.kv_get("adminuser:riya@katha.dev"))["role"] == ""
+    # the tombstone survives later reads — a revoked operator never comes back
+    active = {e for e, v in oidc.directory_all().items() if v.get("role")}
+    assert "riya@katha.dev" not in active and "lead@katha.dev" in active

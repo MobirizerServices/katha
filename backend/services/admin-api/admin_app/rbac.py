@@ -1,16 +1,22 @@
 """Role-based access control for the back office (PDD §14, SAD §8.2).
 
-Dev auth: the acting operator is read from `X-Actor-Id` + `X-Role` headers (prod
-swaps in Google Workspace OIDC → the same `Actor`). `require(*roles)` is a
-FastAPI dependency factory that 401s an unauthenticated caller and 403s one whose
-role is not permitted for the route.
+Identity resolves in two ways (see `oidc.py`):
+- an OIDC session cookie — the operator's email, with the role looked up in the
+  server-side directory on EVERY request (revocation is instant). Mutations
+  must carry `X-Katha-CSRF: 1`.
+- with `KATHA_ADMIN_AUTH=headers` (the dev default), the historical
+  `X-Actor-Id` + `X-Role` headers still work when no session is present. In
+  `oidc` mode those headers are ignored entirely.
+
+`require(*roles)` is a FastAPI dependency factory that 401s an unauthenticated
+caller and 403s one whose role is not permitted for the route.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 
 
 class Role(str, Enum):
@@ -30,9 +36,29 @@ class Actor:
 
 
 def _actor(
+    request: Request,
     x_actor_id: str | None = Header(default=None),
     x_role: str | None = Header(default=None),
 ) -> Actor:
+    from . import oidc
+
+    ident = oidc.session_identity(request)
+    if ident is not None:
+        role = oidc.directory_role(ident["email"])
+        if role is None:
+            raise HTTPException(
+                status_code=401,
+                detail="your access was revoked — ask an admin to re-provision you")
+        if (request.method not in ("GET", "HEAD", "OPTIONS")
+                and request.headers.get("x-katha-csrf") != "1"):
+            raise HTTPException(status_code=403, detail="missing X-Katha-CSRF header")
+        return Actor(id=ident["email"], role=Role(role))
+
+    if oidc.auth_mode() == "oidc":
+        raise HTTPException(
+            status_code=401, detail="sign in required",
+            headers={"X-Katha-Login": "/admin/v1/auth/login"})
+
     if not x_actor_id or not x_role:
         raise HTTPException(status_code=401, detail="missing X-Actor-Id / X-Role")
     try:
