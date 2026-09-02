@@ -27,7 +27,7 @@ struct FeedView: View {
                     }
                 }
             }
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarBackground(Katha.Color.bg, for: .navigationBar)
             .navigationDestination(for: SearchRoute.self) { _ in SearchView() }
             .task { if model.feed.rows.isEmpty { await model.loadHome() } }
             .overlay(alignment: .bottom) {
@@ -214,7 +214,7 @@ private struct HeroCard: View {
     var body: some View {
         NavigationLink(value: series.slug) {
             ZStack(alignment: .bottomLeading) {
-                CoverImage(url: series.coverUrl)
+                CoverImage(url: series.coverWideUrl)
                     .frame(height: 500)
                     .overlay {
                         // Fade seamlessly into the page ground — full-bleed,
@@ -237,24 +237,23 @@ private struct HeroCard: View {
                         .foregroundStyle(Katha.Color.text)
                         .multilineTextAlignment(.leading)
                         .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
-                    HStack(spacing: 10) {
-                        NavigationLink(value: EpisodeRoute(slug: series.slug, number: 1)) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "play.fill")
-                                Text("Play E1")
-                            }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Katha.Color.text)
-                            .padding(.horizontal, 18)
-                            .frame(height: 42)
-                            .background(LinearGradient(colors: [Katha.Color.accent,
-                                                                Katha.Color.accentPressed],
-                                                       startPoint: .top, endPoint: .bottom))
-                            .clipShape(Capsule())
+                    Text("\(series.genres.first ?? "") · \(series.episodeCount) episodes · First \(model.freeEpisodesDefault) free")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Katha.Color.text2)
+                        .lineLimit(1)
+                    NavigationLink(value: EpisodeRoute(slug: series.slug, number: 1)) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "play.fill")
+                            Text("Play E1")
                         }
-                        Text("\(series.genres.first ?? "") · \(series.episodeCount) episodes · Free · \(model.freeEpisodesDefault)")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Katha.Color.text2)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Katha.Color.text)
+                        .padding(.horizontal, 20)
+                        .frame(height: 42)
+                        .background(LinearGradient(colors: [Katha.Color.accent,
+                                                            Katha.Color.accentPressed],
+                                                   startPoint: .top, endPoint: .bottom))
+                        .clipShape(Capsule())
                     }
                 }
                 .padding(.horizontal, Katha.Spacing.lg)
@@ -337,7 +336,7 @@ struct PosterCard: View {
 
     var body: some View {
         CoverImage(url: series.coverUrl)
-            .frame(width: 138, height: 196)
+            .frame(width: 122, height: 217)
             .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous)
                 .strokeBorder(.white.opacity(0.08), lineWidth: 1))

@@ -19,6 +19,11 @@ final class ScreenshotTour: XCTestCase {
         extra.forEach { env[$0] = $1 }
         app.launchEnvironment = env
         app.launch()
+        // Same guard as the main suite: a fresh install re-asks for Local
+        // Network and the unanswered alert blackholes every LAN request.
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let allow = springboard.alerts.buttons["Allow"]
+        if allow.waitForExistence(timeout: 2) { allow.tap() }
         return app
     }
 

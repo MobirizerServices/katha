@@ -75,7 +75,7 @@ struct SeriesView: View {
                             .offset(y: minY > 0 ? -minY : 0)
                             .scaleEffect(minY > 0 ? 1 + minY / 500 : 1, anchor: .top)
                     }
-                Text(d.title)
+                Text(d.title.uppercased())
                     .font(Katha.Font.display(34))
                     .foregroundStyle(Katha.Color.text)
                     .shadow(color: .black.opacity(0.6), radius: 6, y: 1)
