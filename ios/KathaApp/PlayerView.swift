@@ -87,6 +87,10 @@ final class PlayerEngine {
     func pause() { player.pause(); isPlaying = false }
     func toggle() { isPlaying ? pause() : play() }
     func seek(to seconds: Double) {
+        // Scrubbing back after the end notification means the episode is live
+        // again — leaving `ended` set would freeze the end card over playback
+        // and block play/pause and progress for the rest of the session.
+        ended = false
         player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
     }
     func stop() {
@@ -192,6 +196,10 @@ struct PlayerView: View {
         .statusBarHidden(!chromeVisible)
         .gesture(swipeGesture)
         .task {
+            // .task re-runs whenever the view reappears (tab switch, sheet
+            // dismissal); only the FIRST run may pick the starting episode,
+            // or returning mid-binge would yank the viewer back to `number`.
+            guard current == 0 else { return }
             current = number
             await loadDetail()
             await loadPlayback()
@@ -205,7 +213,9 @@ struct PlayerView: View {
             if captured { engine.pause() }
         }
         .onChange(of: engine.currentSeconds) { _, s in
-            if s - lastReported >= 5 { reportProgress() }
+            // abs(): a seek BACK must keep reporting too, or resume freezes at
+            // the high-water mark until playback passes it again.
+            if abs(s - lastReported) >= 5 { reportProgress() }
             maybePreloadNext(at: s)
         }
         .onChange(of: model.dataSaver, initial: true) { _, saver in
@@ -404,6 +414,7 @@ struct PlayerView: View {
     private func advance(to n: Int) async {
         guard let d = detail, (1...d.episodeCount).contains(n) else { return }
         reportProgress(force: true)
+        lastReported = 0        // the throttle window belongs to ONE episode
         current = n
         showPaywall = false
         engine.stop()

@@ -88,13 +88,21 @@ def iap_verify(req: IapVerifyRequest, user: str = Depends(current_user)) -> Wall
     Dev stub: accepts a non-empty JWS and maps SKU→coins. Production validates the JWS
     with Apple's App Store Server Library and keys on the real transactionId (PDD §12.7).
     """
+    from ..auth import dev_stubs_enabled
+    if not dev_stubs_enabled():
+        # The stub credits a pack for ANY unique string — free money if it ever
+        # answers outside the dev harness. Real StoreKit verification replaces
+        # this branch; until then a configured deployment refuses.
+        raise HTTPException(status_code=501,
+                            detail="receipt verification is not configured")
     pack = effective_packs().get(req.sku)
     if pack is None or not req.jws:
         raise HTTPException(status_code=400, detail="unknown sku or missing transaction")
-    # Idempotency key derives from the (stubbed) transaction identity.
+    # Idempotency key derives from the (stubbed) transaction identity, bound to
+    # the user so one buyer's receipt can never dedupe against another's.
     txn = f"jws:{req.jws}"
     store.ledger.credit(user, TxType.PURCHASE, coins=pack["coins"], reference_type="iap",
-                        reference_id=req.sku, idempotency_key=f"iap:{txn}", created_at=now_iso())
+                        reference_id=req.sku, idempotency_key=f"iap:{user}:{txn}", created_at=now_iso())
     store.emit(user, "purchase", ref=req.sku, value=pack["coins"], channel="app")
     return _wallet_response(user)
 
@@ -109,21 +117,25 @@ def web_order(req: WebOrderRequest, user: str = Depends(current_user)) -> Wallet
     pack = effective_packs().get(req.sku)
     if pack is None:
         raise HTTPException(status_code=400, detail="unknown sku")
+    # The payment id (when the caller has one) makes each captured payment its
+    # own credit — without it, buying the same pack twice would silently
+    # dedupe the second genuine purchase to zero coins.
+    order = f"{user}:{req.sku}" + (f":{req.order_ref}" if req.order_ref else "")
     store.ledger.credit(user, TxType.PURCHASE, coins=pack["coins"], reference_type="web_order",
-                        reference_id=req.sku, idempotency_key=f"web:{user}:{req.sku}", created_at=now_iso())
+                        reference_id=req.sku, idempotency_key=f"web:{order}", created_at=now_iso())
     # Every WEB purchase earns the +10% web bonus (PDD §19 decision 11), funded by the
     # absent App Store commission. Any explicit pack bonus is honoured too, whichever is larger.
     web_bonus = max(pack.get("bonus", 0), pack["coins"] * WEB_BONUS_PCT // 100)
     if web_bonus:
         store.ledger.credit(user, TxType.BONUS, coins=web_bonus, reference_type="web_order",
-                            reference_id=req.sku, idempotency_key=f"webbonus:{user}:{req.sku}",
+                            reference_id=req.sku, idempotency_key=f"webbonus:{order}",
                             created_at=now_iso())
     store.emit(user, "purchase", ref=req.sku, value=pack["coins"], channel="web")
     # GST invoice + email for the web purchase (Apple invoices IAP itself).
     # Idempotent alongside the credit: a replayed order never double-invoices.
     if store.shared is not None:
         from katha_infra import comms
-        order_ref = f"web:{user}:{req.sku}"
+        order_ref = f"web:{order}"
         if store.shared.invoice_by_order(order_ref) is None:
             inv = comms.build_invoice(
                 store.shared, user_id=user, order_ref=order_ref, sku=req.sku,
@@ -139,9 +151,9 @@ def web_order(req: WebOrderRequest, user: str = Depends(current_user)) -> Wallet
 @router.post("/series/{slug}/episodes/{number}/unlock", response_model=UnlockResponse)
 def unlock_episode(slug: str, number: int, req: UnlockRequest,
                    user: str = Depends(current_user)) -> UnlockResponse:
-    from ..overrides import get_series
+    from ..overrides import get_series, is_served
     series = get_series(slug)
-    if series is None or not (1 <= number <= series.episode_count):
+    if series is None or not is_served(slug) or not (1 <= number <= series.episode_count):
         raise HTTPException(status_code=404, detail="episode not found")
     eid = catalog.episode_id(slug, number)
     try:
@@ -157,9 +169,9 @@ def unlock_episode(slug: str, number: int, req: UnlockRequest,
 
 @router.post("/series/{slug}/unlock-all", response_model=UnlockResponse)
 def unlock_all(slug: str, req: UnlockRequest, user: str = Depends(current_user)) -> UnlockResponse:
-    from ..overrides import get_series
+    from ..overrides import get_series, is_served
     series = get_series(slug)
-    if series is None:
+    if series is None or not is_served(slug):
         raise HTTPException(status_code=404, detail="series not found")
     locked = [catalog.episode_id(slug, n)
               for n in range(series.free_episode_count + 1, series.episode_count + 1)]

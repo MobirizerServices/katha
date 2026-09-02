@@ -16,12 +16,27 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import os
+import posixpath
 import time
+
+_warned_default_secret = False
 
 
 def _secret() -> bytes:
-    return os.environ.get("KATHA_STREAM_SECRET", "katha-dev-stream-secret").encode()
+    secret = os.environ.get("KATHA_STREAM_SECRET")
+    if secret is None:
+        global _warned_default_secret
+        if not _warned_default_secret:
+            logging.getLogger("katha.signing").warning(
+                "KATHA_STREAM_SECRET is not set — stream tokens are signed with "
+                "the committed dev secret, so anyone who can read the repo can "
+                "mint them. Set a real secret in any reachable deployment."
+            )
+            _warned_default_secret = True
+        secret = "katha-dev-stream-secret"
+    return secret.encode()
 
 
 def make_token(prefix: str, user_id: str, ttl_s: int = 6 * 3600) -> str:
@@ -45,9 +60,23 @@ def check_token(token: str, path: str) -> bool:
     prefix = pfx.replace("~", "/")
     payload = f"{prefix}|{user}|{exp}"
     want = hmac.new(_secret(), payload.encode(), hashlib.sha256).hexdigest()[:32]
-    return hmac.compare_digest(want, sig) and path.startswith(prefix)
+    if not hmac.compare_digest(want, sig):
+        return False
+    # Scope check on the CANONICAL path: percent-encoded "../" survives route
+    # matching, so a raw startswith would let one episode's token walk the whole
+    # media tree. Normalize first, and require a real segment boundary so
+    # "slug/e001/hls-evil" can't ride a "slug/e001/hls" token either.
+    norm = posixpath.normpath(path.lstrip("/"))
+    if norm.startswith("..") or norm in (".", ""):
+        return False
+    if prefix.endswith("/"):
+        return norm.startswith(prefix)
+    return norm == prefix or norm.startswith(prefix + "/")
 
 
 def is_video(path: str) -> bool:
-    """Episode content (playlists, segments, mezzanines) — token-only."""
-    return "/hls/" in path or path.endswith((".m3u8", ".ts", ".mp4"))
+    """Episode content (playlists, segments, mezzanines) — token-only.
+    Case-insensitive: dev serves from APFS, where /HLS/master.M3U8 finds the
+    lowercase file, so a case-sensitive match would be a free bypass."""
+    p = path.lower()
+    return "/hls/" in p or p.endswith((".m3u8", ".ts", ".mp4"))

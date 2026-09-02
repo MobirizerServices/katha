@@ -591,8 +591,9 @@ def approve(approval_id: str, request: Request = None,
     ap = store.approvals.get(approval_id)
     if ap is None:
         raise HTTPException(status_code=404, detail="approval not found")
-    if ap.status == "approved":
-        raise HTTPException(status_code=409, detail="already approved")
+    if ap.status != "pending":
+        # A rejected approval is a veto, not a pause — it must never apply.
+        raise HTTPException(status_code=409, detail=f"already {ap.status}")
     # Separation of duties: the requester cannot approve their own request.
     if actor.id == ap.requested_by:
         raise HTTPException(status_code=403, detail="requester cannot self-approve")

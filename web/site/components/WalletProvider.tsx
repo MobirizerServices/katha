@@ -228,7 +228,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         firstPack: sku === "coins_starter_in" ? false : s.firstPack,
       }));
       toast((base + bonus).toLocaleString("en-IN") + " coins added · invoice emailed");
-      api.webOrder(sku, email)
+      // One payment id per checkout: repeat purchases of the same pack each
+      // credit, while a retry of THIS order stays idempotent server-side.
+      api.webOrder(sku, email, crypto.randomUUID())
         .then((w) => setState((s) => ({ ...s, bought: w.balance_bought, bonus: w.balance_bonus })))
         .catch(() => refreshWallet());
     },

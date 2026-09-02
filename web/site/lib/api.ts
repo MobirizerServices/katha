@@ -59,9 +59,12 @@ export const api = {
   },
 
   // Web coin purchase — credits the pack + the +10% web bonus in the real ledger.
-  webOrder(sku: string, email = ""): Promise<WalletDTO> {
+  // orderRef is the payment id (the PSP's, in production): it keys the credit's
+  // idempotency, so buying the same pack twice is two payments, not a dedupe.
+  webOrder(sku: string, email = "", orderRef?: string): Promise<WalletDTO> {
     return call<WalletDTO>("/v1/web/orders", {
-      method: "POST", body: JSON.stringify({ sku, email }),
+      method: "POST",
+      body: JSON.stringify({ sku, email, ...(orderRef ? { order_ref: orderRef } : {}) }),
     });
   },
 

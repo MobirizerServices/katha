@@ -92,6 +92,11 @@ class IapVerifyRequest(BaseModel):
 class WebOrderRequest(BaseModel):
     sku: str
     email: str = ""      # invoice delivery (web checkout collects it)
+    # PSP payment id (Razorpay payment.captured in production). It keys the
+    # credit's idempotency, so a second genuine purchase of the same pack is a
+    # new payment, not a silent dedupe; absent (legacy/dev) the key falls back
+    # to (user, sku) and replays stay idempotent.
+    order_ref: str = ""
 
 
 class ProblemDetail(BaseModel):

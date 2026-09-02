@@ -42,7 +42,7 @@ class Approval:
     coins: int
     reason_code: str
     note: str
-    status: str = "pending"          # pending | approved
+    status: str = "pending"          # pending | approved | rejected
     approved_by: str | None = None
     created_at: str = ""
 

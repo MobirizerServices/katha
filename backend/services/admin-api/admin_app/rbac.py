@@ -4,9 +4,9 @@ Identity resolves in two ways (see `oidc.py`):
 - an OIDC session cookie — the operator's email, with the role looked up in the
   server-side directory on EVERY request (revocation is instant). Mutations
   must carry `X-Katha-CSRF: 1`.
-- with `KATHA_ADMIN_AUTH=headers` (the dev default), the historical
-  `X-Actor-Id` + `X-Role` headers still work when no session is present. In
-  `oidc` mode those headers are ignored entirely.
+- with `KATHA_ADMIN_AUTH=headers` (an explicit dev/test opt-in — the default
+  is `oidc`), the historical `X-Actor-Id` + `X-Role` headers still work when
+  no session is present. In `oidc` mode those headers are ignored entirely.
 
 `require(*roles)` is a FastAPI dependency factory that 401s an unauthenticated
 caller and 403s one whose role is not permitted for the route.

@@ -99,13 +99,16 @@ def config(authorization: str | None = Header(default=None)) -> dict:
 
     from katha_domain.flags import bucket
 
-    from .auth import decode_token
+    from .auth import decode_token, dev_stubs_enabled
     from .store import store as _store
     user: str | None = None
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1].strip()
         payload = decode_token(token)
-        user = payload["sub"] if payload else token
+        if payload:
+            user = payload["sub"]
+        elif dev_stubs_enabled():
+            user = token
     prof = catalog.pricing()
     overrides = _store.shared.flag_overrides() if getattr(_store, "shared", None) else {}
     experiments: dict[str, str] = {}

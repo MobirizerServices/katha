@@ -7,8 +7,10 @@ in the shared KV, or the in-memory store without persistence), so revocation is
 instant.
 
 Two auth modes, chosen by `KATHA_ADMIN_AUTH`:
-- "headers" (default): the historical dev path — X-Actor-Id/X-Role headers.
-- "oidc": headers are ignored. Sessions only.
+- "oidc" (default): headers are ignored. Sessions only.
+- "headers": the historical dev/test path — X-Actor-Id/X-Role headers, i.e.
+  the caller names its own role. EXPLICIT opt-in only, never a default: an
+  env-less deploy must fail closed, not hand full admin to any network caller.
 
 Two identity providers, chosen by `KATHA_OIDC_ISSUER`:
 - unset: a built-in DEV IdP (this module) — full authorize→code→ID-token flow
@@ -58,7 +60,8 @@ _SESSION_SECRET = (os.environ.get("KATHA_ADMIN_SESSION_SECRET")
 
 
 def auth_mode() -> str:
-    return os.environ.get("KATHA_ADMIN_AUTH", "headers").strip().lower()
+    # Fail closed: client-named roles only when explicitly opted in (dev/test).
+    return os.environ.get("KATHA_ADMIN_AUTH", "oidc").strip().lower()
 
 
 def internal_idp() -> bool:

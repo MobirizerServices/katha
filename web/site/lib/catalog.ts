@@ -141,3 +141,11 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:87
 export function coverUrl(slug: string, wide = false): string {
   return `${API_BASE}/media/${slug}/cover_${wide ? "16x9" : "9x16"}.jpg`;
 }
+
+/** JSON for an inline <script type="application/ld+json"> block. Escapes '<'
+ * so no value can smuggle a '</script>' out of the element — inert with
+ * today's static seed data, mandatory the day synopses come from live admin
+ * content. */
+export function jsonLdString(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, "\\u003c");
+}

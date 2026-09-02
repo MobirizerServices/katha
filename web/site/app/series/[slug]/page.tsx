@@ -15,6 +15,7 @@ import {
   fullLockedCost,
   coinsToRupees,
   fmt,
+  jsonLdString,
 } from "@/lib/catalog";
 
 export function generateStaticParams() {
@@ -66,7 +67,7 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdString(ld) }}
       />
       <section className="billboard">
         <div

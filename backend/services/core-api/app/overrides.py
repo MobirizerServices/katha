@@ -114,6 +114,14 @@ def stamp_covers(s):
     })
 
 
+def is_served(slug: str) -> bool:
+    """The back-office status gate (same rule as the catalog listing): only a
+    live series is served. The money paths must honour it too — an archived or
+    draft series can be neither streamed nor charged for."""
+    from .store import store
+    return (store.kv(f"status:{slug}") or "live") == "live"
+
+
 def get_series(slug: str) -> SeriesDetail | None:
     """The one lookup every money path uses: seed or panel-drafted series,
     with panel pricing applied and versioned cover URLs."""

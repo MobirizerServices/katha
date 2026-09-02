@@ -44,9 +44,9 @@ def _resume_ms(user: str, eid: str) -> int:
 @router.post("/series/{slug}/episodes/{number}/playback")
 def playback(slug: str, number: int, response: Response, user: str = Depends(current_user)):
     store.refresh_ledger()
-    from ..overrides import get_series
+    from ..overrides import get_series, is_served
     series = get_series(slug)
-    if series is None or not (1 <= number <= series.episode_count):
+    if series is None or not is_served(slug) or not (1 <= number <= series.episode_count):
         raise HTTPException(status_code=404, detail="episode not found")
 
     eid = catalog.episode_id(slug, number)

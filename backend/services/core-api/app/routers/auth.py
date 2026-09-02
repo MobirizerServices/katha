@@ -18,6 +18,8 @@ from katha_domain.schemas import (
     UserProfilePatch,
     UserProfileResponse,
 )
+from katha_domain.timeutil import now_iso
+
 from ..auth import current_user, issue_token, user_id_for_apple, user_id_for_phone
 from ..store import store
 
@@ -155,11 +157,18 @@ def patch_me(body: UserProfilePatch, user: str = Depends(current_user)) -> UserP
 def delete_me(user: str = Depends(current_user)) -> dict:
     """Account deletion (App Store requirement; PDD §15 DPDP).
 
-    Dev slice: PII (profile) and engagement projections are removed immediately;
-    the coin ledger is retained as a pseudonymous financial record (§12.7).
-    Production adds the 7-day grace window and warehouse/vector propagation.
+    Dev slice: PII (profile) and engagement projections are removed immediately —
+    from the in-memory projections AND the shared DB (phone scrubbed, devices and
+    push tokens deleted), with a token_version bump so every outstanding 30-day
+    JWT dies now instead of quietly re-materializing the profile on its next
+    request. The coin ledger is retained as a pseudonymous financial record
+    (§12.7). Production adds the 7-day grace window and warehouse/vector
+    propagation.
     """
     store.users.pop(user, None)
     store.engagement.pop(user, None)
+    if store.shared is not None:
+        store.shared.bump_token_version(user)
+        store.shared.erase_user(user, now_iso())
     return {"status": "deleted", "user_id": user,
             "note": "coins are not refunded; ledger retained as a financial record"}

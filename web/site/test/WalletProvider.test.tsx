@@ -193,7 +193,8 @@ describe("purchase — optimistic credit then reconcile", () => {
     expect(ctx.bought).toBe(1300);
     expect(ctx.bonus).toBe(130);
     expect(ctx.balance).toBe(1430);
-    expect(webOrder).toHaveBeenCalledWith("coins_popular_in", "");
+    // the third arg is the per-checkout payment id keying idempotency
+    expect(webOrder).toHaveBeenCalledWith("coins_popular_in", "", expect.any(String));
 
     await act(async () => {
       d.resolve({ balance_bought: 1300, balance_bonus: 200 });
@@ -411,6 +412,6 @@ describe("invoice email pass-through", () => {
     webOrder.mockResolvedValue({ balance_bought: 1300, balance_bonus: 130, total: 1430 });
     act(() => { ctx.purchase(1300, 199, "coins_popular_in", "meera@example.com"); });
     await waitFor(() =>
-      expect(webOrder).toHaveBeenCalledWith("coins_popular_in", "meera@example.com"));
+      expect(webOrder).toHaveBeenCalledWith("coins_popular_in", "meera@example.com", expect.any(String)));
   });
 });

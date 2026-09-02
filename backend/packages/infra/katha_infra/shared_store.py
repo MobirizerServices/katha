@@ -298,6 +298,34 @@ class SharedStore:
                 row.value = value
             await s.commit()
 
+    def kv_incr(self, key: str) -> int:
+        """Atomically increment an integer-valued key and return the new value.
+
+        A single in-place UPDATE ... RETURNING (row-locked by the DB), so
+        concurrent callers each get a distinct value — the counter behind
+        statutory sequences must never be read-modify-write."""
+        return self.db.run(self._kv_incr(key))
+
+    async def _kv_incr(self, key: str) -> int:
+        from sqlalchemy import Integer, String, cast, update
+        from sqlalchemy.exc import IntegrityError
+        stmt = (update(KVRow).where(KVRow.key == key)
+                .values(value=cast(cast(KVRow.value, Integer) + 1, String))
+                .returning(KVRow.value))
+        async with self.db.session_factory() as s:
+            val = (await s.execute(stmt)).scalar_one_or_none()
+            if val is None:
+                try:
+                    s.add(KVRow(key=key, value="1"))
+                    await s.commit()
+                    return 1
+                except IntegrityError:
+                    # Lost the first-insert race — the row exists now; increment it.
+                    await s.rollback()
+                    val = (await s.execute(stmt)).scalar_one_or_none()
+            await s.commit()
+            return int(val)
+
     def kv_prefix(self, prefix: str) -> dict[str, str]:
         return self.db.run(self._kv_prefix(prefix))
 
@@ -734,11 +762,13 @@ class SharedStore:
 
     # ---- invoices ------------------------------------------------------------
     def next_invoice_number(self, year: str) -> str:
-        """Sequential per financial-year prefix, via the KV counter."""
+        """Sequential per financial-year prefix, via the KV counter.
+
+        The increment is a single atomic UPDATE (`kv_incr`), never a
+        read-modify-write: invoice numbers are a statutory GST sequence, so two
+        concurrent purchases must never mint the same one."""
         fy = f"{year[2:]}{int(year) % 100 + 1:02d}"          # 2026 → "2627"
-        key = f"invoiceseq:{fy}"
-        n = int(self.kv_get(key) or 0) + 1
-        self.kv_set(key, str(n))
+        n = self.kv_incr(f"invoiceseq:{fy}")
         return f"KATHA-INV-{fy}-{n:06d}"
 
     def invoice_create(self, **fields) -> None:

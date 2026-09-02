@@ -142,3 +142,14 @@ def test_users_list_reflects_adjusted_users():
                 json={"user_id": "u1", "coins": 50, "reason_code": "g"})
     users = client.get("/admin/v1/users", headers=FINANCE).json()["users"]
     assert any(u["id"] == "u1" for u in users)          # AdminUser shape (id, wallet, ...)
+
+
+def test_rejected_approval_cannot_be_applied():
+    ap_id = _create_pending()
+    r = client.post(f"/admin/v1/approvals/{ap_id}/reject", headers=FINANCE)
+    assert r.status_code == 200
+    # The veto is final: a later approve attempt conflicts and applies nothing.
+    assert client.post(f"/admin/v1/approvals/{ap_id}/approve",
+                       headers=ADMIN).status_code == 409
+    assert client.get("/admin/v1/users/big/ledger",
+                      headers=FINANCE).json()["wallet"]["total"] == 0

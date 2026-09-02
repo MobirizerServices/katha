@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { coverUrl } from "@/lib/catalog";
+import { coverUrl, jsonLdString } from "@/lib/catalog";
 import SiteFooter from "@/components/SiteFooter";
 import {
   SERIES,
@@ -72,7 +72,7 @@ const jsonLd = {
 export default function Home() {
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
 
       {/* ---- hero ---- */}
       <section className="wrap hero" id="get">

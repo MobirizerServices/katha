@@ -8,7 +8,10 @@ wiring change — the money rules stay in the pure ledger.
 """
 from __future__ import annotations
 
+from dataclasses import replace
+
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from katha_ledger import Entitlement, Ledger, Transaction, TxType, UnlockResult, Wallet
 
@@ -27,16 +30,33 @@ class PersistentLedger:
 
     # ---- flush the append-only tail -------------------------------------
     def _flush(self, users: set[str]) -> None:
-        new_tx: list[Transaction] = self._inner._log[self._persisted_tx:]
+        inner = self._inner
+        new_tx: list[Transaction] = inner._log[self._persisted_tx:]
         new_ents: list[Entitlement] = [
-            e for k, e in self._inner._entitlements.items()
+            e for k, e in inner._entitlements.items()
             if k not in self._persisted_ents
         ]
         touched = users | {t.user_id for t in new_tx} | {e.user_id for e in new_ents}
-        wallets: list[Wallet] = [self._inner._wallet(u) for u in touched]
-        self._repo.persist(new_tx, new_ents, wallets)
-        self._persisted_tx = len(self._inner._log)
-        self._persisted_ents = set(self._inner._entitlements)
+        try:
+            self._repo.persist(new_tx, new_ents,
+                               [inner._wallet(u) for u in touched])
+        except IntegrityError:
+            # The other service persisted rows with the same seq-minted ids in
+            # the race window between our refresh() and this flush. Fold its
+            # rows in (advancing _seq past them — _refresh keeps our
+            # unpersisted tail pending), re-mint ids for that tail, and retry
+            # once. Money rows must never be silently dropped.
+            self.refresh()
+            start = self._persisted_tx
+            for i in range(start, len(inner._log)):
+                fresh = replace(inner._log[i], id=inner._next_id())
+                inner._log[i] = fresh
+                inner._by_key[fresh.idempotency_key] = fresh
+            new_tx = inner._log[start:]
+            self._repo.persist(new_tx, new_ents,
+                               [inner._wallet(u) for u in touched])
+        self._persisted_tx = len(inner._log)
+        self._persisted_ents = set(inner._entitlements)
 
     # ---- reads (delegate) -----------------------------------------------
     def balance(self, user_id: str) -> Wallet:
@@ -71,6 +91,11 @@ class PersistentLedger:
             tx_rows = (await session.execute(select(CoinTransactionRow))).scalars().all()
             ent_rows = (await session.execute(select(EntitlementRow))).scalars().all()
         inner = self._inner
+        # Local rows a failed flush left unpersisted stay PENDING: marking them
+        # on-disk here would silently vanish them on the next restart.
+        pending_tx = inner._log[self._persisted_tx:]
+        pending_ents = {k for k in inner._entitlements
+                        if k not in self._persisted_ents}
         fresh = [r for r in tx_rows if r.idempotency_key not in inner._by_key]
         fresh.sort(key=lambda r: _seq_of(r.id))
         for r in fresh:
@@ -91,9 +116,15 @@ class PersistentLedger:
                     user_id=e.user_id, episode_id=e.episode_id,
                     source=e.source, created_at=e.created_at,
                 )
-        # Everything in the log is now on disk; _flush must not re-write it.
-        self._persisted_tx = len(inner._log)
-        self._persisted_ents = set(inner._entitlements)
+        # Watermark bookkeeping: keep [persisted prefix][folded foreign rows]
+        # then the still-pending local tail at the end, so _flush retries
+        # exactly the pending rows and nothing else.
+        if pending_tx:
+            base = self._persisted_tx
+            folded = inner._log[base + len(pending_tx):]
+            inner._log[base:] = folded + pending_tx
+        self._persisted_tx = len(inner._log) - len(pending_tx)
+        self._persisted_ents = set(inner._entitlements) - pending_ents
         return len(fresh)
 
     # ---- mutations (delegate, then flush) -------------------------------

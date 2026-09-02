@@ -16,15 +16,13 @@ import {
   fmt,
 } from "@/lib/catalog";
 
-// Fallback demo stream for when core-api is unreachable; the real source comes
-// from the playback endpoint (locally generated HLS served under /media).
-const DEMO_HLS = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
-
 export default function Player({ series, n }: { series: Series; n: number }) {
   const w = useWallet();
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoOk, setVideoOk] = useState(false);
+  const [streamError, setStreamError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   const ep = series.episodes.find((e) => e.number === n) || series.episodes[0];
   const free = isFreeEpisode(n);
@@ -44,18 +42,25 @@ export default function Player({ series, n }: { series: Series; n: number }) {
     let hls: { destroy: () => void } | null = null;
     let cancelled = false;
 
+    setStreamError(false);
     (async () => {
       try {
         // Authoritative source: the playback endpoint returns the signed HLS
         // master for entitled viewers (locally: the generated /media stream).
-        let src = DEMO_HLS;
+        // A failure here is an ERROR, never a silent substitute — playing a
+        // stand-in stream as if it were the entitled episode misleads.
+        let src: string | null = null;
         try {
           const pb = await api.playback(series.slug, n);
           if (pb && pb.hls_master_url) src = pb.hls_master_url as string;
         } catch {
-          /* offline or guest-locked — fall back to the demo stream */
+          /* handled below as the error state */
         }
         if (cancelled) return;
+        if (!src) {
+          setStreamError(true);
+          return;
+        }
         const reveal = () => !cancelled && setVideoOk(true);
         // Prefer hls.js wherever MSE exists: Chrome answers "maybe" to the
         // native canPlayType probe but cannot actually demux HLS.
@@ -70,12 +75,32 @@ export default function Player({ series, n }: { series: Series; n: number }) {
           // Reveal on real frames (not MANIFEST_PARSED): if the media stack
           // can't open MSE the gradient poster simply stays.
           video.addEventListener("loadeddata", reveal, { once: true });
+          // Signed stream tokens expire mid-play: on the first fatal error,
+          // re-fetch a fresh playback URL once; after that, surface the error.
+          let recovered = false;
+          inst.on(Hls.Events.ERROR, (_evt: unknown, data: { fatal: boolean }) => {
+            if (cancelled || !data.fatal) return;
+            if (recovered) {
+              setStreamError(true);
+              return;
+            }
+            recovered = true;
+            api
+              .playback(series.slug, n)
+              .then((fresh) => {
+                if (cancelled) return;
+                if (fresh && fresh.hls_master_url) inst.loadSource(fresh.hls_master_url as string);
+                else setStreamError(true);
+              })
+              .catch(() => !cancelled && setStreamError(true));
+          });
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
           video.src = src;                       // Safari: native HLS
           video.addEventListener("loadeddata", reveal, { once: true });
+          video.addEventListener("error", () => !cancelled && setStreamError(true), { once: true });
         }
       } catch {
-        /* keep gradient placeholder */
+        if (!cancelled) setStreamError(true);
       }
     })();
 
@@ -83,7 +108,7 @@ export default function Player({ series, n }: { series: Series; n: number }) {
       cancelled = true;
       if (hls) hls.destroy();
     };
-  }, [accessible, series.slug, n]);
+  }, [accessible, series.slug, n, retryKey]);
 
   const goto = (num: number) => router.push(`/watch/${series.slug}/${num}`);
 
@@ -143,9 +168,33 @@ export default function Player({ series, n }: { series: Series; n: number }) {
         )}
 
         {locked && <Paywall />}
+        {accessible && streamError && <StreamError />}
       </div>
     </div>
   );
+
+  function StreamError() {
+    return (
+      <div className="overlay">
+        <div className="ocard">
+          <h3>Stream unavailable</h3>
+          <p>We couldn&apos;t load this episode. Check your connection and try again.</p>
+          <button
+            className="btn p"
+            onClick={() => {
+              setStreamError(false);
+              setRetryKey((k) => k + 1);
+            }}
+          >
+            Try again
+          </button>
+          <Link className="olink" href={`/series/${series.slug}`}>
+            Back to the series
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   function Paywall() {
     return (
