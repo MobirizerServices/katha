@@ -79,7 +79,7 @@ final class KathaAppUITests: XCTestCase {
     func test02_HomeFeedAndCheckin() {
         let app = launchApp()
         assertExists(app.staticTexts["Daily check-in"], 20)
-        assertExists(app.staticTexts["Trending in hi"], 10)
+        assertExists(app.staticTexts["Trending in हिन्दी"], 10)
         tapWhenReady(app.buttons["Claim"])
         // deterministic post-state: the claimed card leaves the feed
         let gone = NSPredicate(format: "exists == false")
@@ -91,7 +91,7 @@ final class KathaAppUITests: XCTestCase {
 
     func test03_SeriesPageAndMyList() {
         let app = launchApp()
-        assertExists(app.staticTexts["Trending in hi"], 20)
+        assertExists(app.staticTexts["Trending in हिन्दी"], 20)
         tapWhenReady(button(app, containing: "Kaanch Ka Mahal"))
 
         assertExists(app.staticTexts["Free · 10 episodes, then 30 coins (≈ ₹4.5) each"], 12)

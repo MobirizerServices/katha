@@ -282,4 +282,4 @@ def test_retry_and_recs_without_persistence():
     tok = core.post("/v1/auth/guest").json()["access_token"]
     rows = core.get("/v1/home",
                     headers={"Authorization": f"Bearer {tok}"}).json()["rows"]
-    assert [r["title"] for r in rows] == ["Trending in hi", "New this week"]
+    assert [r["title"] for r in rows] == ["Trending in हिन्दी", "New this week"]

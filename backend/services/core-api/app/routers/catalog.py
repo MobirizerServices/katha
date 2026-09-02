@@ -57,7 +57,8 @@ def home(lang: str = "hi",
     from .. import recs
     served = _served(overrides.all_summaries())
     series = [s for s in served if s.primary_language == lang] or served
-    rows = [HomeRow(title=f"Trending in {lang}", series=recs.rank_trending(series))]
+    native = {"hi": "हिन्दी", "ta": "தமிழ்", "te": "తెలుగు"}.get(lang, lang)
+    rows = [HomeRow(title=f"Trending in {native}", series=recs.rank_trending(series))]
     user = _bearer_user(authorization)
     if user:
         byw = recs.because_you_watched(user, served)

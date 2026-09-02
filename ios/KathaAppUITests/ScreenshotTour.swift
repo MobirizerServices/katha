@@ -58,7 +58,7 @@ final class ScreenshotTour: XCTestCase {
 
     func test02_TourDiscover() {
         let app = launchApp()
-        wait(app, text: "Trending in hi", 20)
+        wait(app, text: "Trending in हिन्दी", 20)
         snap("2.1-home")
 
         app.tabBars.buttons["Browse"].tap()
@@ -69,11 +69,19 @@ final class ScreenshotTour: XCTestCase {
         app.buttons["All"].tap()
 
         app.tabBars.buttons["Home"].tap()
-        app.buttons["Search"].tap()
+        // Coordinate taps: the header can re-render mid-tap (same guard as
+        // the main suite's test05).
+        let search = app.buttons["Search"].firstMatch
+        _ = search.waitForExistence(timeout: 8)
+        search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        if !app.staticTexts["Trending"].waitForExistence(timeout: 5), search.exists {
+            search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            _ = app.staticTexts["Trending"].waitForExistence(timeout: 8)
+        }
         let field = app.textFields.firstMatch          // inline 2.3 search bar
         _ = field.waitForExistence(timeout: 8)
         snap("2.3-search-empty")
-        field.tap()
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         field.typeText("kaanch")
         _ = button(app, containing: "Kaanch Ka Mahal").waitForExistence(timeout: 8)
         snap("2.3b-search-results")

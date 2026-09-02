@@ -52,7 +52,7 @@ struct BrowseView: View {
                     emptyState("Nothing here yet",
                                "Try another genre — or switch language.")
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 124), spacing: 12)],
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 138), spacing: 12)],
                               spacing: Katha.Spacing.lg) {
                         ForEach(filtered) { s in
                             NavigationLink(value: s.slug) { PosterCard(series: s) }
@@ -232,7 +232,7 @@ struct MyListView: View {
                            icon: "bookmark")
                     .padding(.top, 120)
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 124), spacing: 12)],
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 138), spacing: 12)],
                           spacing: Katha.Spacing.lg) {
                     ForEach(model.myListSeries) { s in
                         NavigationLink(value: s.slug) { PosterCard(series: s) }

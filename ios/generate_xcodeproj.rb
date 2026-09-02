@@ -28,6 +28,10 @@ target.resources_build_phase.add_file_reference(assets_ref, true)
 privacy_ref = group.new_reference('PrivacyInfo.xcprivacy')
 target.resources_build_phase.add_file_reference(privacy_ref, true)
 
+# The display face (Anton, OFL) — folder reference so the license ships too.
+fonts_ref = group.new_reference('Fonts')
+target.resources_build_phase.add_file_reference(fonts_ref, true)
+
 # Local Swift package dependency on ../KathaKit (path is relative to the project dir).
 local = project.new(Xcodeproj::Project::Object::XCLocalSwiftPackageReference)
 local.relative_path = 'KathaKit'

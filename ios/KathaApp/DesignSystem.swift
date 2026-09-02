@@ -27,8 +27,9 @@ public enum Katha {
     /// labels run in small caps (a glyph feature — accessibility labels and
     /// UI-test string matching keep the original text).
     public enum Font {
+        /// Anton (OFL, bundled) — the same face the site and the key art use.
         public static func display(_ size: CGFloat) -> SwiftUI.Font {
-            .system(size: size, weight: .heavy).width(.condensed)
+            .custom("Anton-Regular", size: size)
         }
         public static let wordmark: SwiftUI.Font =
             .system(size: 24, weight: .bold, design: .serif).italic()

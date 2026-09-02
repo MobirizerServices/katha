@@ -396,7 +396,8 @@ def test_events_emitted_by_core_paths(shared):
     core.put("/v1/progress", headers={"Authorization": "Bearer ev-user"},
              json={"items": [{"slug": "kaanch-ka-mahal", "number": 1,
                               "position_ms": 9000, "duration_ms": 120000}]})
-    a = shared.analytics(now=T0, days=3)
+    from katha_domain.timeutil import now_iso
+    a = shared.analytics(now=now_iso(), days=3)   # live clock — events are stamped live
     today = a["daily"][-1]
     assert today["paywall_views"] == 1 and today["purchases"] == 1
     assert today["unlocks"] == 1 and today["dau"] == 1
@@ -405,14 +406,19 @@ def test_events_emitted_by_core_paths(shared):
 
 
 def test_analytics_windows_split_and_refund_ratio(shared):
+    # Live timestamps: "today"/30d are real calendar windows — frozen dates
+    # made this test rot at midnight.
+    from datetime import datetime, timedelta, timezone
+    from katha_domain.timeutil import now_iso
+    today = now_iso()
     pl = PersistentLedger(shared.db)
-    old = "2026-08-20T10:00:00+00:00"
+    old = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
     pl.credit("w1", TxType.PURCHASE, coins=1000, reference_type="iap",
               reference_id="s", idempotency_key="an1", created_at=old)
     pl.credit("w2", TxType.PURCHASE, coins=500, reference_type="web_order",
-              reference_id="s", idempotency_key="an2", created_at=T0)
+              reference_id="s", idempotency_key="an2", created_at=today)
     pl.refund_clawback("w2", coins=100, reference_type="gateway_refund",
-                       reference_id="rf", idempotency_key="an3", created_at=T0)
+                       reference_id="rf", idempotency_key="an3", created_at=today)
     r = _admin().get("/admin/v1/analytics", headers=ADMIN_H)
     assert r.status_code == 200
     a = r.json()

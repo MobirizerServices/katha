@@ -11,28 +11,8 @@ struct FeedView: View {
     var body: some View {
         content
             .background(Katha.Color.bg)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Image("KathaMark")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 26, height: 26)
-                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                        .accessibilityHidden(true)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 14) {
-                        languageMenu
-                        NavigationLink(value: SearchRoute()) {
-                            Image(systemName: "magnifyingglass")
-                                .accessibilityLabel("Search")
-                                .foregroundStyle(Katha.Color.text)
-                        }
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: SearchRoute.self) { _ in SearchView() }
-            .toolbarBackground(Katha.Color.bg, for: .navigationBar)
             .task { if model.feed.rows.isEmpty { await model.loadHome() } }
             .overlay(alignment: .bottom) {
                 if let coins = claimedToast {
@@ -47,17 +27,31 @@ struct FeedView: View {
     /// in the content (it scrolls away) because the iOS 26 toolbar clips its
     /// leading item into a glass circle.
     private var masthead: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("Katha")
-                .font(Katha.Font.wordmark)
-                .foregroundStyle(Katha.Color.text)
-            Text("कथा")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Katha.Color.text2)
+        HStack(spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Katha")
+                    .font(Katha.Font.wordmark)
+                    .foregroundStyle(Katha.Color.text)
+                Text("कथा")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Katha.Color.text2)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Katha")
+            Spacer()
+            languageMenu
+            NavigationLink(value: SearchRoute()) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Katha.Color.text)
+                    .frame(width: 34, height: 34)
+                    .background(Katha.Color.surface)
+                    .clipShape(Circle())
+                    .accessibilityLabel("Search")
+            }
         }
         .padding(.horizontal, Katha.Spacing.lg)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Katha")
+        .padding(.top, Katha.Spacing.sm)
     }
 
     private var languageMenu: some View {
@@ -91,9 +85,9 @@ struct FeedView: View {
             FeedLoadingState()
         } else {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: Katha.Spacing.xl) {
+                LazyVStack(alignment: .leading, spacing: Katha.Spacing.lg) {
                     masthead
-                    BrandRibbon().padding(.top, -Katha.Spacing.md)
+                    BrandRibbon().padding(.top, -Katha.Spacing.sm)
                     if !model.checkinClaimedToday {
                         checkinCard
                             .transition(.scale(scale: 0.92).combined(with: .opacity))
@@ -150,7 +144,8 @@ struct FeedView: View {
             }
             .buttonStyle(PressableStyle())
         }
-        .padding(Katha.Spacing.lg)
+        .padding(.horizontal, Katha.Spacing.lg)
+        .padding(.vertical, Katha.Spacing.md)
         .background(Katha.Color.surface)
         .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous)
@@ -218,24 +213,29 @@ private struct HeroCard: View {
         NavigationLink(value: series.slug) {
             ZStack(alignment: .bottomLeading) {
                 CoverImage(url: series.coverUrl)
-                    .frame(height: 420)
+                    .frame(height: 500)
                     .overlay {
-                        // Keep the title/CTA legible over the artwork.
-                        LinearGradient(colors: [.clear, Katha.Color.bg.opacity(0.9)],
-                                       startPoint: .center, endPoint: .bottom)
+                        // Fade seamlessly into the page ground — full-bleed,
+                        // no card frame: the story IS the screen.
+                        LinearGradient(stops: [
+                            .init(color: .clear, location: 0.45),
+                            .init(color: Katha.Color.bg.opacity(0.75), location: 0.82),
+                            .init(color: Katha.Color.bg, location: 1),
+                        ], startPoint: .top, endPoint: .bottom)
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
+                    .clipped()
                     // The art drifts slower than the scroll — quiet depth.
                     .visualEffect { content, proxy in
                         let minY = proxy.frame(in: .scrollView).minY
                         return content.offset(y: minY < 0 ? -minY * 0.18 : 0)
                     }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(series.title)
-                        .font(Katha.Font.display(36))
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(series.title.uppercased())
+                        .font(Katha.Font.display(42))
                         .foregroundStyle(Katha.Color.text)
                         .multilineTextAlignment(.leading)
-                    HStack(spacing: 8) {
+                        .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
+                    HStack(spacing: 10) {
                         NavigationLink(value: EpisodeRoute(slug: series.slug, number: 1)) {
                             HStack(spacing: 6) {
                                 Image(systemName: "play.fill")
@@ -243,37 +243,24 @@ private struct HeroCard: View {
                             }
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Katha.Color.text)
-                            .padding(.horizontal, 16)
-                            .frame(height: 40)
-                            .background(Katha.Color.accent)
+                            .padding(.horizontal, 18)
+                            .frame(height: 42)
+                            .background(LinearGradient(colors: [Katha.Color.accent,
+                                                                Katha.Color.accentPressed],
+                                                       startPoint: .top, endPoint: .bottom))
                             .clipShape(Capsule())
                         }
-                        Text("\(series.genres.first ?? "") · \(series.episodeCount) episodes")
-                            .font(.system(size: 13))
+                        Text("\(series.genres.first ?? "") · \(series.episodeCount) episodes · Free · \(model.freeEpisodesDefault)")
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Katha.Color.text2)
                     }
                 }
-                .padding(Katha.Spacing.lg)
-
-                VStack {
-                    HStack {
-                        Text("Free · \(model.freeEpisodesDefault) episodes")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Katha.Color.text)
-                            .padding(.horizontal, 8)
-                            .frame(height: 22)
-                            .background(.black.opacity(0.55))
-                            .clipShape(Capsule())
-                        Spacer()
-                    }
-                    Spacer()
-                }
-                .padding(Katha.Spacing.md)
+                .padding(.horizontal, Katha.Spacing.lg)
+                .padding(.bottom, Katha.Spacing.sm)
             }
         }
         .buttonStyle(PressableStyle())
         .zoomSource(id: series.slug)
-        .padding(.horizontal, Katha.Spacing.lg)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(series.title), featured story")
     }
@@ -347,33 +334,24 @@ struct PosterCard: View {
     let series: SeriesSummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            CoverImage(url: series.coverUrl)
-                .frame(width: 124, height: 176)
-                .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous)
-                    .strokeBorder(.white.opacity(0.07), lineWidth: 1))
-                .overlay(alignment: .bottomLeading) {
-                    Text(series.primaryLanguage.uppercased())
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Katha.Color.text)
-                        .padding(4)
-                        .background(Katha.Color.bg.opacity(0.6))
-                        .clipShape(Capsule())
-                        .padding(6)
-                }
-                .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
-            Text(series.title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Katha.Color.text)
-                .lineLimit(2)
-                .frame(width: 124, alignment: .leading)
-            Text("\(series.episodeCount) episodes")
-                .font(.system(size: 11))
-                .foregroundStyle(Katha.Color.text2)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(series.title), \(series.episodeCount) episodes")
+        CoverImage(url: series.coverUrl)
+            .frame(width: 138, height: 196)
+            .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 1))
+            .overlay(alignment: .topTrailing) {
+                Text(series.primaryLanguage.uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Katha.Color.text)
+                    .padding(.horizontal, 6)
+                    .frame(height: 18)
+                    .background(Katha.Color.bg.opacity(0.55))
+                    .clipShape(Capsule())
+                    .padding(7)
+            }
+            .shadow(color: .black.opacity(0.4), radius: 10, y: 5)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(series.title), \(series.episodeCount) episodes")
     }
 }
 

@@ -39,6 +39,11 @@ DEV_DB = "/tmp/katha_shared.db"
 
 BOLD = "/System/Library/Fonts/Avenir Next Condensed.ttc"
 BODY = "/System/Library/Fonts/Avenir Next.ttc"
+# The product display face (bundled in the app + used on the site) — art and
+# UI speak one voice. Falls back to Avenir Condensed if the file is missing.
+ANTON = str(ROOT / "ios" / "KathaApp" / "Fonts" / "Anton-Regular.ttf")
+if not Path(ANTON).exists():
+    ANTON = BOLD
 
 LANG_LABEL = {"hi": "HINDI", "ta": "TAMIL", "te": "TELUGU"}
 GOLD = (245, 192, 66)
@@ -264,70 +269,62 @@ def draw_cover(s, size, layout):
              else w / 1200)
     m = int(72 * scale)
 
-    # eyebrow + wordmark
-    f_eyebrow = font(BODY, 26 * scale, 1)
-    d.text((m, m), "KATHA  ORIGINAL", font=f_eyebrow, fill=high + (235,))
-    d.line((m, m + int(44 * scale), m + int(120 * scale), m + int(44 * scale)),
-           fill=GOLD, width=max(2, int(4 * scale)))
+    # v3 discipline: posters carry ONE lockup — the title, in the product's
+    # display face. No eyebrow, no hook paragraph, no chip clutter: at rail
+    # sizes those baked strings read as noise and flatten every screen. The
+    # banner carries NO title at all — the app and site overlay their own,
+    # and a second baked title was double-printing under it. Only the og card
+    # (a link preview that must stand alone) keeps the fuller lockup.
 
-    # rating pill, top right
-    f_rate = font(BODY, 28 * scale, 1)
-    rate = s["content_rating"]
-    rw = d.textlength(rate, font=f_rate)
-    d.rounded_rectangle((w - m - rw - int(28 * scale), m - int(4 * scale),
-                         w - m, m + int(44 * scale)),
-                        radius=int(8 * scale), outline=(255, 255, 255, 150), width=2)
-    d.text((w - m - rw - int(14 * scale), m + int(6 * scale)), rate,
-           font=f_rate, fill=(255, 255, 255, 225))
+    if layout == "banner":
+        f_wm = font(BODY, 20 * scale, 0)
+        d.text((w - m - d.textlength("PLACEHOLDER", font=f_wm), h - int(34 * scale)),
+               "PLACEHOLDER", font=f_wm, fill=(255, 255, 255, 60))
+        return img.convert("RGB")
 
-    # hook line (the tagline) — skip on square/og where space is tight
-    if layout in ("portrait", "banner") and s.get("tagline"):
-        f_tag = font(BOLD, (66 if layout == "portrait" else 56) * scale, 1)
-        max_tag = (w - m * 2) if layout == "portrait" else int(w * 0.5)
-        ty = int(h * 0.2)
-        for line in wrap(d, s["tagline"], f_tag, max_tag)[:3]:
-            d.text((m, ty), line, font=f_tag, fill=(255, 255, 255, 105))
-            ty += int(f_tag.size * 1.1)
-        d.line((m, ty + int(20 * scale), m + int(150 * scale), ty + int(20 * scale)),
-               fill=GOLD + (170,), width=max(2, int(3 * scale)))
+    if layout == "og":
+        f_eyebrow = font(BODY, 26 * scale, 1)
+        d.text((m, m), "KATHA  ORIGINAL", font=f_eyebrow, fill=high + (235,))
+        d.line((m, m + int(44 * scale), m + int(120 * scale), m + int(44 * scale)),
+               fill=GOLD, width=max(2, int(4 * scale)))
 
-    # title lockup, bottom-anchored
-    tsize = {"portrait": 124, "banner": 104, "square": 96, "og": 84}[layout]
-    f_title = font(BOLD, tsize * scale, 1)
-    f_mean = font(BODY, 32 * scale, 0)
-    f_chip = font(BODY, 25 * scale, 1)
-    max_w = (w - m * 2) if layout != "banner" else int(w * 0.56)
-    lines = wrap(d, s["title"], f_title, max_w)[:3]
-    lh = int(f_title.size * 1.0)
+    tsize = {"portrait": 150, "square": 110, "og": 96}[layout]
+    f_title = font(ANTON, tsize * scale)
+    f_mean = font(BODY, 30 * scale, 0)
+    max_w = w - m * 2
+    lines = wrap(d, s["title"].upper(), f_title, max_w)[:3]
+    lh = int(f_title.size * 1.06)
 
-    block = len(lines) * lh + int(120 * scale)
-    if s.get("title_meaning"):
-        block += int(48 * scale)
+    block = len(lines) * lh + int(56 * scale)
+    show_meaning = layout != "square" and s.get("title_meaning")
+    if show_meaning:
+        block += int(46 * scale)
+    if layout == "og":
+        block += int(56 * scale)
     y = h - m - block
 
+    d.line((m, y - int(26 * scale), m + int(120 * scale), y - int(26 * scale)),
+           fill=GOLD + (220,), width=max(2, int(5 * scale)))
     for line in lines:
-        d.text((m + 3, y + 4), line, font=f_title, fill=(0, 0, 0, 130))
+        d.text((m + 3, y + 4), line, font=f_title, fill=(0, 0, 0, 140))
         d.text((m, y), line, font=f_title, fill=(255, 255, 255))
         y += lh
-    if s.get("title_meaning"):
-        d.text((m, y + int(6 * scale)), s["title_meaning"].upper(),
+    if show_meaning:
+        d.text((m, y + int(8 * scale)), s["title_meaning"].upper(),
                font=f_mean, fill=GOLD)
-        y += int(48 * scale)
+        y += int(46 * scale)
 
-    # chips row
-    cy = h - m - int(50 * scale)
-    x = m
-    x += chip(d, (x, cy), LANG_LABEL.get(s["primary_language"], "HINDI"),
-              f_chip, fg=(20, 20, 25), bg=(255, 255, 255, 235)) + int(12 * scale)
-    x += chip(d, (x, cy), f"{s['episode_count']} EPISODES", f_chip) + int(12 * scale)
-    if layout != "og":
-        chip(d, (x, cy), f"{s.get('free_episodes', 10)} FREE", f_chip,
-             fg=(18, 40, 26), bg=(47, 191, 113, 240))
+    if layout == "og":
+        f_chip = font(BODY, 25 * scale, 1)
+        cy = h - m - int(46 * scale)
+        x = m
+        x += chip(d, (x, cy), LANG_LABEL.get(s["primary_language"], "HINDI"),
+                  f_chip, fg=(20, 20, 25), bg=(255, 255, 255, 235)) + int(12 * scale)
+        chip(d, (x, cy), f"{s['episode_count']} EPISODES", f_chip)
 
-    f_wm = font(BODY, 20 * scale, 0)
-    d.text((w - m - d.textlength("PLACEHOLDER KEY ART — DEV", font=f_wm),
-            h - int(30 * scale)), "PLACEHOLDER KEY ART — DEV",
-           font=f_wm, fill=(255, 255, 255, 80))
+    f_wm = font(BODY, 19 * scale, 0)
+    d.text((w - m - d.textlength("PLACEHOLDER", font=f_wm), h - int(32 * scale)),
+           "PLACEHOLDER", font=f_wm, fill=(255, 255, 255, 60))
     return img.convert("RGB")
 
 
