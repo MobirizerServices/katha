@@ -47,10 +47,36 @@ final class PlayerEngine {
         }
     }
 
+    /// Data-saver ceiling in bits/second; 0 lifts the cap. Applied to the
+    /// current item live and to everything loaded afterwards.
+    var bitrateCap: Double = 0 {
+        didSet { player.currentItem?.preferredPeakBitRate = bitrateCap }
+    }
+    private var warmed: (url: URL, item: AVPlayerItem)?
+
+    /// Warm the next episode: the item exists and its master playlist is
+    /// fetched before the swipe, so advancing starts in a beat, not a spinner.
+    func warm(url: URL) {
+        guard warmed?.url != url else { return }
+        let item = AVPlayerItem(url: url)
+        item.preferredPeakBitRate = bitrateCap
+        item.preferredForwardBufferDuration = 6
+        warmed = (url, item)
+        Task { _ = try? await item.asset.load(.isPlayable) }
+    }
+
     func load(url: URL, resumeMs: Int) {
         ended = false; failed = false
         currentSeconds = 0; durationSeconds = 0
-        player.replaceCurrentItem(with: AVPlayerItem(url: url))
+        let item: AVPlayerItem
+        if let warmed, warmed.url == url {
+            item = warmed.item
+            self.warmed = nil
+        } else {
+            item = AVPlayerItem(url: url)
+        }
+        item.preferredPeakBitRate = bitrateCap
+        player.replaceCurrentItem(with: item)
         if resumeMs > 1500 {
             player.seek(to: CMTime(seconds: Double(resumeMs) / 1000, preferredTimescale: 600))
         }
@@ -123,6 +149,8 @@ struct PlayerView: View {
     @State private var toast: String?
     @State private var pinPassed = false
     @State private var lastReported = 0.0
+    @State private var nextReady: (number: Int, pb: PlaybackResponse)?
+    @State private var preloadingFor: Int?
 
     private var episodeTitle: String {
         detail?.episodes.first { $0.number == current }?.title ?? "Episode \(current)"
@@ -178,6 +206,10 @@ struct PlayerView: View {
         }
         .onChange(of: engine.currentSeconds) { _, s in
             if s - lastReported >= 5 { reportProgress() }
+            maybePreloadNext(at: s)
+        }
+        .onChange(of: model.dataSaver, initial: true) { _, saver in
+            engine.bitrateCap = saver ? 900_000 : 0
         }
         .sheet(isPresented: $showPaywall) {
             if let pb = playback, let d = detail {
@@ -384,7 +416,36 @@ struct PlayerView: View {
         detail = try? await model.api.seriesDetail(slug: slug)
     }
 
+    /// Preload the next episode in the final 20 seconds — playback auth,
+    /// stream token and master playlist are ready before the swipe. Never
+    /// debits: a locked next episode simply isn't warmed (auto-unlock stays
+    /// a start-of-episode decision).
+    private func maybePreloadNext(at s: Double) {
+        guard engine.durationSeconds > 0, s > engine.durationSeconds - 20,
+              let d = detail, current < d.episodeCount,
+              preloadingFor != current + 1 else { return }
+        let n = current + 1
+        preloadingFor = n
+        Task {
+            guard let pb = try? await model.api.playback(slug: slug, number: n),
+                  pb.isEntitled, let u = pb.hlsMasterUrl,
+                  let url = URL(string: u) else { return }
+            nextReady = (n, pb)
+            engine.warm(url: url)
+        }
+    }
+
     private func loadPlayback() async {
+        if let ready = nextReady, ready.number == current, ready.pb.isEntitled {
+            nextReady = nil
+            playback = ready.pb
+            loadFailed = false
+            showPaywall = false
+            if let u = ready.pb.hlsMasterUrl, let url = URL(string: u) {
+                engine.load(url: url, resumeMs: ready.pb.resumePositionMs ?? 0)
+                return
+            }
+        }
         do {
             var pb = try await model.api.playback(slug: slug, number: current)
 

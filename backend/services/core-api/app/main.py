@@ -49,14 +49,35 @@ app.include_router(playback_router.router)
 app.include_router(wallet_router.router)
 
 
-@app.get("/media/{path:path}", include_in_schema=False)
-def media(path: str) -> FileResponse:
-    """Dev stand-in for the CDN: covers + placeholder HLS from KATHA_MEDIA_DIR."""
+def _serve_media(path: str) -> FileResponse:
     base = media_dir().resolve()
     target = (base / path).resolve()
     if not target.is_relative_to(base) or not target.is_file():
         raise HTTPException(status_code=404, detail="not found")
     return FileResponse(target)
+
+
+@app.get("/media/t/{token}/{path:path}", include_in_schema=False)
+def media_stream(token: str, path: str) -> FileResponse:
+    """Tokened episode streams (ADR-012): the token from /playback authorizes
+    this episode's whole HLS tree — master, variants, segments — until it
+    expires. Relative playlist references resolve under the token root."""
+    from . import signing
+    if not signing.check_token(token, path):
+        raise HTTPException(status_code=403,
+                            detail="stream token invalid or expired")
+    return _serve_media(path)
+
+
+@app.get("/media/{path:path}", include_in_schema=False)
+def media(path: str) -> FileResponse:
+    """Public media: covers, og cards, the manifest. Episode video only ever
+    leaves through the tokened route — a bare URL can't be shared."""
+    from . import signing
+    if signing.is_video(path):
+        raise HTTPException(status_code=403,
+                            detail="episode streams need a playback token")
+    return _serve_media(path)
 
 
 @app.get("/health", tags=["ops"])

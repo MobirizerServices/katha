@@ -17,14 +17,28 @@ from ..store import store
 router = APIRouter(prefix="/v1", tags=["playback"])
 
 
-def _signed_url(episode_id: str) -> str:
-    # Serve the generated placeholder HLS when it exists on disk; otherwise fall
-    # back to the CloudFront/Cloudflare signing stub (SAD §7.1). Never a real secret.
+def _signed_url(episode_id: str, user: str) -> str:
+    """Tokened stream URL (ADR-012): one HMAC token covers the episode's whole
+    HLS tree for this user, expiring with the playback grant."""
+    from ..signing import make_token
     slug, _, tail = episode_id.partition(":e")
-    rel = f"{slug}/e{int(tail):03d}/hls/master.m3u8"
-    if (media_dir() / rel).is_file():
-        return f"{catalog.media_base()}/media/{rel}?exp={iso_plus(6)}"
+    epdir = f"{slug}/e{int(tail):03d}/hls/"
+    if (media_dir() / epdir / "master.m3u8").is_file():
+        token = make_token(epdir, user)
+        return f"{catalog.media_base()}/media/t/{token}/{epdir}master.m3u8"
     return f"https://cdn.katha.dev/hls/{episode_id}/master.m3u8?exp={iso_plus(6)}"
+
+
+def _resume_ms(user: str, eid: str) -> int:
+    """Where this viewer left off — a finished episode restarts from the top."""
+    from ..store import store as _s
+    item = _s.engagement.get(user)
+    prog = item.progress.get(eid) if item else None
+    if prog is None:
+        return 0
+    if prog.duration_ms and prog.position_ms >= prog.duration_ms - 3000:
+        return 0
+    return prog.position_ms
 
 
 @router.post("/series/{slug}/episodes/{number}/playback")
@@ -45,9 +59,9 @@ def playback(slug: str, number: int, response: Response, user: str = Depends(cur
             "locked": False,
             "episode_id": eid,
             "entitled": True,
-            "hls_master_url": _signed_url(eid),
+            "hls_master_url": _signed_url(eid, user),
             "expires_at": iso_plus(6),
-            "resume_position_ms": 0,
+            "resume_position_ms": _resume_ms(user, eid),
             "captions": [{"lang": series.primary_language, "url": f".../{eid}/subs.vtt"}],
         }
 

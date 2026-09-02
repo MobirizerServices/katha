@@ -68,6 +68,18 @@ Transports activate purely by env:
 | `KATHA_APNS_KEY_P8` (path), `KATHA_APNS_KEY_ID`, `KATHA_APNS_TEAM_ID`, `KATHA_APNS_TOPIC`, `KATHA_APNS_ENV=prod` | Episode-drop pushes deliver to APNs over HTTP/2 with an ES256 provider token. The .p8 lives in the secret manager, never the repo. |
 | `KATHA_GSTIN` | Printed on every web-purchase tax invoice (default marks registration pending). |
 
+## 5a. Stream URL signing (added 2 Sep 2026 — ADR-012 as built)
+
+Episode video only leaves through ``/media/t/{token}/{path}``: the token
+(HMAC-SHA256 over ``prefix|user|exp`` with ``KATHA_STREAM_SECRET``) binds the
+episode's whole HLS directory to one user for the playback grant's 6-hour
+life. HLS's relative references resolve under the token root, so one token
+covers master → variants → segments with no playlist rewriting. Bare
+``/media/...m3u8|.ts|.mp4`` URLs return 403 everywhere; covers/og stay
+public. Production moves verification to the CDN edge (signed URLs/cookies)
+with the same payload; rotate ``KATHA_STREAM_SECRET`` like a session secret
+(in-flight grants die on rotation — acceptable, clients re-auth playback).
+
 ## 6. OTP abuse guard (added 2 Sep 2026)
 
 `/v1/auth/otp/request` and `/verify` run a sliding-window limiter per phone

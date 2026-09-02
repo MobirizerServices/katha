@@ -42,7 +42,9 @@ def test_free_episode_plays_without_coins():
     assert r.status_code == 200
     body = r.json()
     assert body["locked"] is False
-    assert "master.m3u8?exp=" in body["hls_master_url"]   # real expiry now (#001)
+    # Local media → tokened stream URL; CI (no media/) → the CDN signing stub.
+    assert "master.m3u8" in body["hls_master_url"]
+    assert "/media/t/" in body["hls_master_url"] or "?exp=" in body["hls_master_url"]
 
 
 def test_locked_episode_returns_price_and_bundle_offer():

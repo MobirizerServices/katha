@@ -44,13 +44,18 @@ LADDER = [  # (name, w, h, maxrate_k)
 ]
 
 
+# Production runtime: episodes are at least five minutes (product decision,
+# 2 Sep 2026). KATHA_EPISODE_SECONDS overrides for quick smoke assets.
+EPISODE_SECONDS = int(os.environ.get("KATHA_EPISODE_SECONDS", "300"))
+
+
 def episode_duration(ep: dict) -> int:
-    """Deterministic 12-18s per episode. Bump to 60-120 for full-length assets.
+    """At least EPISODE_SECONDS, staggered a little so lengths look real.
 
     The E10 cliff runs 6s long on purpose: Content Bible 3.3 gives the turn air,
     and the paused frame under the paywall sheet is the sales asset.
     """
-    return 12 + (ep["number"] % 7) + (6 if ep.get("is_cliff") else 0)
+    return EPISODE_SECONDS + (ep["number"] % 7) + (6 if ep.get("is_cliff") else 0)
 
 
 def build_episode(color, slug, title, ep):
@@ -115,8 +120,15 @@ def build_episode(color, slug, title, ep):
 def main():
     catalog = json.loads(CATALOG.read_text())
     cap = None if "--all" in sys.argv else MAX_EPISODES
+    # --series slug[,slug]: regenerate just those series (full-length refresh
+    # is heavy — 5-minute episodes take a while per rendition ladder).
+    only = None
+    if "--series" in sys.argv:
+        only = set(sys.argv[sys.argv.index("--series") + 1].split(","))
     jobs = []
     for s in catalog["series"]:
+        if only is not None and s["slug"] not in only:
+            continue
         eps = s["episodes"] if cap is None else s["episodes"][:cap]
         for ep in eps:
             jobs.append((s.get("cover_hue", "0x1B2A4A"), s["slug"], s["title"], ep))
