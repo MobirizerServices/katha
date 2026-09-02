@@ -5,13 +5,29 @@ import KathaKit
 // steps skippable in spirit — no login required to watch free episodes.
 
 struct SplashView: View {
+    private let cardShape = RoundedRectangle(cornerRadius: Katha.Radius.xxl, style: .continuous)
+
     var body: some View {
         ZStack {
             Katha.Color.bg.ignoresSafeArea()
+            Color.clear
+                .overlay {
+                    Image(decorative: "OnboardingHero")
+                        .resizable()
+                        .scaledToFill()
+                }
+                .overlay {
+                    HeroScrim(topTint: 0.2, stops: [(opacity: 0.15, location: 0.5),
+                                                    (opacity: 1, location: 1)])
+                }
+                .clipped()
+                .ignoresSafeArea()
             VStack(spacing: 10) {
-                Image(systemName: "play.rectangle.fill")
-                    .font(.system(size: 64))
-                    .foregroundStyle(Katha.Color.accent)
+                Image(decorative: "KathaMark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 92, height: 92)
+                    .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.xl, style: .continuous))
                     .shadow(color: Katha.Color.accent.opacity(0.35), radius: 24, y: 10)
                 Text("Katha")
                     .font(.system(size: 44, weight: .heavy))
@@ -20,6 +36,11 @@ struct SplashView: View {
                     .font(.system(size: 18))
                     .foregroundStyle(Katha.Color.text2)
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 28)
+            .background(.ultraThinMaterial.opacity(0.72))
+            .clipShape(cardShape)
+            .overlay(cardShape.strokeBorder(.white.opacity(0.12)))
             VStack {
                 Spacer()
                 Text("Stories in 2 minutes.")

@@ -42,6 +42,8 @@ public enum Katha {
         public static let sm: CGFloat = 8
         public static let md: CGFloat = 12
         public static let lg: CGFloat = 16
+        public static let xl: CGFloat = 22
+        public static let xxl: CGFloat = 28
         public static let pill: CGFloat = 999
     }
 
@@ -205,6 +207,24 @@ struct KathaPrimaryButton: View {
         }
         .buttonStyle(PressableStyle())
         .disabled(!enabled)
+    }
+}
+
+/// The house scrim: key art fading vertically into the page ground so titles
+/// read over any cover. Every image-over-bg fade in the app goes through this,
+/// so the fade retunes in one place. `stops` are (bg-opacity, location) pairs
+/// top→bottom; `topTint` darkens the top of the art for status-bar legibility.
+struct HeroScrim: View {
+    var topTint: Double = 0
+    let stops: [(opacity: Double, location: Double)]
+
+    var body: some View {
+        LinearGradient(
+            stops: (topTint > 0 ? [Gradient.Stop(color: .black.opacity(topTint), location: 0)] : [])
+                + stops.map { .init(color: Katha.Color.bg.opacity($0.opacity),
+                                    location: $0.location) },
+            startPoint: .top, endPoint: .bottom
+        )
     }
 }
 

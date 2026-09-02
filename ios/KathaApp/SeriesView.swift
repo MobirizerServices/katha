@@ -63,11 +63,9 @@ struct SeriesView: View {
                     .overlay {
                         // Scrim strong enough that the title reads over any key art
                         // (dev placeholder covers carry baked-in text of their own).
-                        LinearGradient(stops: [
-                            .init(color: .clear, location: 0),
-                            .init(color: Katha.Color.bg.opacity(0.55), location: 0.62),
-                            .init(color: Katha.Color.bg.opacity(0.98), location: 1),
-                        ], startPoint: .top, endPoint: .bottom)
+                        HeroScrim(stops: [(opacity: 0, location: 0),
+                                          (opacity: 0.55, location: 0.62),
+                                          (opacity: 0.98, location: 1)])
                     }
                     .visualEffect { content, proxy in
                         let minY = proxy.frame(in: .scrollView).minY

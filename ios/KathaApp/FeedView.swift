@@ -219,11 +219,9 @@ private struct HeroCard: View {
                     .overlay {
                         // Fade seamlessly into the page ground — full-bleed,
                         // no card frame: the story IS the screen.
-                        LinearGradient(stops: [
-                            .init(color: .clear, location: 0.45),
-                            .init(color: Katha.Color.bg.opacity(0.75), location: 0.82),
-                            .init(color: Katha.Color.bg, location: 1),
-                        ], startPoint: .top, endPoint: .bottom)
+                        HeroScrim(stops: [(opacity: 0, location: 0.45),
+                                          (opacity: 0.75, location: 0.82),
+                                          (opacity: 1, location: 1)])
                     }
                     .clipped()
                     // The art drifts slower than the scroll — quiet depth.

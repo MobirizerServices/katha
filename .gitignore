@@ -65,6 +65,7 @@ coverage/
 ios/KathaApp.xcodeproj/
 ios/build/
 ios/build-device/
+ios/build-sim/
 
 # Device screen-review captures (session artifacts, regenerable)
 review/

@@ -52,7 +52,8 @@ struct LoginSheet: View {
             }
 
             HStack(spacing: 10) {
-                Text("📱")
+                Image(systemName: "phone.fill")
+                    .foregroundStyle(Katha.Color.accent)
                 TextField("+91 98765 43210", text: $phone)
                     .keyboardType(.phonePad)
                     .foregroundStyle(Katha.Color.text)
