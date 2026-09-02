@@ -17,8 +17,9 @@ struct WalletView: View {
 
                 VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
                     Text("Get coins")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(Katha.Color.text)
+                        .font(Katha.Font.label(14))
+                        .kerning(1.2)
+                        .foregroundStyle(Katha.Color.text2)
                     ForEach(packs) { pack in
                         PackRow(pack: pack, buying: buying == pack.sku) {
                             Task { await buy(pack) }
@@ -32,8 +33,9 @@ struct WalletView: View {
                 if !history.isEmpty {
                     VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
                         Text("History")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(Katha.Color.text)
+                            .font(Katha.Font.label(14))
+                            .kerning(1.2)
+                            .foregroundStyle(Katha.Color.text2)
                         ForEach(groupedHistory, id: \.day) { group in
                             Text(dayLabel(group.day))
                                 .font(.system(size: 12, weight: .semibold))
@@ -67,7 +69,8 @@ struct WalletView: View {
     private var balanceCard: some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
             Text("Balance")
-                .font(.system(size: 13, weight: .semibold))
+                .font(Katha.Font.label())
+                .kerning(1.1)
                 .foregroundStyle(Katha.Color.text2)
             HStack(spacing: Katha.Spacing.sm) {
                 ZStack {

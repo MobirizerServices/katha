@@ -261,7 +261,7 @@ struct MyListView: View {
 // MARK: - shared empty state
 
 func emptyState(_ title: String, _ subtitle: String,
-                icon: String = "sparkles") -> some View {
+                icon: String = "theatermasks") -> some View {
     VStack(spacing: 8) {
         Image(systemName: icon)
             .font(.system(size: 34))

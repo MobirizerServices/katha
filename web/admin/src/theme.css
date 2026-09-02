@@ -1,15 +1,16 @@
 /* ============ Katha Admin — design tokens (dark, video-first) ============ */
 :root {
-  --bg: #0b0b0f;
-  --surface: #16161d;
-  --raised: #1f1f28;
-  --surface2: #1b1c23;
-  --line: #262832;
-  --line2: #1f2028;
-  --text: #f5f5f7;
-  --text2: #a1a1aa;
-  --text3: #767b87;
-  --inv: #15161b;
+  /* Warm ember darks — the same brand ground as the app and the site. */
+  --bg: #0f0b09;
+  --surface: #1a1310;
+  --raised: #261c16;
+  --surface2: #1c1512;
+  --line: #2c221b;
+  --line2: #241b15;
+  --text: #f7f2ec;
+  --text2: #b5a89c;
+  --text3: #877a6f;
+  --inv: #181210;
   --accent: #ff5c3a;
   --accent-h: #ff7f63;
   --accent-pressed: #e04a2b;
@@ -24,10 +25,10 @@
   --danger-soft: rgba(255, 77, 79, 0.14);
   --info: #6c9dff;
   --info-soft: rgba(108, 157, 255, 0.14);
-  --side: #0b0b0f;
-  --side2: #16161d;
-  --side3: #1f1f28;
-  --sidetext: #cfd1d8;
+  --side: #0f0b09;
+  --side2: #1a1310;
+  --side3: #261c16;
+  --sidetext: #d8cfc6;
   --r: 12px;
   --r-sm: 8px;
   --r-lg: 16px;
@@ -225,7 +226,9 @@ main {
   gap: 10px;
   padding: 0 24px;
   background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  /* the brand ribbon — same sindoor→marigold hairline as the app + site */
+  border-image: linear-gradient(90deg, var(--accent), var(--coin)) 1;
+  border-bottom: 2px solid;
   position: sticky;
   top: 0;
   z-index: 20;

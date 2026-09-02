@@ -13,16 +13,12 @@ struct FeedView: View {
             .background(Katha.Color.bg)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    HStack(spacing: 8) {
-                        Image("KathaMark")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 26, height: 26)
-                            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                        Text("Katha")
-                            .font(.system(size: 22, weight: .heavy))
-                            .foregroundStyle(Katha.Color.text)
-                    }
+                    Image("KathaMark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 26, height: 26)
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        .accessibilityHidden(true)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 14) {
@@ -45,6 +41,23 @@ struct FeedView: View {
                         .task { try? await Task.sleep(for: .seconds(2)); claimedToast = nil }
                 }
             }
+    }
+
+    /// The literary signature: serif-italic wordmark + Devanagari echo. Lives
+    /// in the content (it scrolls away) because the iOS 26 toolbar clips its
+    /// leading item into a glass circle.
+    private var masthead: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("Katha")
+                .font(Katha.Font.wordmark)
+                .foregroundStyle(Katha.Color.text)
+            Text("कथा")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Katha.Color.text2)
+        }
+        .padding(.horizontal, Katha.Spacing.lg)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Katha")
     }
 
     private var languageMenu: some View {
@@ -79,6 +92,8 @@ struct FeedView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Katha.Spacing.xl) {
+                    masthead
+                    BrandRibbon().padding(.top, -Katha.Spacing.md)
                     if !model.checkinClaimedToday {
                         checkinCard
                             .transition(.scale(scale: 0.92).combined(with: .opacity))
@@ -149,8 +164,9 @@ struct FeedView: View {
     private var continueRow: some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
             Text("Continue watching")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Katha.Color.text)
+                .font(Katha.Font.label(14))
+                .kerning(1.2)
+                .foregroundStyle(Katha.Color.text2)
                 .padding(.horizontal, Katha.Spacing.lg)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Katha.Spacing.md) {
@@ -216,7 +232,7 @@ private struct HeroCard: View {
                     }
                 VStack(alignment: .leading, spacing: 8) {
                     Text(series.title)
-                        .font(.system(size: 30, weight: .heavy))
+                        .font(Katha.Font.display(36))
                         .foregroundStyle(Katha.Color.text)
                         .multilineTextAlignment(.leading)
                     HStack(spacing: 8) {
@@ -280,8 +296,9 @@ private struct FeedRow: View {
                         .foregroundStyle(Katha.Color.accent)
                 }
                 Text(row.title)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Katha.Color.text)
+                    .font(Katha.Font.label(14))
+                    .kerning(1.2)
+                    .foregroundStyle(isPersonal ? Katha.Color.text : Katha.Color.text2)
             }
             .padding(.horizontal, Katha.Spacing.lg)
             ScrollView(.horizontal, showsIndicators: false) {

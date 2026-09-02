@@ -6,17 +6,35 @@ import UIKit
 
 public enum Katha {
 
+    /// Warm ember darks — lamplight and single-screen cinema, not the blue-black
+    /// every streaming template ships. Sindoor accent + marigold coin unchanged:
+    /// those two were already Katha's.
     public enum Color {
-        public static let bg = SwiftUI.Color(hex: 0x0B0B0F)
-        public static let surface = SwiftUI.Color(hex: 0x16161D)
-        public static let raised = SwiftUI.Color(hex: 0x1F1F28)
-        public static let text = SwiftUI.Color(hex: 0xF5F5F7)
-        public static let text2 = SwiftUI.Color(hex: 0xA1A1AA)
+        public static let bg = SwiftUI.Color(hex: 0x0F0B09)
+        public static let surface = SwiftUI.Color(hex: 0x1A1310)
+        public static let raised = SwiftUI.Color(hex: 0x261C16)
+        public static let text = SwiftUI.Color(hex: 0xF7F2EC)
+        public static let text2 = SwiftUI.Color(hex: 0xB5A89C)
         public static let accent = SwiftUI.Color(hex: 0xFF5C3A)
         public static let accentPressed = SwiftUI.Color(hex: 0xE04A2B)
         public static let coin = SwiftUI.Color(hex: 0xF5C042)
         public static let success = SwiftUI.Color(hex: 0x2FBF71)
         public static let danger = SwiftUI.Color(hex: 0xFF4D4F)
+    }
+
+    /// The type voices. Display is condensed-heavy (hand-painted film-poster
+    /// energy) for titles; the wordmark is a literary serif italic; section
+    /// labels run in small caps (a glyph feature — accessibility labels and
+    /// UI-test string matching keep the original text).
+    public enum Font {
+        public static func display(_ size: CGFloat) -> SwiftUI.Font {
+            .system(size: size, weight: .heavy).width(.condensed)
+        }
+        public static let wordmark: SwiftUI.Font =
+            .system(size: 24, weight: .bold, design: .serif).italic()
+        public static func label(_ size: CGFloat = 13) -> SwiftUI.Font {
+            .system(size: size, weight: .semibold).smallCaps()
+        }
     }
 
     public enum Radius {
@@ -186,6 +204,17 @@ struct KathaPrimaryButton: View {
         }
         .buttonStyle(PressableStyle())
         .disabled(!enabled)
+    }
+}
+
+/// Katha's signature line: a sindoor→marigold hairline. The same ribbon runs
+/// under the site header and the admin topbar — one brand mark, three surfaces.
+struct BrandRibbon: View {
+    var body: some View {
+        LinearGradient(colors: [Katha.Color.accent, Katha.Color.coin],
+                       startPoint: .leading, endPoint: .trailing)
+            .frame(height: 2)
+            .accessibilityHidden(true)
     }
 }
 

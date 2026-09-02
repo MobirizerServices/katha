@@ -1,5 +1,14 @@
 import type { Metadata, Viewport } from "next";
+import { Anton, Fraunces } from "next/font/google";
 import "./globals.css";
+
+// The two brand voices: Anton for display titles (hand-painted film-poster
+// condensation), Fraunces italic for the wordmark (a story publisher, not a
+// tech platform). Self-hosted at build time by next/font.
+const display = Anton({ weight: "400", subsets: ["latin"],
+                        variable: "--font-display", display: "swap" });
+const wordmark = Fraunces({ weight: "600", style: "italic", subsets: ["latin"],
+                            variable: "--font-wordmark", display: "swap" });
 import { WalletProvider } from "@/components/WalletProvider";
 import SiteHeader from "@/components/SiteHeader";
 
@@ -40,14 +49,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0B0B0F",
+  themeColor: "#0F0B09",
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${display.variable} ${wordmark.variable}`}>
       <body>
         <a className="skip" href="#main">
           Skip to content

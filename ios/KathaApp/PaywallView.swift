@@ -38,7 +38,7 @@ struct PaywallView: View {
                 // Header: episode identity
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Unlock E\(episodeNumber)")
-                        .font(.system(size: 22, weight: .bold))
+                        .font(Katha.Font.display(28))
                         .foregroundStyle(Katha.Color.text)
                     Text(episodeTitle)
                         .font(.system(size: 14))

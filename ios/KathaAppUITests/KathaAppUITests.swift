@@ -26,7 +26,18 @@ final class KathaAppUITests: XCTestCase {
         extra.forEach { env[$0] = $1 }
         app.launchEnvironment = env
         app.launch()
+        dismissLocalNetworkPrompt()
         return app
+    }
+
+    /// iOS resets the Local Network grant on a fresh install and throws its
+    /// system alert mid-run — with nobody to tap Allow, every LAN request
+    /// (playback, covers) blackholes and the player shows "Connection lost".
+    /// Headless device runs accept it here.
+    private func dismissLocalNetworkPrompt() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let allow = springboard.alerts.buttons["Allow"]
+        if allow.waitForExistence(timeout: 3) { allow.tap() }
     }
 
     private func assertExists(_ element: XCUIElement, _ timeout: TimeInterval = 12) {
