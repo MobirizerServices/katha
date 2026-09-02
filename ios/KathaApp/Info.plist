@@ -21,7 +21,7 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>KathaAPIBase</key>
-	<string>http://192.168.1.7:8799</string>
+	<string>http://192.168.1.12:8799</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>

@@ -4,8 +4,21 @@ import KathaKit
 // Onboarding (mockup §1): splash → language → interests. Under 20 seconds, both
 // steps skippable in spirit — no login required to watch free episodes.
 
+/// The launch identity — a staged cinematic entrance: the key art fades in and
+/// drifts (Ken Burns), the mark springs up, the wordmark and Devanagari echo
+/// stagger, and the tagline rises last. Shown at onboarding step 0 and as the
+/// RootView boot screen. Honors Reduce Motion: everything lands at once, no drift.
 struct SplashView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let cardShape = RoundedRectangle(cornerRadius: Katha.Radius.xxl, style: .continuous)
+
+    // Each element's entrance is its own flag so the sequence can stagger them.
+    @State private var heroIn = false
+    @State private var drift = false
+    @State private var markIn = false
+    @State private var wordIn = false
+    @State private var devIn = false
+    @State private var taglineIn = false
 
     var body: some View {
         ZStack {
@@ -15,13 +28,17 @@ struct SplashView: View {
                     Image(decorative: "OnboardingHero")
                         .resizable()
                         .scaledToFill()
+                        .scaleEffect(drift ? 1.08 : 1.0)      // slow Ken Burns
+                        .opacity(heroIn ? 1 : 0)
                 }
                 .overlay {
                     HeroScrim(topTint: 0.2, stops: [(opacity: 0.15, location: 0.5),
                                                     (opacity: 1, location: 1)])
+                        .opacity(heroIn ? 1 : 0.55)           // scrim breathes up
                 }
                 .clipped()
                 .ignoresSafeArea()
+
             VStack(spacing: 10) {
                 Image(decorative: "KathaMark")
                     .resizable()
@@ -29,26 +46,55 @@ struct SplashView: View {
                     .frame(width: 92, height: 92)
                     .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.xl, style: .continuous))
                     .shadow(color: Katha.Color.accent.opacity(0.35), radius: 24, y: 10)
+                    .scaleEffect(markIn ? 1 : 0.8)
+                    .opacity(markIn ? 1 : 0)
                 Text("Katha")
                     .font(.system(size: 44, weight: .heavy))
                     .foregroundStyle(Katha.Color.text)
+                    .opacity(wordIn ? 1 : 0)
+                    .offset(y: wordIn ? 0 : 12)
                 Text("कथा")
                     .font(.system(size: 18))
                     .foregroundStyle(Katha.Color.text2)
+                    .opacity(devIn ? 1 : 0)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 28)
             .background(.ultraThinMaterial.opacity(0.72))
             .clipShape(cardShape)
             .overlay(cardShape.strokeBorder(.white.opacity(0.12)))
+            .opacity(markIn ? 1 : 0)                            // card fades with the mark
             VStack {
                 Spacer()
                 Text("Stories in 2 minutes.")
                     .font(.system(size: 15))
                     .foregroundStyle(Katha.Color.text2)
                     .padding(.bottom, 48)
+                    .opacity(taglineIn ? 1 : 0)
+                    .offset(y: taglineIn ? 0 : 16)
             }
         }
+        .task { await runIntro() }
+    }
+
+    /// Drive the staggered entrance. Under Reduce Motion every element is placed
+    /// immediately with no animation or drift.
+    private func runIntro() async {
+        guard !reduceMotion else {
+            heroIn = true; markIn = true; wordIn = true; devIn = true; taglineIn = true
+            return
+        }
+        withAnimation(.easeOut(duration: 0.8)) { heroIn = true }
+        // A long, once-through drift that keeps moving under the whole sequence.
+        withAnimation(.easeInOut(duration: 6)) { drift = true }
+        try? await Task.sleep(for: .milliseconds(200))
+        withAnimation(Katha.Motion.spring) { markIn = true }
+        try? await Task.sleep(for: .milliseconds(300))
+        withAnimation(.easeOut(duration: 0.5)) { wordIn = true }
+        try? await Task.sleep(for: .milliseconds(200))
+        withAnimation(.easeOut(duration: 0.5)) { devIn = true }
+        try? await Task.sleep(for: .milliseconds(300))
+        withAnimation(.easeOut(duration: 0.6)) { taglineIn = true }
     }
 }
 
@@ -65,7 +111,8 @@ struct OnboardingFlow: View {
             case 0:
                 SplashView()
                     .task {
-                        try? await Task.sleep(for: .seconds(1))
+                        // Hold long enough for the cinematic entrance to finish.
+                        try? await Task.sleep(for: .seconds(2))
                         withAnimation { step = 1 }
                     }
             case 1:

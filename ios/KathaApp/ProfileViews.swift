@@ -23,6 +23,7 @@ struct ProfileView: View {
                     row("doc.text.fill", "Invoices") { InvoicesView() }
                     row("gearshape.fill", "Settings") { SettingsView() }
                     row("questionmark.circle.fill", "Help & grievance") { HelpView() }
+                    actionRow("lightbulb.fill", "Replay tips") { model.coachReplayToken += 1 }
                 }
                 .background(Katha.Color.surface)
                 .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
@@ -120,6 +121,32 @@ struct ProfileView: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12))
                     .foregroundStyle(Katha.Color.text2)
+            }
+            .padding(.horizontal, Katha.Spacing.lg)
+            .frame(height: 52)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle())
+    }
+
+    /// A tappable row that runs an action in place (no navigation), matching the
+    /// look of `row` minus the disclosure chevron.
+    private func actionRow(_ icon: String, _ title: String,
+                           action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: Katha.Spacing.md) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Katha.Color.accent.opacity(0.16))
+                        .frame(width: 30, height: 30)
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Katha.Color.accent)
+                }
+                Text(title)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Katha.Color.text)
+                Spacer()
             }
             .padding(.horizontal, Katha.Spacing.lg)
             .frame(height: 52)

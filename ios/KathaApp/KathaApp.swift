@@ -116,6 +116,14 @@ final class AppModel {
             if !episodeAlerts { cancelDropNudges() }
         }
     }
+    /// First-run coach marks shown once on the first Home visit; re-triggerable
+    /// from Help. Persisted so the tour never re-runs on its own.
+    var hasSeenCoachMarks = false {
+        didSet { defaults.set(hasSeenCoachMarks, forKey: "katha.coachmarks.seen") }
+    }
+    /// Bumped to replay the coach-mark tour on demand (from Profile → Replay
+    /// tips). Transient — not persisted; the host observes the change.
+    var coachReplayToken = 0
     /// Dev-slice parental PIN (production hashes with Argon2 server-side, PDD §12.9).
     var parentalPin: String? {
         didSet {
@@ -134,7 +142,7 @@ final class AppModel {
         if env["KATHA_RESET"] != nil {
             for key in ["katha.token", "katha.onboarded", "katha.lang", "katha.interests",
                         "katha.autounlock", "katha.datasaver", "katha.pin", "katha.alerts",
-                        "katha.checkin.day", "katha.recentSearches"] {
+                        "katha.checkin.day", "katha.recentSearches", "katha.coachmarks.seen"] {
                 UserDefaults.standard.removeObject(forKey: key)
             }
         }
@@ -160,6 +168,7 @@ final class AppModel {
         dataSaver = d.bool(forKey: "katha.datasaver")
         episodeAlerts = d.object(forKey: "katha.alerts") == nil ? true : d.bool(forKey: "katha.alerts")
         parentalPin = d.string(forKey: "katha.pin")
+        hasSeenCoachMarks = d.bool(forKey: "katha.coachmarks.seen")
     }
 
     // MARK: Session lifecycle
@@ -410,18 +419,20 @@ struct MainTabView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            TabView {
-                tabStack(path: $homePath) { FeedView() }
-                    .environment(\.zoomNamespace, heroZoom)
-                    .tabItem { Label("Home", systemImage: "play.rectangle.fill") }
-                tabStack { BrowseView() }
-                    .tabItem { Label("Browse", systemImage: "square.grid.2x2.fill") }
-                tabStack { MyListView() }
-                    .tabItem { Label("My list", systemImage: "bookmark.fill") }
-                tabStack { ProfileView() }
-                    .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
+            CoachMarksHost {
+                TabView {
+                    tabStack(path: $homePath) { FeedView() }
+                        .environment(\.zoomNamespace, heroZoom)
+                        .tabItem { Label("Home", systemImage: "play.rectangle.fill") }
+                    tabStack { BrowseView() }
+                        .tabItem { Label("Browse", systemImage: "square.grid.2x2.fill") }
+                    tabStack { MyListView() }
+                        .tabItem { Label("My list", systemImage: "bookmark.fill") }
+                    tabStack { ProfileView() }
+                        .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
+                }
+                .background(Katha.Color.bg)
             }
-            .background(Katha.Color.bg)
 
             // Force update below config.min_app_version (server-decided).
             if model.updateRequired {

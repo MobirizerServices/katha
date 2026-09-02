@@ -92,6 +92,7 @@ struct FeedView: View {
                     BrandRibbon().padding(.top, -Katha.Spacing.sm)
                     if !model.checkinClaimedToday {
                         checkinCard
+                            .coachAnchor(.checkin)
                             .transition(.scale(scale: 0.92).combined(with: .opacity))
                     }
                     if let hero = model.feed.rows.first?.series.first { HeroCard(series: hero) }
