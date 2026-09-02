@@ -192,4 +192,38 @@ final class ScreenshotTour: XCTestCase {
         _ = nudged.buttons["Watch now"].waitForExistence(timeout: 25)
         snap("3.6-drop-banner")           // immediately — the banner lives 6 s
     }
+
+    func test07_TourNewSurfaces() {
+        // Watch a little so the "Because you watched" rail has a seed, then
+        // relaunch — the feed personalizes on load, not on back-navigation.
+        let seeded = launchApp(extra: ["KATHA_AUTOPLAY": "kaanch-ka-mahal:1"])
+        wait(seeded, text: "E1 · One face too many", 20)
+        sleep(3)
+        seeded.navigationBars.buttons.firstMatch.tap()
+        sleep(1)                                     // progress report flushes
+
+        let app = launchApp(reset: false)
+        _ = app.staticTexts["Daily check-in"].waitForExistence(timeout: 20)
+        _ = app.staticTexts.containing(
+            NSPredicate(format: "label BEGINSWITH 'Because you watched'"))
+            .firstMatch.waitForExistence(timeout: 10)
+        app.swipeUp()
+        sleep(1)
+        snap("2.1b-home-personalized")
+
+        // Profile → Invoices (GST register; empty for a fresh guest).
+        app.tabBars.buttons["Profile"].tap()
+        button(app, containing: "Invoices").tap()
+        _ = app.staticTexts["Invoices"].waitForExistence(timeout: 10)
+        sleep(1)
+        snap("4.8-invoices")
+
+        // Help → the in-app grievance form.
+        app.navigationBars.buttons.firstMatch.tap()
+        button(app, containing: "Help & grievance").tap()
+        wait(app, text: "File a grievance", 10)
+        app.swipeUp()
+        sleep(1)
+        snap("4.6b-grievance-form")
+    }
 }
