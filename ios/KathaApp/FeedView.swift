@@ -11,7 +11,23 @@ struct FeedView: View {
     var body: some View {
         content
             .background(Katha.Color.bg)
-            .toolbar(.hidden, for: .navigationBar)
+            // Controls live in the REAL toolbar (reliable hit-testing on every
+            // OS); its background is hidden so the serif masthead below reads
+            // as one header band.
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 12) {
+                        languageMenu
+                        NavigationLink(value: SearchRoute()) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(Katha.Color.text)
+                                .accessibilityLabel("Search")
+                        }
+                    }
+                }
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationDestination(for: SearchRoute.self) { _ in SearchView() }
             .task { if model.feed.rows.isEmpty { await model.loadHome() } }
             .overlay(alignment: .bottom) {
@@ -27,31 +43,17 @@ struct FeedView: View {
     /// in the content (it scrolls away) because the iOS 26 toolbar clips its
     /// leading item into a glass circle.
     private var masthead: some View {
-        HStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Katha")
-                    .font(Katha.Font.wordmark)
-                    .foregroundStyle(Katha.Color.text)
-                Text("कथा")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Katha.Color.text2)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Katha")
-            Spacer()
-            languageMenu
-            NavigationLink(value: SearchRoute()) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Katha.Color.text)
-                    .frame(width: 34, height: 34)
-                    .background(Katha.Color.surface)
-                    .clipShape(Circle())
-                    .accessibilityLabel("Search")
-            }
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("Katha")
+                .font(Katha.Font.wordmark)
+                .foregroundStyle(Katha.Color.text)
+            Text("कथा")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Katha.Color.text2)
         }
         .padding(.horizontal, Katha.Spacing.lg)
-        .padding(.top, Katha.Spacing.sm)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Katha")
     }
 
     private var languageMenu: some View {
