@@ -36,6 +36,22 @@ the MP4s in a folder named `{slug}_e{NN}.mp4`, and ingest:
 make ingest SRC=~/katha-ai-clips        # folder of kaanch-ka-mahal_e01.mp4, …
 ```
 
+**3. Internet Archive — public-domain / Creative-Commons only**
+Not everything on archive.org is free; much is uploaded without rights (old
+Bollywood especially). `fetch_archive.py` refuses any item whose metadata lacks
+a clear PD/CC signal, so it can't pull infringing content:
+```bash
+cat > ia_plan.json <<'JSON'
+[{"id": "some_pd_or_cc_identifier", "slug": "kaanch-ka-mahal", "episode": 3}]
+JSON
+make fetch-archive PLAN=ia_plan.json
+```
+The identifier is in the item URL (`archive.org/details/<IDENTIFIER>`). If an
+item is genuinely clear but not auto-detected, run the tool directly with
+`--i-verified-rights` (you take responsibility). Caveat: PD films are mostly old,
+landscape and B&W — a weak fit for vertical micro-drama, so use IA only for
+atmospheric cutaways, not the hero screens.
+
 Recommended demo mix: **AI hero clips** for the 2–3 flagship series (looks like
 *your* show, and answers "can they actually make AI video?"), **stock** for the
 rest so the whole catalogue feels alive.

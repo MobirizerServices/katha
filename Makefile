@@ -3,7 +3,7 @@ PYBIN := backend/.venv/bin/python
 # Paths are relative to backend/ (every recipe cd's there first).
 PP := packages/ledger:packages/domain:packages/infra:services/core-api
 
-.PHONY: help setup test test-backend test-ios test-e2e api admin openapi gen-contracts seed-media ingest fetch-stock web fmt clean
+.PHONY: help setup test test-backend test-ios test-e2e api admin openapi gen-contracts seed-media ingest fetch-stock fetch-archive web fmt clean
 
 help:
 	@echo "setup        create venv + install backend deps"
@@ -90,6 +90,12 @@ ingest:
 #   PEXELS_API_KEY=… make fetch-stock PLAN=demo_plan.json
 fetch-stock:
 	python3 tools/fetch_stock.py --plan "$(PLAN)"
+
+# Fetch public-domain / Creative-Commons video from the Internet Archive and
+# ingest it. Refuses items without a clear PD/CC rights signal.
+#   make fetch-archive PLAN=ia_plan.json      # [{id, slug, episode}, ...]
+fetch-archive:
+	python3 tools/fetch_archive.py --plan "$(PLAN)"
 
 web:
 	cd web/site && npm install && npm run dev
