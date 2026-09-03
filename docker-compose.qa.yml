@@ -1,0 +1,98 @@
+# Full Katha QA stack: data layer + both APIs + async worker + both web apps +
+# the TLS edge proxy. Bring up with:
+#   cp deploy/.env.qa.example .env   # then fill in real secrets
+#   docker compose -f docker-compose.qa.yml up -d --build
+# (docker-compose.yml stays the lightweight data-only file for local dev.)
+name: katha-qa
+
+x-backend-env: &backend-env
+  KATHA_ENV: qa
+  KATHA_PERSIST: "1"
+  KATHA_DB_URL: postgresql+asyncpg://katha:${POSTGRES_PASSWORD}@postgres:5432/katha
+  KATHA_DB_AUTOCREATE: "0"          # Alembic owns the schema
+  KATHA_REDIS_URL: redis://redis:6379/0
+  KATHA_JWT_SECRET: ${KATHA_JWT_SECRET}
+  KATHA_STREAM_SECRET: ${KATHA_STREAM_SECRET}
+  KATHA_CORS_ORIGINS: ${KATHA_CORS_ORIGINS}
+  KATHA_MEDIA_DIR: /srv/media
+  KATHA_XACCEL: "1"
+  SENTRY_DSN: ${SENTRY_DSN:-}
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: katha
+      POSTGRES_USER: katha
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U katha"]
+      interval: 10s
+      retries: 5
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+
+  backend:                          # core-api (public)
+    build: { context: ., dockerfile: backend/Dockerfile }
+    environment:
+      <<: *backend-env
+      KATHA_ASGI_APP: app.main:app
+      KATHA_RUN_MIGRATIONS: "1"     # this service runs `alembic upgrade head` once
+    volumes: ["media:/srv/media"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  admin-backend:                    # admin-api
+    build: { context: ., dockerfile: backend/Dockerfile }
+    environment:
+      <<: *backend-env
+      KATHA_ASGI_APP: admin_app.main:app
+      KATHA_ADMIN_AUTH: oidc
+      KATHA_ADMIN_SESSION_SECRET: ${KATHA_ADMIN_SESSION_SECRET}
+      KATHA_OIDC_ISSUER: ${KATHA_OIDC_ISSUER}
+      KATHA_OIDC_CLIENT_ID: ${KATHA_OIDC_CLIENT_ID}
+      KATHA_OIDC_CLIENT_SECRET: ${KATHA_OIDC_CLIENT_SECRET}
+    depends_on:
+      backend: { condition: service_started }
+
+  worker:                           # arq async tasks (email, push)
+    build: { context: ., dockerfile: backend/Dockerfile }
+    working_dir: /app/services/worker
+    entrypoint: ["arq", "settings.WorkerSettings"]
+    environment: *backend-env
+    depends_on:
+      redis: { condition: service_healthy }
+
+  web-site:
+    build:
+      context: ./web/site
+      args: { NEXT_PUBLIC_API_BASE: ${PUBLIC_API_BASE} }
+    depends_on: [backend]
+
+  web-admin:
+    build:
+      context: ./web/admin
+      args: { VITE_ADMIN_API_BASE: ${PUBLIC_ADMIN_API_BASE} }
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+      - media:/srv/media:ro
+      - certbot-www:/var/www/certbot
+    depends_on: [backend, admin-backend, web-site, web-admin]
+
+volumes:
+  pgdata:
+  media:
+  certbot-www:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
@@ -57,16 +57,23 @@ app.include_router(playback_router.router)
 app.include_router(wallet_router.router)
 
 
-def _serve_media(path: str) -> FileResponse:
+def _serve_media(path: str) -> Response:
     base = media_dir().resolve()
     target = (base / path).resolve()
     if not target.is_relative_to(base) or not target.is_file():
         raise HTTPException(status_code=404, detail="not found")
+    # P0-8: with KATHA_XACCEL set, the app authorizes the request (token check
+    # already ran) then hands the bytes to nginx via X-Accel-Redirect, so ~100
+    # concurrent HLS streams never touch the Python tier. Dev/test (unset) serve
+    # the file directly.
+    if os.environ.get("KATHA_XACCEL"):
+        rel = target.relative_to(base)
+        return Response(status_code=200, headers={"X-Accel-Redirect": f"/__media/{rel}"})
     return FileResponse(target)
 
 
 @app.get("/media/t/{token}/{path:path}", include_in_schema=False)
-def media_stream(token: str, path: str) -> FileResponse:
+def media_stream(token: str, path: str) -> Response:
     """Tokened episode streams (ADR-012): the token from /playback authorizes
     this episode's whole HLS tree — master, variants, segments — until it
     expires. Relative playlist references resolve under the token root."""
@@ -78,7 +85,7 @@ def media_stream(token: str, path: str) -> FileResponse:
 
 
 @app.get("/media/{path:path}", include_in_schema=False)
-def media(path: str) -> FileResponse:
+def media(path: str) -> Response:
     """Public media: covers, og cards, the manifest. Episode video only ever
     leaves through the tokened route — a bare URL can't be shared."""
     from . import signing
@@ -90,7 +97,40 @@ def media(path: str) -> FileResponse:
 
 @app.get("/health", tags=["ops"])
 def health() -> dict:
+    """Liveness: the process is up and the catalog is loaded."""
     return {"status": "ok", "series": len(catalog.all_series())}
+
+
+@app.get("/ready", tags=["ops"], include_in_schema=False)
+def ready() -> Response:
+    """Readiness: dependencies the process needs to serve traffic. Returns 503
+    (not 200) when a dependency is down so the load balancer drains this replica."""
+    import json as _json
+
+    from .store import store as _store
+    checks: dict[str, str] = {}
+    ok = True
+    if getattr(_store, "shared", None) is not None:
+        try:
+            _store.shared.kv_get("config:app.min_version")  # cheap round-trip
+            checks["db"] = "ok"
+        except Exception:  # noqa: BLE001 — surface any driver error as not-ready
+            checks["db"] = "error"
+            ok = False
+    else:
+        checks["db"] = "in-memory"
+    redis_url = os.environ.get("KATHA_REDIS_URL")
+    if redis_url:
+        try:
+            import redis as _redis
+            _redis.Redis.from_url(redis_url, socket_timeout=0.5).ping()
+            checks["redis"] = "ok"
+        except Exception:  # noqa: BLE001
+            checks["redis"] = "error"
+            ok = False
+    return Response(_json.dumps({"ready": ok, "checks": checks}),
+                    status_code=200 if ok else 503,
+                    media_type="application/json")
 
 
 @app.get("/v1/config", tags=["config"])
