@@ -46,6 +46,8 @@ app.add_middleware(
 # missing/dev-default secret, a dev auth mode, or a SQLite URL. No-op in dev/test.
 try:
     from katha_infra import enforce_production_config
+    from katha_infra import observability
+    observability.init("core-api")
     enforce_production_config("core-api")
 except ImportError:
     pass  # infra not on path (pure in-memory dev run) — nothing to enforce

@@ -6,17 +6,69 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
-      - run: cd backend && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python "fastapi>=0.115" "uvicorn[standard]" "pydantic>=2" httpx sqlalchemy aiosqlite "pyjwt>=2.9" "cryptography>=43" pytest pytest-cov
+      - run: cd backend && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements-dev.txt
       - name: backend tests + coverage gate (>=98%)
         run: cd backend && .venv/bin/python -m pytest
       - name: contract drift gate
-        run: cd backend && PYTHONPATH=packages/ledger:packages/domain:packages/infra:services/core-api .venv/bin/python -c "import json;from app.main import app;cur=open('../contracts/openapi/core-api.json').read();new=json.dumps(app.openapi(),indent=2);exit(0 if cur==new else print('OpenAPI drift: run make openapi') or 1)"
+        run: |
+          cd backend && PYTHONPATH=packages/ledger:packages/domain:packages/infra:services/core-api .venv/bin/python -c "import json;from app.main import app;cur=open('../contracts/openapi/core-api.json').read();new=json.dumps(app.openapi(),indent=2);exit(0 if cur==new else print('OpenAPI drift: run make openapi') or 1)"
+
+  migrations:
+    # Proves the Alembic baseline applies on a real Postgres and that the models
+    # and migrations agree (no un-migrated schema drift).
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_DB: katha, POSTGRES_USER: katha, POSTGRES_PASSWORD: katha }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U katha" --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      KATHA_DB_URL: postgresql+asyncpg://katha:katha@localhost:5432/katha
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: cd backend && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
+      - name: alembic upgrade head
+        run: cd backend && .venv/bin/alembic upgrade head
+      - name: alembic check (models == migrations)
+        run: cd backend && .venv/bin/alembic check
+
+  security:
+    # Non-blocking to start (advisories surface without gating merges); flip to
+    # required once the backlog is triaged.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - name: pip-audit (Python deps)
+        run: cd backend && uvx pip-audit -r requirements.txt
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: npm audit (site)
+        run: cd web/site && npm audit --audit-level=high
+      - name: npm audit (admin)
+        run: cd web/admin && npm audit --audit-level=high
+
+  docker:
+    # Validates the backend image builds (Dockerfile + requirements resolve).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: build backend image
+        run: docker build -f backend/Dockerfile -t katha-backend:ci .
+
   ios:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
       - name: iOS KathaKit tests + coverage gate (>=98%)
         run: cd ios/KathaKit && ./coverage.sh
+
   web-site:
     runs-on: ubuntu-latest
     steps:
@@ -26,6 +78,7 @@ jobs:
       - run: cd web/site && npm install && npm run build
       - name: web/site tests + coverage gates (98 lines / 95 branches)
         run: cd web/site && npm run coverage
+
   web-admin:
     runs-on: ubuntu-latest
     steps:

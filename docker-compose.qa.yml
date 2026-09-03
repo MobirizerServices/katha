@@ -74,13 +74,15 @@ services:
   web-site:
     build:
       context: ./web/site
-      args: { NEXT_PUBLIC_API_BASE: ${PUBLIC_API_BASE} }
+      args:
+        NEXT_PUBLIC_API_BASE: "${PUBLIC_API_BASE}"
     depends_on: [backend]
 
   web-admin:
     build:
       context: ./web/admin
-      args: { VITE_ADMIN_API_BASE: ${PUBLIC_ADMIN_API_BASE} }
+      args:
+        VITE_ADMIN_API_BASE: "${PUBLIC_ADMIN_API_BASE}"
 
   nginx:
     image: nginx:1.27-alpine

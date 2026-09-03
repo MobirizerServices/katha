@@ -44,8 +44,29 @@ def _otp_limits() -> dict:
         return _OTP_DEFAULTS
 
 
+_redis_limiter = None
+
+
+def _limiter():
+    """Lazily build the shared Redis limiter. None when infra isn't importable;
+    disabled (enabled=False) when KATHA_REDIS_URL isn't set — both fall back to
+    the in-memory window below, which is what dev/test always use."""
+    global _redis_limiter
+    if _redis_limiter is None:
+        try:
+            from katha_infra.ratelimit import RateLimiter
+            _redis_limiter = RateLimiter()
+        except Exception:  # infra not on path (pure in-memory dev run)
+            _redis_limiter = False
+    return _redis_limiter or None
+
+
 def _otp_throttle(key: str, cap: int, window_s: float) -> int:
     """Record a hit; returns seconds to wait (0 = allowed)."""
+    lim = _limiter()
+    if lim is not None and lim.enabled:            # pragma: no cover - needs Redis
+        allowed, retry = lim.hit(f"otp:{key}", cap, window_s)
+        return 0 if allowed else retry
     now = time.monotonic()
     hits = [t for t in _otp_hits.get(key, []) if now - t < window_s]
     if len(hits) >= cap:
@@ -96,6 +117,14 @@ def otp_request(body: OtpRequestBody, request: Request) -> OtpRequestResponse:
     if not body.phone.strip():
         raise HTTPException(status_code=400, detail="phone required")
     _otp_guard(request, body.phone.strip(), kind="phone")
+    # Real delivery when a provider is configured; dev/test stay a no-op stub
+    # (verify accepts any 4-digit code).
+    try:
+        from katha_infra import otp as _otp
+        if _otp.enabled():                          # pragma: no cover - needs provider
+            _otp.generate_and_send(body.phone.strip())
+    except ImportError:
+        pass
     return OtpRequestResponse(request_id=f"otp_{uuid.uuid4().hex[:12]}", phone=body.phone)
 
 
@@ -106,6 +135,14 @@ def otp_verify(body: OtpVerifyBody, request: Request,
     if not (code.isdigit() and len(code) == 4):
         raise HTTPException(status_code=400, detail="invalid code (dev: any 4 digits)")
     _otp_guard(request, body.phone.strip(), kind="verify")
+    # With a real provider, the code must match the one we sent; dev/test accept
+    # any 4-digit code (checked above).
+    try:
+        from katha_infra import otp as _otp
+        if _otp.enabled() and not _otp.verify(body.phone.strip(), code):  # pragma: no cover - needs provider
+            raise HTTPException(status_code=401, detail="incorrect or expired code")
+    except ImportError:
+        pass
     user_id = user_id_for_phone(body.phone)
     u = store.get_or_create_user(user_id, kind="phone", phone=body.phone)
     u.kind, u.phone = "phone", body.phone
