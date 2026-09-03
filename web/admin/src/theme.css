@@ -999,6 +999,150 @@ tr[tabindex]:focus-visible{outline:2px solid #f65428;outline-offset:-2px}
 .wins .fbtn.on { border-color: var(--accent, #F65428); color: var(--accent, #F65428); }
 @media (max-width: 1100px) { .anrow { grid-template-columns: 1fr; } }
 
+/* ============ newer-view classes: bring them onto the design system ============
+   Several views (Users, Catalog detail, Config, Outbox) use a header-wrapped
+   panel + .table/.frow/.lk/.split/.acct classes that predated these styles, so
+   they were rendering with browser defaults. These rules give them the same
+   ember-dark treatment as the rest of the panel/table/filter system. */
+
+/* Panel header bar when the heading is wrapped in <header> (not a bare h3). */
+.panel > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.panel > header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Two-column work layout: a list/lookup beside a detail panel. */
+.split {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+}
+@media (max-width: 1100px) {
+  .split { grid-template-columns: 1fr; }
+}
+
+/* Lookup search input (sits under a panel header). */
+.lk {
+  padding: 12px 14px 6px;
+}
+.lk input {
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.lk input::placeholder { color: var(--text3); }
+.lk input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* A row of labeled controls — modal forms and inline filter bars. */
+.frow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.frow > label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text2);
+  flex: 1;
+  min-width: 130px;
+}
+.frow input,
+.frow select,
+.frow textarea {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+}
+.frow textarea { min-height: 72px; resize: vertical; }
+.frow input:focus,
+.frow select:focus,
+.frow textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Base table styling for table.table — mirrors table.t so newer tables read
+   the same (padded cells, header band, row separators, hover + selection). */
+table.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--font);
+}
+table.table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text2);
+  font-size: 12px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface2);
+  white-space: nowrap;
+}
+table.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line2);
+  vertical-align: middle;
+}
+table.table tr:last-child td { border-bottom: 0; }
+table.table tbody tr:hover td { background: var(--surface2); }
+table.table tbody tr[tabindex] { cursor: pointer; }
+table.table tbody tr.sel td { background: var(--accent-soft); }
+table.table td small { font-size: 12px; }
+
+/* Account detail block + the bought/bonus/unlocked coin boxes. */
+.acct { padding: 16px; }
+.coinrow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.coinrow .coinbox { flex: 1; min-width: 110px; }
+
+/* Activity timeline list. */
+.tl {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+}
+.tl li {
+  padding: 8px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line2);
+}
+.tl li:last-child { border-bottom: 0; }
+
 /* ---- a11y: contrast nudge for long-session reading (#099) ---- */
 .muted, .tiny.muted { color: #a5a1ad; }
 
