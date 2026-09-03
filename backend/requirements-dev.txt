@@ -1,0 +1,5 @@
+# Dev/CI dependencies: everything runtime plus the test toolchain.
+-r requirements.txt
+
+pytest>=8.0
+pytest-cov>=5.0

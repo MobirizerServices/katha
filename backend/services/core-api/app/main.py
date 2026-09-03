@@ -42,6 +42,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Fail-closed: in a managed env (KATHA_ENV=qa|staging|prod) refuse to start on a
+# missing/dev-default secret, a dev auth mode, or a SQLite URL. No-op in dev/test.
+try:
+    from katha_infra import enforce_production_config
+    enforce_production_config("core-api")
+except ImportError:
+    pass  # infra not on path (pure in-memory dev run) — nothing to enforce
+
 app.include_router(auth_router.router)
 app.include_router(catalog_router.router)
 app.include_router(engagement_router.router)

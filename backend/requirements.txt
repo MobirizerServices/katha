@@ -1,0 +1,29 @@
+# Katha backend runtime dependencies. Constraints match CI's known-good ranges
+# plus the QA/prod infra libs. Follow-up (P2): compile to fully hashed pins with
+# `pip-compile --generate-hashes` for reproducible, audited builds.
+
+# --- web / API ---
+fastapi>=0.115
+uvicorn[standard]>=0.30
+gunicorn>=22.0            # process manager for uvicorn workers in QA/prod
+pydantic>=2.7
+httpx>=0.27
+
+# --- data ---
+sqlalchemy>=2.0
+aiosqlite>=0.20          # dev / test
+asyncpg>=0.29            # Postgres (QA/prod)
+alembic>=1.13            # schema migrations
+
+# --- cache / rate-limit / queue broker ---
+redis>=5.0
+arq>=0.26                # async task queue (invoice email, push)
+
+# --- auth / crypto ---
+pyjwt>=2.9
+cryptography>=43
+
+# --- observability (imported lazily; optional at runtime) ---
+sentry-sdk[fastapi]>=2.0
+prometheus-client>=0.20
+structlog>=24.1

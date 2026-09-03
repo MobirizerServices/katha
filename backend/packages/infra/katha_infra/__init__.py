@@ -12,6 +12,7 @@ from .models import (
     WalletRow,
 )
 from .persistent_ledger import PersistentLedger
+from .prodguard import InsecureConfigError, enforce as enforce_production_config
 from .repository import LedgerRepository
 from .shared_store import SharedStore
 
@@ -19,6 +20,8 @@ __all__ = [
     "Database",
     "db_url",
     "DEFAULT_DB_URL",
+    "enforce_production_config",
+    "InsecureConfigError",
     "Base",
     "CoinTransactionRow",
     "WalletRow",

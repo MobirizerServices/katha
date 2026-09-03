@@ -1461,3 +1461,10 @@ app.include_router(router)
 from . import oidc as _oidc  # noqa: E402  (needs `audit` + SHARED defined above)
 
 app.include_router(_oidc.router)
+
+# Fail-closed config guard (see katha_infra.prodguard). No-op in dev/test.
+try:
+    from katha_infra import enforce_production_config
+    enforce_production_config("admin-api")
+except ImportError:
+    pass

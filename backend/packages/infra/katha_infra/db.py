@@ -61,27 +61,46 @@ class Database:
         self.runner.run(self._create_all())
 
     async def _make_engine(self) -> AsyncEngine:
-        return create_async_engine(self.url, future=True)
+        # SQLite (dev/test) keeps the default single-connection pool. A server
+        # engine (Postgres) gets a real pool with pre-ping and recycling so it
+        # survives idle drops and concurrent load — sized from env for QA/prod.
+        if self.url.startswith("sqlite"):
+            return create_async_engine(self.url, future=True)
+        return create_async_engine(
+            self.url, future=True,
+            pool_size=int(os.environ.get("KATHA_DB_POOL_SIZE", "10")),
+            max_overflow=int(os.environ.get("KATHA_DB_MAX_OVERFLOW", "10")),
+            pool_pre_ping=True,
+            pool_recycle=int(os.environ.get("KATHA_DB_POOL_RECYCLE", "1800")),
+        )
 
     async def _create_all(self) -> None:
+        # In managed deployments Alembic owns the schema; set KATHA_DB_AUTOCREATE=0
+        # so the app never races migrations. Default on for dev/test (SQLite).
+        if os.environ.get("KATHA_DB_AUTOCREATE", "1") == "0":
+            return
+        await self._create_all_unmanaged()
+
+    async def _create_all_unmanaged(self) -> None:
         # checkfirst=True, but two services can still race on a fresh shared DB —
-        # tolerate "table already exists" from a concurrent creator.
-        from sqlalchemy.exc import OperationalError
+        # tolerate "table already exists" from a concurrent creator. Postgres
+        # raises ProgrammingError here, SQLite OperationalError.
+        from sqlalchemy.exc import OperationalError, ProgrammingError
         try:
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
-        except OperationalError as e:
+        except (OperationalError, ProgrammingError) as e:
             if "already exists" not in str(e):
                 raise
         # Additive column migration for pre-existing dev DBs (create_all never
-        # alters tables): ignore "duplicate column" on already-migrated files.
+        # alters tables): ignore "duplicate column" on already-migrated DBs.
         from sqlalchemy import text
         for ddl in ("ALTER TABLE user_profile ADD COLUMN last_seen VARCHAR NOT NULL DEFAULT ''",
                     "ALTER TABLE user_profile ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"):
             try:
                 async with self.engine.begin() as conn:
                     await conn.execute(text(ddl))
-            except OperationalError:
+            except (OperationalError, ProgrammingError):
                 pass
 
     def run(self, coro: Awaitable[T]) -> T:
