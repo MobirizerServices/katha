@@ -91,7 +91,8 @@ describe("send()/mutate result contract", () => {
 describe("ui primitives", () => {
   it("fmtINR formats Indian rupees", () => {
     expect(fmtINR(199)).toBe("₹199");
-    expect(fmtINR(0.15)).toBe("₹0.2");
+    expect(fmtINR(0.15)).toBe("₹0.15");
+    expect(fmtINR(99.99)).toBe("₹99.99");
   });
 
   it("IsoTime renders a dash for empty and a title for real stamps", () => {

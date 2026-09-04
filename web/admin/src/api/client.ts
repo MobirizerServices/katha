@@ -20,12 +20,25 @@ import {
   MOCK_USERS,
 } from "./mock";
 
-export const BASE_URL =
-  (import.meta as { env?: Record<string, string> }).env?.VITE_ADMIN_API_BASE || "/admin/v1";
+export const BASE_URL = import.meta.env.VITE_ADMIN_API_BASE || "/admin/v1";
+/** Where covers are served from (core-api / the CDN). Dev: the local core-api;
+ *  QA/prod: the public app origin (set VITE_MEDIA_BASE at build). */
+export const MEDIA_BASE = import.meta.env.VITE_MEDIA_BASE || "http://127.0.0.1:8799";
 
 // ---- online/offline seam (#005) -------------------------------------------
 let online = false;
 const listeners = new Set<(v: boolean) => void>();
+// 401/403 from the server means the SESSION is gone (or the role changed),
+// not that the server is: the store re-reads identity and routes to Login.
+const unauthListeners = new Set<(status: number) => void>();
+
+export function onUnauthorized(fn: (status: number) => void): () => void {
+  unauthListeners.add(fn);
+  return () => unauthListeners.delete(fn);
+}
+function notifyUnauthorized(status: number) {
+  if (status === 401 || status === 403) unauthListeners.forEach((fn) => fn(status));
+}
 
 export function isOnline(): boolean {
   return online;
@@ -60,24 +73,37 @@ export function __resetApiCache(): void {
   CACHE.clear();
 }
 
-async function get<T>(path: string, fallback: T, ttl = 0): Promise<T> {
+/** Read `path`. `offline` is returned ONLY when the server cannot be reached
+ *  (sample fixtures, flagged by the banner); an HTTP error from a reachable
+ *  server returns `onError` (an empty shape) — fixture data must never stand
+ *  in for a 401 after the session expires or a 500 from the real API. */
+async function get<T>(path: string, offline: T, ttl = 0, onError: T = offline): Promise<T> {
   if (ttl > 0) {
     const hit = CACHE.get(path);
     if (hit && Date.now() - hit.t < ttl) return hit.v as T;
   }
+  let res: Response;
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 2500);
-    const res = await fetch(`${BASE_URL}${path}`, { headers: HEADERS, signal: ctrl.signal });
+    res = await fetch(`${BASE_URL}${path}`,
+                      { headers: HEADERS, signal: ctrl.signal, credentials: "include" });
     clearTimeout(t);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    setOnline(true);
+  } catch {
+    setOnline(false);
+    return offline;
+  }
+  setOnline(true);
+  if (!res.ok) {
+    notifyUnauthorized(res.status);
+    return onError;
+  }
+  try {
     const parsed = (await res.json()) as T;
     if (ttl > 0) CACHE.set(path, { t: Date.now(), v: parsed });
     return parsed;
   } catch {
-    setOnline(false);
-    return fallback;
+    return onError;
   }
 }
 
@@ -211,10 +237,10 @@ export interface Policy {
 
 export const api = {
   async getOverview(): Promise<Overview> {
-    return get<Overview>("/overview", MOCK_OVERVIEW);
+    return get<Overview>("/overview", MOCK_OVERVIEW, 0, null as unknown as Overview);
   },
   async listSeries(): Promise<Series[]> {
-    return get<Series[]>("/catalog/series", MOCK_SERIES, CACHE_TTL_MS);
+    return get<Series[]>("/catalog/series", MOCK_SERIES, CACHE_TTL_MS, []);
   },
   async seriesDetail(slug: string): Promise<SeriesDetail | null> {
     return get<SeriesDetail | null>(`/catalog/series/${slug}`, null);
@@ -237,13 +263,13 @@ export const api = {
       (opts.segment !== "guests" || u.payer === "—") &&
       (opts.segment !== "payers" || u.payer !== "—"));
     return get<{ users: AdminUser[]; total: number }>(
-      `/users?${p}`, { users: fallback, total: fallback.length });
+      `/users?${p}`, { users: fallback, total: fallback.length }, 0, { users: [], total: 0 });
   },
   async listApprovals(status = "pending"): Promise<Approval[]> {
-    return get<Approval[]>(`/approvals?status=${status}`, MOCK_APPROVALS);
+    return get<Approval[]>(`/approvals?status=${status}`, MOCK_APPROVALS, 0, []);
   },
   async listFlags(): Promise<FeatureFlag[]> {
-    return get<FeatureFlag[]>("/config/flags", MOCK_FLAGS, CACHE_TTL_MS);
+    return get<FeatureFlag[]>("/config/flags", MOCK_FLAGS, CACHE_TTL_MS, []);
   },
   async listAudit(opts: { actor?: string; q?: string; limit?: number; before?: number } = {}):
       Promise<AuditPage> {
@@ -258,7 +284,7 @@ export const api = {
       (!n || r.action.toLowerCase().includes(n) || r.entity.toLowerCase().includes(n) ||
         r.change.toLowerCase().includes(n)));
     return get<AuditPage>(`/audit?${p}`,
-      { rows, chain_ok: true, total: rows.length });
+      { rows, chain_ok: true, total: rows.length }, 0, { rows: [], chain_ok: true, total: 0 });
   },
   async getUserLedger(userId: string): Promise<UserLedger> {
     return get<UserLedger>(`/users/${userId}/ledger`, {
@@ -345,7 +371,7 @@ export const api = {
  *  when the server is absent — callers reconcile against the SERVER's answer
  *  (#026/#063), never assume success. */
 export type MutationResult =
-  | ({ offline?: false; error?: string } & Record<string, unknown>)
+  | ({ offline?: false; error?: string; httpStatus?: number; login?: string } & Record<string, unknown>)
   | { offline: true };
 
 export async function send(path: string, method: string, body?: unknown): Promise<MutationResult> {
@@ -354,10 +380,16 @@ export async function send(path: string, method: string, body?: unknown): Promis
       method,
       headers: { "content-type": "application/json", ...HEADERS },
       body: body === undefined ? undefined : JSON.stringify(body),
+      credentials: "include",
     });
     setOnline(true);
     const parsed = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!res.ok) return { error: String(parsed.detail ?? `HTTP ${res.status}`) };
+    if (!res.ok) {
+      notifyUnauthorized(res.status);
+      // A step-up demand carries where to re-authenticate.
+      const login = res.headers?.get?.("X-Katha-Login") ?? undefined;
+      return { error: String(parsed.detail ?? `HTTP ${res.status}`), httpStatus: res.status, login };
+    }
     return parsed;
   } catch {
     setOnline(false);
@@ -366,8 +398,11 @@ export async function send(path: string, method: string, body?: unknown): Promis
 }
 
 export const mutate = {
-  adjust: (userId: string, coins: number, reasonCode: string, note: string) =>
-    send("/wallet/adjust", "POST", { user_id: userId, coins, reason_code: reasonCode, note }),
+  // idempotencyKey: one per click; a retry after a timeout lands once (#A10).
+  adjust: (userId: string, coins: number, reasonCode: string, note: string,
+           idempotencyKey?: string) =>
+    send("/wallet/adjust", "POST", { user_id: userId, coins, reason_code: reasonCode, note,
+                                     ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}) }),
   refund: (userId: string, txId: string) =>
     send("/wallet/refund", "POST", { user_id: userId, tx_id: txId }),
   erase: (userId: string) => send(`/users/${userId}/erase`, "POST"),
@@ -410,6 +445,6 @@ export const mutate = {
   uiPing: (view: string) => send("/metrics/ui", "POST", { view }),
   annotateAudit: (id: number, note: string) =>
     send(`/audit/${id}/note`, "PATCH", { note }),
-  notifyDrop: (slug: string, episode: number) =>
-    send(`/catalog/series/${slug}/notify-drop`, "POST", { episode }),
+  notifyDrop: (slug: string, episode: number, resend = false) =>
+    send(`/catalog/series/${slug}/notify-drop`, "POST", { episode, resend }),
 };

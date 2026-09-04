@@ -1,7 +1,10 @@
 // Live client for Katha core-api. The web app renders server state and captures
 // intent; the backend ledger is the source of truth (all money flows through it).
 // Nothing here computes a price, a bonus, a balance or an entitlement.
-const BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8799";
+// Production: same origin — the edge serves /v1 and /media on the site host, so
+// nothing is baked into the bundle. Dev/test: the local core-api.
+const BASE = process.env.NEXT_PUBLIC_API_BASE
+  ?? (process.env.NODE_ENV === "production" ? "" : "http://localhost:8799");
 const TOKEN_KEY = "katha.token.v1";
 
 export function getToken(): string | null {

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SiteFooter from "@/components/SiteFooter";
 import {
-  API_BASE,
+  ogImageUrl,
   getSeries,
   allSlugs,
   coverUrl,
@@ -38,7 +38,7 @@ export async function generateMetadata({
       title: s.title,
       description: s.synopsis,
       type: "video.tv_show",
-      images: [{ url: `${API_BASE}/media/${slug}/og_1200x630.jpg`,
+      images: [{ url: ogImageUrl(slug),
                  width: 1200, height: 630, alt: s.title }],
     },
   };
@@ -60,7 +60,7 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
     genre: s.genres,
     numberOfEpisodes: s.episodeCount,
     contentRating: s.rating,
-    image: `${API_BASE}/media/${s.slug}/og_1200x630.jpg`,
+    image: ogImageUrl(s.slug),
   };
 
   return (

@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { api, isOnline, mutate, onOnlineChange } from "./api/client";
+import { api, isOnline, mutate, onOnlineChange, onUnauthorized } from "./api/client";
 import type { AttentionItem, Health, Identity, MutationResult } from "./api/client";
 import type { Approval, AuditEntry, FeatureFlag } from "./api/types";
 import { ROLE_NAMES } from "./auth/roles";
@@ -23,6 +23,8 @@ export interface ToastMsg {
 
 interface Store {
   role: Role;
+  /** The signed-in operator's id: their OIDC email, or the dev header actor. */
+  me: string;
   setRole: (r: Role) => void;
   identity: Identity | null;
   signedOut: boolean;
@@ -71,8 +73,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void api.attention().then((a) => setAttention(a.items));
   }, []);
 
-  // Identity is fetched once at boot (a sign-in navigates the whole page, so a
-  // fresh session always re-boots the app) and re-checked after sign-out.
+  // Identity is fetched at boot, after sign-out, and whenever the server
+  // answers 401/403 mid-session (expired cookie, revoked role): the operator
+  // is routed to Login instead of being shown sample data.
   const refreshIdentity = useCallback(async () => {
     const me = await api.authMe();
     setIdentity(me);
@@ -103,9 +106,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     refreshSignals();
     const t = window.setInterval(refreshSignals, 60_000);
     const off = onOnlineChange(setOnlineState);
+    const offAuth = onUnauthorized(() => void refreshIdentity());
     return () => {
       window.clearInterval(t);
       off();
+      offAuth();
     };
   }, [refreshSignals, reloadApprovals, refreshIdentity]);
 
@@ -175,6 +180,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const signedOut = identity?.mode === "oidc" && !identity.authenticated;
+  const me = (identity?.mode === "oidc" && identity.email) || ME;
 
   const setFlagPct = useCallback(
     async (key: string, pct: number, confirm?: string) => {
@@ -198,11 +204,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(
     () => ({
-      role, setRole, identity, signedOut, logout, online, health, attention,
+      role, me, setRole, identity, signedOut, logout, online, health, attention,
       refreshSignals, approvals, reloadApprovals, addApproval, resolveApproval,
       audit, addAudit, flags, toggleFlag, setFlagPct, toasts, showToast,
     }),
-    [role, setRole, identity, signedOut, logout, online, health, attention,
+    [role, me, setRole, identity, signedOut, logout, online, health, attention,
      refreshSignals, approvals, reloadApprovals, addApproval, resolveApproval,
      audit, addAudit, flags, toggleFlag, setFlagPct, toasts, showToast]
   );

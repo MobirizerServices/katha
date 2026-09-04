@@ -1519,6 +1519,15 @@ def notify_drop(slug: str, request: Request = None, body: dict = Body(...),
         raise HTTPException(status_code=400, detail="episode required")
     if SHARED is None:
         raise HTTPException(status_code=503, detail="needs persistence")
+    # One drop push per episode unless explicitly resent: a double click (or a
+    # retried request) must not notify every device twice.
+    sent_key = f"dropsent:{slug}:{episode}"
+    already = SHARED.kv_get(sent_key)
+    if already and not body.get("resend"):
+        raise HTTPException(status_code=409,
+                            detail=f"episode {episode} was already pushed at {already}; "
+                                   "send again with resend=true")
+    SHARED.kv_set(sent_key, now_iso())
     from app.overrides import get_series
     from katha_infra import comms
     series = get_series(slug)

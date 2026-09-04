@@ -110,8 +110,10 @@ export function Modal({
 }
 
 
+/** Rupees with up to two decimals (paise) — ₹0.15 per coin, ₹99.99 — never
+ *  rounded to a tenth. */
 export function fmtINR(rupees: number): string {
-  return "₹" + Number(rupees).toLocaleString("en-IN", { maximumFractionDigits: 1 });
+  return "₹" + Number(rupees).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 }
 
 /** Humanized time from an ISO string, full stamp on hover (#094). */

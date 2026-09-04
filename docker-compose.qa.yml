@@ -89,14 +89,16 @@ services:
     build:
       context: ./web/site
       args:
-        NEXT_PUBLIC_API_BASE: "${PUBLIC_API_BASE}"
+        NEXT_PUBLIC_SITE_ORIGIN: "${PUBLIC_API_BASE}"   # same host serves site, /v1 and /media
+        # NEXT_PUBLIC_API_BASE is deliberately unset: same-origin
     depends_on: [backend]
 
   web-admin:
     build:
       context: ./web/admin
       args:
-        VITE_ADMIN_API_BASE: "${PUBLIC_ADMIN_API_BASE}"
+        VITE_MEDIA_BASE: "${PUBLIC_API_BASE}"      # covers come from the app host
+        # VITE_ADMIN_API_BASE is deliberately unset: same-origin /admin/v1
 
   nginx:
     image: nginx:1.27-alpine

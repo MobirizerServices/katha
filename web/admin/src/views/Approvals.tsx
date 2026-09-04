@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Approval } from "../api/types";
 import { Empty, IsoTime, Modal, PageHeader, Sev, fmtN } from "../ui";
-import { ME, useStore } from "../store";
+import { useStore } from "../store";
 import { canAct } from "../auth/roles";
 
 function ageHours(when: string): number | null {
@@ -11,7 +11,7 @@ function ageHours(when: string): number | null {
 }
 
 export function Approvals() {
-  const { role, online, approvals, reloadApprovals, resolveApproval, showToast } = useStore();
+  const { role, me, online, approvals, reloadApprovals, resolveApproval, showToast } = useStore();
   const [tab, setTab] = useState<"pending" | "history">("pending");
   const [history, setHistory] = useState<Approval[]>([]);
   const [rejecting, setRejecting] = useState<Approval[] | null>(null);
@@ -38,19 +38,26 @@ export function Approvals() {
     });
 
   async function decide(list: Approval[], decision: "approved" | "rejected", withNote = "") {
+    let ok = 0;
+    let offline = 0;
     for (const a of list) {
-      if (decision === "approved" && a.requestedBy === ME) {
+      if (decision === "approved" && a.requestedBy === me) {
         showToast("You can't approve your own request", "error");
         continue;
       }
-      const res = await resolveApproval(a.id, decision, ME, withNote);
-      if (!("offline" in res) && res.error) {
-        showToast(`${a.id}: ${res.error}`, "error");
-      }
+      const res = await resolveApproval(a.id, decision, me, withNote);
+      if ("offline" in res) offline += 1;
+      else if (res.error) showToast(`${a.id}: ${res.error}`, "error");
+      else ok += 1;
     }
-    showToast(decision === "approved"
-      ? "Approved · change written to the ledger"
-      : "Rejected · returned to requester with your note");
+    // Say only what actually happened: a failed batch is not "written".
+    if (ok > 0) {
+      showToast(decision === "approved"
+        ? `Approved ${ok > 1 ? `${ok} requests` : ""} · change written to the ledger`
+        : `Rejected ${ok > 1 ? `${ok} requests` : ""} · returned to requester with your note`);
+    } else if (offline > 0) {
+      showToast("Offline — nothing was decided", "error");
+    }
     setPicked(new Set());
     setRejecting(null);
     setNote("");
@@ -134,8 +141,8 @@ export function Approvals() {
                       Reject
                     </button>
                     <button className="btn p"
-                            disabled={!canDecide || !online || a.requestedBy === ME}
-                            title={a.requestedBy === ME ? "Requester cannot self-approve" : ""}
+                            disabled={!canDecide || !online || a.requestedBy === me}
+                            title={a.requestedBy === me ? "Requester cannot self-approve" : ""}
                             onClick={() => void decide([a], "approved")}>
                       Approve
                     </button>

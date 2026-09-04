@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { api, BASE_URL } from "../src/api/client";
+import { api, BASE_URL, isOnline, onUnauthorized, send } from "../src/api/client";
 import { MOCK_OVERVIEW, MOCK_SERIES, MOCK_USERS, MOCK_APPROVALS, MOCK_FLAGS, MOCK_AUDIT } from "../src/api/mock";
 
 afterEach(() => {
@@ -37,10 +37,33 @@ describe("api client — live success path", () => {
 });
 
 describe("api client — fallback path", () => {
-  it("falls back to the mock when the server returns a non-2xx status", async () => {
+  it("an HTTP error from a REACHABLE server returns an empty shape, never the fixtures", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) }));
-    const result = await api.getOverview();
-    expect(result).toEqual(MOCK_OVERVIEW);
+    expect(await api.getOverview()).toBeNull();
+    expect(await api.listSeries()).toEqual([]);
+    expect((await api.listUsers()).users).toEqual([]);
+    expect(await api.listApprovals()).toEqual([]);
+    expect(await api.listFlags()).toEqual([]);
+    expect((await api.listAudit({})).rows).toEqual([]);
+    expect(isOnline()).toBe(true);
+  });
+
+  it("a 401 mid-session tells the store to re-check identity", async () => {
+    const seen: number[] = [];
+    const off = onUnauthorized((s) => seen.push(s));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) }));
+    await api.getOverview();
+    await send("/wallet/adjust", "POST", {});
+    off();
+    expect(seen).toEqual([401, 401]);
+  });
+
+  it("sends the session cookie on every call", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+    vi.stubGlobal("fetch", fetchMock);
+    await api.health();
+    await send("/x", "POST", {});
+    for (const c of fetchMock.mock.calls) expect(c[1].credentials).toBe("include");
   });
 
   it("falls back to the mock when fetch rejects (network/offline)", async () => {

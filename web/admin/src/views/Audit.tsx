@@ -20,7 +20,13 @@ function renderChange(change: string) {
 
 function toCsv(rows: AuditEntry[]): string {
   const head = "id,ts,actor,action,entity,change,ip";
-  const esc = (v: unknown) => `"${String(v ?? "").replaceAll('"', '""')}"`;
+  // Quote every cell and neutralize spreadsheet formulas: a note typed as
+  // "=HYPERLINK(...)" or "-1+cmd|..." must open as text, not execute.
+  const esc = (v: unknown) => {
+    let t = String(v ?? "");
+    if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+    return `"${t.replaceAll('"', '""')}"`;
+  };
   return [head, ...rows.map((r) =>
     [r.id ?? "", r.ts, r.actor, r.action, r.entity, r.change, r.ip ?? ""].map(esc).join(",")
   )].join("\n");

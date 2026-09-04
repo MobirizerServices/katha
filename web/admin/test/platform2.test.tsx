@@ -741,7 +741,7 @@ describe("comms: Outbox view + drop pushes", () => {
     await waitFor(() => expect(getStore().toasts.some((t) =>
       t.text.includes("pushed to 3 device(s)"))).toBe(true));
     const post = calls.find((c) => c.url.includes("/notify-drop"));
-    expect(JSON.parse(String(post?.init?.body))).toEqual({ episode: 60 });
+    expect(JSON.parse(String(post?.init?.body))).toEqual({ episode: 60, resend: false });
   });
 });
 

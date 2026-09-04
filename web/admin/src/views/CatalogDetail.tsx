@@ -20,6 +20,7 @@ export function CatalogDetail() {
   const { slug = "" } = useParams();
   const { role, online, showToast } = useStore();
   const [d, setD] = useState<SeriesDetail | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
   const [takedown, setTakedown] = useState(false);
   const [reason, setReason] = useState("");
   const [rateOpen, setRateOpen] = useState(false);
@@ -82,9 +83,22 @@ export function CatalogDetail() {
   async function sendDrop() {
     const res = await mutate.notifyDrop(slug, dropEp);
     if ("offline" in res) return showToast("Offline — nothing sent", "error");
+    if (res.httpStatus === 409) return showToast(`Not sent again: ${res.error}`, "error");
     if (res.error) return showToast(`Not sent: ${res.error}`, "error");
     showToast(`Episode ${dropEp} drop pushed to ${res.devices} device(s) — see Outbox`);
     setDropOpen(false);
+  }
+
+  /** One in-flight mutation at a time: a double-click on "Send push" (or any
+   *  save) must not fire twice. Buttons read `busy` to disable themselves. */
+  async function run(fn: () => Promise<unknown>) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveTitle() {
@@ -140,8 +154,8 @@ export function CatalogDetail() {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {["live", "scheduled", "draft"].map((st) => (
                 <button key={st} className="btn s"
-                        disabled={!contentRole || !online || d.status === st}
-                        onClick={() => void setStatus(st)}>
+                        disabled={busy || (!contentRole || !online || d.status === st)}
+                        onClick={() => void run(() => setStatus(st))}>
                   {st === "live" ? "Publish (live)" : `Mark ${st}`}
                 </button>
               ))}
@@ -298,8 +312,8 @@ export function CatalogDetail() {
                footer={
                  <>
                    <button className="btn s" onClick={() => setPriceOpen(false)}>Cancel</button>
-                   <button className="btn danger" disabled={priceTyped !== d.slug}
-                           onClick={() => void savePricing()}>
+                   <button className="btn danger" disabled={busy || (priceTyped !== d.slug)}
+                           onClick={() => void run(() => savePricing())}>
                      Change pricing
                    </button>
                  </>
@@ -335,7 +349,7 @@ export function CatalogDetail() {
                footer={
                  <>
                    <button className="btn s" onClick={() => setRightsOpen(false)}>Cancel</button>
-                   <button className="btn p" onClick={() => void saveRights()}>
+                   <button className="btn p" disabled={busy} onClick={() => void run(() => saveRights())}>
                      Save rights
                    </button>
                  </>
@@ -361,7 +375,7 @@ export function CatalogDetail() {
                footer={
                  <>
                    <button className="btn s" onClick={() => setDropOpen(false)}>Cancel</button>
-                   <button className="btn p" onClick={() => void sendDrop()}>
+                   <button className="btn p" disabled={busy} onClick={() => void run(() => sendDrop())}>
                      Send push
                    </button>
                  </>
@@ -383,8 +397,8 @@ export function CatalogDetail() {
                footer={
                  <>
                    <button className="btn s" onClick={() => setRetitle(null)}>Cancel</button>
-                   <button className="btn p" disabled={!newTitle.trim()}
-                           onClick={() => void saveTitle()}>
+                   <button className="btn p" disabled={busy || (!newTitle.trim())}
+                           onClick={() => void run(() => saveTitle())}>
                      Rename
                    </button>
                  </>
@@ -402,8 +416,8 @@ export function CatalogDetail() {
                footer={
                  <>
                    <button className="btn s" onClick={() => setRateOpen(false)}>Cancel</button>
-                   <button className="btn p" disabled={!rateReason.trim()}
-                           onClick={() => void applyRating()}>
+                   <button className="btn p" disabled={busy || (!rateReason.trim())}
+                           onClick={() => void run(() => applyRating())}>
                      Save rating
                    </button>
                  </>

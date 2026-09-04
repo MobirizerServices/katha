@@ -33,12 +33,17 @@ function AdjustDialog({ user, onClose, onApplied }: { user: AdminUser; onClose: 
     !Number.isInteger(amount) || amount <= 0 || amount > 100_000 ||
     (reason.startsWith("other") && !note.trim());
 
+  // One idempotency key per attempt; kept across an offline retry (the server
+  // may have committed before the response was lost) and rotated otherwise.
+  const keyRef = useRef(uid());
+
   async function submit() {
     if (invalid || busy) return;
     setBusy(true);
     const res = await mutate.adjust(
-      user.id, dir === "Credit" ? amount : -amount, reason, note);
+      user.id, dir === "Credit" ? amount : -amount, reason, note, keyRef.current);
     setBusy(false);
+    if (!("offline" in res)) keyRef.current = uid();
     if (!("offline" in res) && res.error) {
       showToast(`Adjustment failed: ${res.error}`, "error");
       return;
@@ -408,9 +413,14 @@ export function Users() {
   const [adjustFor, setAdjustFor] = useState<AdminUser | null>(null);
   const [ledgerFor, setLedgerFor] = useState<AdminUser | null>(null);
   const debounce = useRef<number>(0);
+  // Sequence guard: a slow answer for "me" must not overwrite results for
+  // "meera", and "Load more" must not append a page from a previous filter.
+  const seq = useRef(0);
 
   const load = useCallback(async (offset = 0) => {
+    const my = ++seq.current;
     const page = await api.listUsers({ q, sort, segment, offset, limit: 50 });
+    if (my !== seq.current) return;
     setTotal(page.total);
     setUsers((prev) => (offset === 0 ? page.users : [...(prev ?? []), ...page.users]));
     if (offset === 0) {

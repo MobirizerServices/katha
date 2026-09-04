@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, mutate } from "../api/client";
+import { api, mutate, MEDIA_BASE } from "../api/client";
 import type { Series } from "../api/types";
 import { Empty, Modal, PageHeader, Skeleton, StatusBadge, fmtN } from "../ui";
 import type { SeriesStatus } from "../api/types";
@@ -171,7 +171,7 @@ export function Catalog() {
                 <td>
                   <Link to={`/catalog/${s.slug}`} className="serieslink">
                     <img className="covermini" alt=""
-                         src={`http://127.0.0.1:8799/media/${s.slug}/cover_9x16.jpg`}
+                         src={`${MEDIA_BASE}/media/${s.slug}/cover_9x16.jpg`}
                          onError={(e) => ((e.target as HTMLImageElement).style.visibility = "hidden")} />
                     <span>
                       <b>{s.title}</b>

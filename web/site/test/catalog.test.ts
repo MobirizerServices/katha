@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   FREE_EPISODES,
   EPISODE_COIN_PRICE,
@@ -171,5 +171,32 @@ describe("jsonLdString", () => {
     expect(out).not.toContain("</script>");
     expect(out).toContain("\\u003c/script>");
     expect(JSON.parse(out).name).toBe("</script><img src=x onerror=1>");
+  });
+});
+
+describe("origins (S7)", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+
+  it("dev/test talk to the local core-api; production is same-origin with absolute og images", async () => {
+    const dev = await import("@/lib/catalog");
+    expect(dev.API_BASE).toBe("http://localhost:8799");
+    expect(dev.coverUrl("s")).toBe("http://localhost:8799/media/s/cover_9x16.jpg");
+    expect(dev.ogImageUrl("s")).toBe("http://localhost:8799/media/s/og_1200x630.jpg");
+
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://qa.katha.example");
+    vi.resetModules();
+    const prod = await import("@/lib/catalog");
+    expect(prod.API_BASE).toBe("");                                   // relative: nothing baked in
+    expect(prod.coverUrl("s", true)).toBe("/media/s/cover_16x9.jpg");
+    expect(prod.ogImageUrl("s")).toBe("https://qa.katha.example/media/s/og_1200x630.jpg");
+    const api = await import("@/lib/api");
+    expect(api.api.base).toBe("");
+
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("NEXT_PUBLIC_API_BASE", "https://api.katha.example");
+    vi.resetModules();
+    const split = await import("@/lib/catalog");
+    expect(split.ogImageUrl("s")).toBe("https://api.katha.example/media/s/og_1200x630.jpg");
   });
 });

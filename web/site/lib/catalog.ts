@@ -131,9 +131,17 @@ export function fmt(n: number): string {
 }
 
 /** Cover art served by core-api's /media route (CDN in production). */
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8799";
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE
+  ?? (process.env.NODE_ENV === "production" ? "" : "http://localhost:8799");
+/** Absolute origin for URLs that leave the page (og:image, JSON-LD): the public
+ *  site origin, since /media is served on it in production. */
+export const PUBLIC_ORIGIN =
+  process.env.NEXT_PUBLIC_SITE_ORIGIN || API_BASE || "http://localhost:3000";
 export function coverUrl(slug: string, wide = false): string {
   return `${API_BASE}/media/${slug}/cover_${wide ? "16x9" : "9x16"}.jpg`;
+}
+export function ogImageUrl(slug: string): string {
+  return `${PUBLIC_ORIGIN}/media/${slug}/og_1200x630.jpg`;
 }
 
 /** JSON for an inline <script type="application/ld+json"> block. Escapes '<'
