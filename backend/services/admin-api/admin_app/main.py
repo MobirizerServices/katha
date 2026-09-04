@@ -24,7 +24,7 @@ from katha_domain.flags import DEFAULT_FLAGS, effective_flags
 from katha_domain.timeutil import now_iso
 
 from .rbac import Actor, MATRIX, Role, require
-from .store import DUAL_APPROVAL_THRESHOLD, store
+from .store import DUAL_APPROVAL_THRESHOLD, Approval, store
 
 app = FastAPI(
     title="Katha admin-api",
@@ -243,6 +243,54 @@ def _audit_row(row) -> dict:
     }
 
 
+# ---- approval queue: the shared DB when persisted (every worker sees it,
+# survives restarts), the in-memory dict otherwise (unit tests) ---------------
+def _approval_create(actor: Actor, user_id: str, coins: int, reason_code: str,
+                     note: str) -> Approval:
+    if SHARED is None:
+        return store.create_approval(actor, user_id, coins, reason_code, note)
+    ap = Approval(id=f"apr_{uuid.uuid4().hex[:12]}", requested_by=actor.id,
+                  user_id=user_id, coins=coins, reason_code=reason_code, note=note,
+                  created_at=now_iso())
+    SHARED.approval_create(id=ap.id, requested_by=ap.requested_by, user_id=ap.user_id,
+                           coins=ap.coins, reason_code=ap.reason_code, note=ap.note,
+                           created_at=ap.created_at)
+    return ap
+
+
+def _approval_from(d: dict) -> Approval:
+    return Approval(id=d["id"], requested_by=d["requested_by"], user_id=d["user_id"],
+                    coins=d["coins"], reason_code=d["reason_code"], note=d["note"],
+                    status=d["status"], approved_by=d["approved_by"],
+                    created_at=d["created_at"])
+
+
+def _approval_get(approval_id: str) -> Approval | None:
+    if SHARED is None:
+        return store.approvals.get(approval_id)
+    d = SHARED.approval_get(approval_id)
+    return _approval_from(d) if d else None
+
+
+def _approvals_all() -> list[Approval]:
+    if SHARED is None:
+        return list(store.approvals.values())
+    return [_approval_from(d) for d in SHARED.approvals_all()]
+
+
+def _approval_transition(ap: Approval, to: str, by: str) -> bool:
+    """pending → to exactly once. False when someone else got there first."""
+    if SHARED is None:
+        if ap.status != "pending":
+            return False
+        ap.status, ap.approved_by = to, by
+        return True
+    if not SHARED.approval_transition(ap.id, to=to, by=by, at=now_iso()):
+        return False
+    ap.status, ap.approved_by = to, by
+    return True
+
+
 def _approval_view(ap) -> dict:
     return {
         "id": ap.id, "status": ap.status, "requested_by": ap.requested_by,
@@ -380,10 +428,11 @@ def list_approvals(status: str = "pending",
     """Approvals with history (#047), balance impact (#048) and requester
     day-context (#052). status: pending | approved | rejected | all."""
     from collections import Counter
-    day_counts = Counter(ap.requested_by for ap in store.approvals.values()
+    everything = _approvals_all()
+    day_counts = Counter(ap.requested_by for ap in everything
                          if ap.created_at[:10] == now_iso()[:10])
     out = []
-    for ap in store.approvals.values():
+    for ap in everything:
         if status != "all" and ap.status != status:
             continue
         bal = _wallet_view(ap.user_id)["total"] if ap.status == "pending" else None
@@ -405,12 +454,11 @@ def list_approvals(status: str = "pending",
 @router.post("/approvals/{approval_id}/reject", tags=["wallet"])
 def reject(approval_id: str, request: Request = None, body: dict = Body(default={}),
            actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE))):
-    ap = store.approvals.get(approval_id)
+    ap = _approval_get(approval_id)
     if ap is None:
         raise HTTPException(status_code=404, detail="approval not found")
-    if ap.status != "pending":
+    if ap.status != "pending" or not _approval_transition(ap, "rejected", actor.id):
         raise HTTPException(status_code=409, detail=f"already {ap.status}")
-    ap.status = "rejected"
     audit(actor, "wallet.adjust.rejected", ap.user_id,
           {"approval_id": ap.id, "coins": ap.coins,
            "note": (body.get("note") or "").strip()}, request)
@@ -570,7 +618,7 @@ def wallet_adjust(
 
     # Above the threshold: do NOT apply — queue a pending approval for a 2nd actor.
     if abs(coins) > DUAL_APPROVAL_THRESHOLD:
-        ap = store.create_approval(actor, user_id, coins, reason_code, note)
+        ap = _approval_create(actor, user_id, coins, reason_code, note)
         audit(actor, "wallet.adjust.requested", user_id,
               {"approval_id": ap.id, "coins": coins, "reason_code": reason_code}, request)
         _notify(f"[katha-admin] approval {ap.id}: {coins:+,} coins for {user_id} "
@@ -589,7 +637,7 @@ def wallet_adjust(
 def approve(approval_id: str, request: Request = None,
             actor: Actor = Depends(require(Role.FINANCE))):
     _step_up(request)
-    ap = store.approvals.get(approval_id)
+    ap = _approval_get(approval_id)
     if ap is None:
         raise HTTPException(status_code=404, detail="approval not found")
     if ap.status != "pending":
@@ -599,9 +647,11 @@ def approve(approval_id: str, request: Request = None,
     if actor.id == ap.requested_by:
         raise HTTPException(status_code=403, detail="requester cannot self-approve")
 
+    # Claim the approval BEFORE moving money: the conditional transition is
+    # what makes two approvers (or a double click) apply it at most once.
+    if not _approval_transition(ap, "approved", actor.id):
+        raise HTTPException(status_code=409, detail="already decided")
     _apply_adjust(ap.user_id, ap.coins, ap.reason_code, f"adjust:{ap.id}")
-    ap.status = "approved"
-    ap.approved_by = actor.id
     audit(actor, "wallet.adjust.approved", ap.user_id,
           {"approval_id": ap.id, "coins": ap.coins, "requested_by": ap.requested_by}, request)
     return {"status": "applied", "approval": _approval_view(ap),
@@ -893,7 +943,7 @@ def attention(actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,
     stable id and can be acknowledged (#016); new danger items mirror to the
     alert webhook once (#111)."""
     items = []
-    pending = [ap for ap in store.approvals.values() if ap.status == "pending"]
+    pending = [ap for ap in _approvals_all() if ap.status == "pending"]
     if pending:
         items.append({"id": "approvals", "severity": "warn",
                       "title": f"{len(pending)} approval(s) waiting",
@@ -1366,9 +1416,7 @@ def invoices(actor: Actor = Depends(require(Role.FINANCE, Role.ANALYST, Role.RO)
         return {"rows": [], "totals": {"count": 0, "gross_minor": 0, "gst_minor": 0}}
     rows = SHARED.invoices_all()
     return {"rows": rows,
-            "totals": {"count": len(rows),
-                       "gross_minor": sum(r["total_minor"] for r in rows),
-                       "gst_minor": sum(r["gst_minor"] for r in rows)}}
+            "totals": SHARED.invoice_totals()}
 
 
 @router.get("/outbox", tags=["ops"])

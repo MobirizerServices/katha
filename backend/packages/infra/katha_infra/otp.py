@@ -8,7 +8,9 @@ sent over the configured provider, and checked on verify.
 Providers (KATHA_OTP_PROVIDER):
   console  — log the code (single-box QA without an SMS account)
   msg91    — MSG91 flow/OTP API (KATHA_MSG91_KEY, KATHA_MSG91_TEMPLATE)
-  twilio   — Twilio Verify (KATHA_TWILIO_SID, KATHA_TWILIO_TOKEN, KATHA_TWILIO_SERVICE)
+  twilio   — Twilio Verify (KATHA_TWILIO_SID, KATHA_TWILIO_TOKEN, KATHA_TWILIO_SERVICE);
+             Twilio generates AND checks the code (VerificationCheck) — nothing
+             is stored locally for it
 """
 from __future__ import annotations
 
@@ -49,15 +51,53 @@ def _store_code(phone: str, code: str) -> None:
     _mem[phone] = (code, time.time() + _TTL_S, 0)
 
 
+def _provider() -> str:
+    return os.environ.get("KATHA_OTP_PROVIDER", "console").lower()
+
+
 def generate_and_send(phone: str) -> None:
-    """Create a fresh code, store it, and dispatch it over the provider."""
+    """Dispatch a code over the provider. Twilio Verify mints and checks its
+    own code (we never see it); every other provider gets one we generate
+    and store, and verify() compares against that."""
+    provider = _provider()
+    if provider == "twilio":
+        _twilio_start(phone)
+        return
     code = f"{secrets.randbelow(10000):04d}"
     _store_code(phone, code)
-    provider = os.environ.get("KATHA_OTP_PROVIDER", "console").lower()
     if provider == "console":
         _log.info("OTP for %s is %s (console provider)", phone, code)
     else:  # pragma: no cover - real SMS providers need network + credentials
         _send_via_provider(provider, phone, code)
+
+
+def _twilio_auth() -> tuple[str, tuple[str, str]]:
+    svc = os.environ.get("KATHA_TWILIO_SERVICE", "")
+    sid = os.environ.get("KATHA_TWILIO_SID", "")
+    return (f"https://verify.twilio.com/v2/Services/{svc}",
+            (sid, os.environ.get("KATHA_TWILIO_TOKEN", "")))
+
+
+def _twilio_start(phone: str) -> None:
+    import httpx
+    base, auth = _twilio_auth()
+    httpx.post(f"{base}/Verifications", data={"To": phone, "Channel": "sms"},
+               auth=auth, timeout=5).raise_for_status()
+
+
+def _twilio_check(phone: str, code: str) -> bool:
+    """Twilio Verify's VerificationCheck: the only place the code is judged.
+    Twilio enforces its own attempt cap (5) and expiry (10 min)."""
+    import httpx
+    base, auth = _twilio_auth()
+    try:
+        r = httpx.post(f"{base}/VerificationCheck", data={"To": phone, "Code": code},
+                       auth=auth, timeout=5)
+    except httpx.HTTPError:
+        return False
+    if r.status_code != 200:
+        return False
+    return r.json().get("status") == "approved"
 
 
 def _send_via_provider(provider: str, phone: str, code: str) -> None:  # pragma: no cover
@@ -67,18 +107,15 @@ def _send_via_provider(provider: str, phone: str, code: str) -> None:  # pragma:
                    params={"mobile": phone, "otp": code,
                            "template_id": os.environ.get("KATHA_MSG91_TEMPLATE", "")},
                    headers={"authkey": os.environ.get("KATHA_MSG91_KEY", "")}, timeout=5)
-    elif provider == "twilio":
-        sid = os.environ.get("KATHA_TWILIO_SID", "")
-        svc = os.environ.get("KATHA_TWILIO_SERVICE", "")
-        httpx.post(f"https://verify.twilio.com/v2/Services/{svc}/Verifications",
-                   data={"To": phone, "Channel": "sms"},
-                   auth=(sid, os.environ.get("KATHA_TWILIO_TOKEN", "")), timeout=5)
     else:
         raise ValueError(f"unknown OTP provider: {provider}")
 
 
 def verify(phone: str, code: str) -> bool:
-    """Check a submitted code against the stored one, enforcing the attempt cap."""
+    """Check a submitted code: with Twilio, ask Twilio; otherwise compare against
+    the stored one, enforcing the attempt cap."""
+    if _provider() == "twilio":
+        return _twilio_check(phone, code)
     r = _redis()
     if r is not None:  # pragma: no cover - needs a live Redis
         tries = r.incr(f"otp:tries:{phone}")

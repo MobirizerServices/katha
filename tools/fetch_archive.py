@@ -35,24 +35,54 @@ def _get_json(url: str) -> dict:
         return json.loads(r.read())
 
 
+# Licenses under which a clip may be cropped, re-encoded and streamed inside a
+# PAID product. Exact-match on the canonical URL path: BY-NC forbids commercial
+# use, ND forbids the re-encode, and "any creativecommons.org URL" admitted both.
+ALLOWED_LICENSES = {
+    "publicdomain/zero/1.0": "CC0",
+    "publicdomain/mark/1.0": "Public Domain Mark",
+    "licenses/by/4.0": "CC BY 4.0",
+    "licenses/by/3.0": "CC BY 3.0",
+    "licenses/by/2.0": "CC BY 2.0",
+    "licenses/by-sa/4.0": "CC BY-SA 4.0",
+    "licenses/by-sa/3.0": "CC BY-SA 3.0",
+}
+MAX_DOWNLOAD_BYTES = 2 * 1024 ** 3      # a mis-tagged 30 GB master must not be pulled whole
+
+
+def _license_key(url: str) -> str | None:
+    """'https://creativecommons.org/licenses/by-nc/4.0/' → 'licenses/by-nc/4.0'."""
+    u = (url or "").strip().lower()
+    for host in ("https://creativecommons.org/", "http://creativecommons.org/"):
+        if u.startswith(host):
+            return u[len(host):].strip("/")
+    return None
+
+
 def rights_ok(m: dict) -> tuple[bool, str]:
-    """Return (usable, reason) from an item's metadata rights signals."""
-    lic = (m.get("licenseurl") or "").lower()
-    status = (m.get("possible-copyright-status") or "").lower()
-    rights = (m.get("rights") or "").lower()
-    if "creativecommons.org" in lic:
-        return True, f"CC license: {m.get('licenseurl')}"
-    if status == "public domain" or "public domain" in rights:
-        return True, "marked public domain"
-    return False, ("no public-domain / Creative-Commons signal in metadata "
+    """Return (usable, reason). Only an EXACT allow-listed license, or an exact
+    public-domain status, passes — substring matches accepted "not public
+    domain" and BY-NC-ND before."""
+    key = _license_key(m.get("licenseurl") or "")
+    if key is not None:
+        if key in ALLOWED_LICENSES:
+            return True, f"{ALLOWED_LICENSES[key]} ({m.get('licenseurl')})"
+        return False, (f"license {m.get('licenseurl')!r} is not usable in a paid product "
+                       f"(allowed: {', '.join(sorted(ALLOWED_LICENSES.values()))})")
+    status = (m.get("possible-copyright-status") or "").strip().lower()
+    rights = (m.get("rights") or "").strip().lower()
+    if status in ("public domain", "publicdomain") or rights in ("public domain", "publicdomain"):
+        return True, "marked public domain (exact status)"
+    return False, ("no public-domain / allow-listed Creative-Commons signal in metadata "
                    f"(licenseurl={m.get('licenseurl')!r}, "
                    f"possible-copyright-status={m.get('possible-copyright-status')!r}, "
                    f"rights={m.get('rights')!r})")
 
 
 def pick_video(files: list[dict]) -> str | None:
-    """Largest downloadable video file in the item."""
-    vids = [f for f in files if (f.get("name", "").lower().endswith(VIDEO_EXT))]
+    """Largest downloadable video file in the item that fits the size cap."""
+    vids = [f for f in files if (f.get("name", "").lower().endswith(VIDEO_EXT))
+            and int(f.get("size") or 0) <= MAX_DOWNLOAD_BYTES]
     if not vids:
         return None
     vids.sort(key=lambda f: int(f.get("size") or 0), reverse=True)
@@ -60,9 +90,17 @@ def pick_video(files: list[dict]) -> str | None:
 
 
 def _download(url: str, dest: Path) -> None:
+    """Stream to disk with a hard byte cap (metadata sizes are self-reported)."""
     req = urllib.request.Request(url, headers={"User-Agent": "katha-fetch"})
     with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as out:
+        declared = int(resp.headers.get("Content-Length") or 0)
+        if declared > MAX_DOWNLOAD_BYTES:
+            raise RuntimeError(f"{declared} bytes exceeds the {MAX_DOWNLOAD_BYTES} cap")
+        total = 0
         while chunk := resp.read(1 << 16):
+            total += len(chunk)
+            if total > MAX_DOWNLOAD_BYTES:
+                raise RuntimeError(f"download exceeded the {MAX_DOWNLOAD_BYTES} byte cap")
             out.write(chunk)
 
 
@@ -113,7 +151,22 @@ def main() -> None:
             continue
         dest = out_dir / f"{job['slug']}_e{int(job['episode']):02d}.mp4"
         print(f"  … {ident} — {reason if ok else 'rights self-verified'}; downloading {name}")
-        _download(DL.format(id=ident, name=urllib.request.quote(name)), dest)
+        try:
+            _download(DL.format(id=ident, name=urllib.request.quote(name)), dest)
+        except RuntimeError as e:
+            dest.unlink(missing_ok=True)
+            print(f"  ✗ {ident} — {e}", file=sys.stderr)
+            continue
+        # Provenance next to the clip: what was fetched, under which rights,
+        # so a later question ("may we stream this?") has an answer on disk.
+        dest.with_suffix(".rights.json").write_text(json.dumps({
+            "source": f"https://archive.org/details/{ident}", "file": name,
+            "rights": reason if ok else "self-verified with --i-verified-rights",
+            "licenseurl": m.get("licenseurl"),
+            "possible_copyright_status": m.get("possible-copyright-status"),
+            "fetched_at": __import__("datetime").datetime.now(
+                __import__("datetime").timezone.utc).isoformat(timespec="seconds"),
+        }, indent=2))
         downloaded.append(dest)
         print(f"  ✓ {job['slug']} e{int(job['episode']):03d} → {dest.name}")
 

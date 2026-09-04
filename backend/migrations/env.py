@@ -16,8 +16,11 @@ from pathlib import Path
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
-# Make the infra package importable when alembic runs from backend/.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packages" / "infra"))
+# Make the backend packages importable when alembic runs from backend/ (infra
+# pulls in the ledger + domain packages, so all three go on the path).
+_pkgs = Path(__file__).resolve().parents[1] / "packages"
+for _name in ("infra", "ledger", "domain"):
+    sys.path.insert(0, str(_pkgs / _name))
 from katha_infra.models import Base  # noqa: E402
 
 config = context.config

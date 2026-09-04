@@ -347,24 +347,35 @@ class SharedStore:
         return self.db.run(self._audit_append(ts, actor_id, actor_role, action,
                                               target, detail, ip, user_agent))
 
+    # Postgres advisory key for the audit chain head ("AUDIT"). Every append
+    # reads the last hash and writes the next link; without serialization two
+    # concurrent admin actions take the same prev_hash and the chain reads as
+    # tampered forever. SQLite gets the same guarantee from BEGIN IMMEDIATE.
+    _AUDIT_LOCK_KEY = 0x4155444954
+
     async def _audit_append(self, ts, actor_id, actor_role, action, target,
                             detail, ip, user_agent) -> dict:
         import hashlib
-        async with self.db.session_factory() as s:
-            last = (await s.execute(select(AuditLogRow)
-                    .order_by(AuditLogRow.id.desc()).limit(1))).scalars().first()
-            prev_hash = last.hash if last else ""
+        from sqlalchemy import insert, text
+        tbl = AuditLogRow.__table__
+        async with self.db.engine.connect() as conn:
+            if self.db.url.startswith("sqlite"):
+                await conn.exec_driver_sql("BEGIN IMMEDIATE")
+            else:
+                await conn.execute(text("SELECT pg_advisory_xact_lock(:k)"),
+                                   {"k": self._AUDIT_LOCK_KEY})
+            prev_hash = (await conn.scalar(
+                select(tbl.c.hash).order_by(tbl.c.id.desc()).limit(1))) or ""
             digest = hashlib.sha256(
                 f"{prev_hash}|{ts}|{actor_id}|{action}|{target}|{detail}".encode()
             ).hexdigest()
-            row = AuditLogRow(ts=ts, actor_id=actor_id, actor_role=actor_role,
-                              action=action, target=target, detail=detail,
-                              ip=ip, user_agent=user_agent,
-                              prev_hash=prev_hash, hash=digest)
-            s.add(row)
-            await s.commit()
-            await s.refresh(row)
-        return {"id": row.id, "hash": digest}
+            res = await conn.execute(insert(tbl).values(
+                ts=ts, actor_id=actor_id, actor_role=actor_role, action=action,
+                target=target, detail=detail, ip=ip, user_agent=user_agent,
+                prev_hash=prev_hash, hash=digest))
+            row_id = res.inserted_primary_key[0]
+            await conn.commit()
+        return {"id": row_id, "hash": digest}
 
     def audit_list(self, *, actor: str = "", q: str = "", limit: int = 100,
                    before_id: int | None = None) -> dict:
@@ -803,15 +814,36 @@ class SharedStore:
                  "seller_gstin": r.seller_gstin, "created_at": r.created_at}
                 for r in rows]
 
-    def invoices_all(self, limit: int = 200) -> list[dict]:
-        return self.db.run(self._invoices_all(limit))
+    def invoices_all(self, limit: int | None = None, fy: str = "") -> list[dict]:
+        """The whole register (or one financial-year prefix, e.g. "2627"),
+        newest first. Uncapped by default: this is what gets filed, and a
+        silent cap would drop the oldest invoices from the return."""
+        return self.db.run(self._invoices_all(limit, fy))
 
-    async def _invoices_all(self, limit) -> list[dict]:
+    def invoice_totals(self, fy: str = "") -> dict:
+        return self.db.run(self._invoice_totals(fy))
+
+    async def _invoice_totals(self, fy) -> dict:
+        from sqlalchemy import func
+        from .models import InvoiceRow
+        stmt = select(func.count(InvoiceRow.id),
+                      func.coalesce(func.sum(InvoiceRow.total_minor), 0),
+                      func.coalesce(func.sum(InvoiceRow.gst_minor), 0))
+        if fy:
+            stmt = stmt.where(InvoiceRow.id.like(f"KATHA-INV-{fy}-%"))
+        async with self.db.session_factory() as s:
+            count, gross, gst = (await s.execute(stmt)).one()
+        return {"count": int(count), "gross_minor": int(gross), "gst_minor": int(gst)}
+
+    async def _invoices_all(self, limit, fy) -> list[dict]:
         from .models import InvoiceRow
         async with self.db.session_factory() as s:
-            rows = (await s.execute(select(InvoiceRow)
-                    .order_by(InvoiceRow.created_at.desc())
-                    .limit(limit))).scalars().all()
+            stmt = select(InvoiceRow).order_by(InvoiceRow.created_at.desc())
+            if fy:
+                stmt = stmt.where(InvoiceRow.id.like(f"KATHA-INV-{fy}-%"))
+            if limit:
+                stmt = stmt.limit(limit)
+            rows = (await s.execute(stmt)).scalars().all()
         return [{"id": r.id, "user_id": r.user_id, "sku": r.sku,
                  "coins": r.coins, "bonus_coins": r.bonus_coins,
                  "total_minor": r.total_minor, "taxable_minor": r.taxable_minor,
@@ -830,3 +862,62 @@ class SharedStore:
         if r is None:
             return None
         return {"id": r.id, "order_ref": r.order_ref}
+
+    # ---- dual-approval queue (shared across workers, survives restarts) ------
+    def approval_create(self, *, id: str, requested_by: str, user_id: str, coins: int,
+                        reason_code: str, note: str, created_at: str) -> dict:
+        return self.db.run(self._approval_create(id, requested_by, user_id, coins,
+                                                 reason_code, note, created_at))
+
+    async def _approval_create(self, id, requested_by, user_id, coins, reason_code,
+                               note, created_at) -> dict:
+        from .models import ApprovalRow
+        async with self.db.session_factory() as s:
+            s.add(ApprovalRow(id=id, status="pending", requested_by=requested_by,
+                              approved_by="", user_id=user_id, coins=coins,
+                              reason_code=reason_code, note=note,
+                              created_at=created_at, decided_at=""))
+            await s.commit()
+        return (await self._approval_get(id)) or {}
+
+    def approval_get(self, id: str) -> dict | None:
+        return self.db.run(self._approval_get(id))
+
+    async def _approval_get(self, id) -> dict | None:
+        from .models import ApprovalRow
+        async with self.db.session_factory() as s:
+            r = await s.get(ApprovalRow, id)
+        return self._approval_dict(r) if r else None
+
+    def approvals_all(self) -> list[dict]:
+        return self.db.run(self._approvals_all())
+
+    async def _approvals_all(self) -> list[dict]:
+        from .models import ApprovalRow
+        async with self.db.session_factory() as s:
+            rows = (await s.execute(select(ApprovalRow)
+                    .order_by(ApprovalRow.created_at.desc()))).scalars().all()
+        return [self._approval_dict(r) for r in rows]
+
+    def approval_transition(self, id: str, *, to: str, by: str, at: str) -> bool:
+        """pending → to, exactly once: a conditional UPDATE, so two approvers
+        racing (or the same click twice) can apply the money at most once."""
+        return self.db.run(self._approval_transition(id, to, by, at))
+
+    async def _approval_transition(self, id, to, by, at) -> bool:
+        from sqlalchemy import update
+        from .models import ApprovalRow
+        async with self.db.session_factory() as s:
+            res = await s.execute(
+                update(ApprovalRow)
+                .where(ApprovalRow.id == id, ApprovalRow.status == "pending")
+                .values(status=to, approved_by=by, decided_at=at))
+            await s.commit()
+        return res.rowcount == 1
+
+    @staticmethod
+    def _approval_dict(r) -> dict:
+        return {"id": r.id, "status": r.status, "requested_by": r.requested_by,
+                "approved_by": r.approved_by or None, "user_id": r.user_id,
+                "coins": r.coins, "reason_code": r.reason_code, "note": r.note,
+                "created_at": r.created_at, "decided_at": r.decided_at}

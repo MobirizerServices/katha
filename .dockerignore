@@ -1,0 +1,24 @@
+# Build context for backend/Dockerfile is the REPO ROOT (docker-compose.qa.yml),
+# so backend/.dockerignore never applied: the macOS venv, coverage data and any
+# dev SQLite ledger (real rows, phone numbers) were baked into the image.
+.git
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.coverage
+**/htmlcov/
+**/*.db
+**/*.db-journal
+**/.dev-backup/
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+ios/
+media/
+docs/
+deploy/certs/
+.env
+.env.*
+!deploy/.env.qa.example

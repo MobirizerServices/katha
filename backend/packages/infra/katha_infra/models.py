@@ -7,7 +7,7 @@ rules. `coin_transaction` is the append-only source of truth; `wallet` and
 """
 from __future__ import annotations
 
-from sqlalchemy import Integer, String, UniqueConstraint
+from sqlalchemy import Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -77,7 +77,7 @@ class KVRow(Base):
     __tablename__ = "admin_kv"
 
     key: Mapped[str] = mapped_column(String(128), primary_key=True)
-    value: Mapped[str] = mapped_column(String(1024))
+    value: Mapped[str] = mapped_column(Text, nullable=False)   # whole drafts/experiments live here
 
 
 class AuditLogRow(Base):
@@ -208,3 +208,22 @@ class OutboxRow(Base):
     status: Mapped[str] = mapped_column(String, index=True, nullable=False)  # queued|sent|failed
     detail: Mapped[str] = mapped_column(String, nullable=False, default="")
     created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class ApprovalRow(Base):
+    """A dual-approval request for a coin adjustment above the threshold. Shared
+    across every admin-api worker and survives restarts; the status transition
+    is a conditional UPDATE so two approvers cannot both apply it."""
+
+    __tablename__ = "approval"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    status: Mapped[str] = mapped_column(String, index=True, nullable=False, default="pending")
+    requested_by: Mapped[str] = mapped_column(String, nullable=False)
+    approved_by: Mapped[str] = mapped_column(String, nullable=False, default="")
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    coins: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason_code: Mapped[str] = mapped_column(String, nullable=False)
+    note: Mapped[str] = mapped_column(String, nullable=False, default="")
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    decided_at: Mapped[str] = mapped_column(String, nullable=False, default="")
