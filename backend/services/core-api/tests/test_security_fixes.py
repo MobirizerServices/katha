@@ -89,6 +89,21 @@ def test_iap_stub_refuses_outside_dev(monkeypatch):
     assert r.status_code == 501
 
 
+def test_web_order_stub_refuses_outside_dev(monkeypatch):
+    """C1: the web-order stub credits coins on the caller's word alone, so it
+    must fail closed exactly like the IAP stub once dev stubs are off."""
+    from app.auth import issue_token
+    from app.store import store
+    monkeypatch.setenv("KATHA_DEV_STUBS", "0")
+    user = "usr_deadbeef00000001"
+    tok = issue_token(user)
+    before = store.ledger.balance(user).total
+    r = client.post("/v1/web/orders", headers={"Authorization": f"Bearer {tok}"},
+                    json={"sku": "coins_mega_in", "order_ref": "pay_forged_1"})
+    assert r.status_code == 501
+    assert store.ledger.balance(user).total == before
+
+
 def test_iap_idempotency_key_is_user_bound():
     a = {"Authorization": "Bearer iap-user-a"}
     b = {"Authorization": "Bearer iap-user-b"}

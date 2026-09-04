@@ -112,8 +112,14 @@ def web_order(req: WebOrderRequest, user: str = Depends(current_user)) -> Wallet
     """Web coin purchase (UPI). Credits the pack + the +10% web bonus (PDD §21.4).
 
     Dev stub: simulates a captured Razorpay webhook. Production credits only after the
-    signature-verified `payment.captured` webhook, idempotent by payment id.
+    signature-verified `payment.captured` webhook, idempotent by payment id — until
+    that handler exists, a configured deployment refuses (501), exactly like
+    `/iap/verify`, because this stub credits coins on the caller's word alone.
     """
+    from ..auth import dev_stubs_enabled
+    if not dev_stubs_enabled():
+        raise HTTPException(status_code=501,
+                            detail="web order capture is not configured")
     pack = effective_packs().get(req.sku)
     if pack is None:
         raise HTTPException(status_code=400, detail="unknown sku")

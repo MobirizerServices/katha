@@ -296,7 +296,7 @@
           "auth"
         ],
         "summary": "Delete Me",
-        "description": "Account deletion (App Store requirement; PDD \u00a715 DPDP).\n\nDev slice: PII (profile) and engagement projections are removed immediately;\nthe coin ledger is retained as a pseudonymous financial record (\u00a712.7).\nProduction adds the 7-day grace window and warehouse/vector propagation.",
+        "description": "Account deletion (App Store requirement; PDD \u00a715 DPDP).\n\nDev slice: PII (profile) and engagement projections are removed immediately \u2014\nfrom the in-memory projections AND the shared DB (phone scrubbed, devices and\npush tokens deleted), with a token_version bump so every outstanding 30-day\nJWT dies now instead of quietly re-materializing the profile on its next\nrequest. The coin ledger is retained as a pseudonymous financial record\n(\u00a712.7). Production adds the 7-day grace window and warehouse/vector\npropagation.",
         "operationId": "delete_me_v1_me_delete",
         "parameters": [
           {
@@ -1260,7 +1260,7 @@
           "wallet"
         ],
         "summary": "Web Order",
-        "description": "Web coin purchase (UPI). Credits the pack + the +10% web bonus (PDD \u00a721.4).\n\nDev stub: simulates a captured Razorpay webhook. Production credits only after the\nsignature-verified `payment.captured` webhook, idempotent by payment id.",
+        "description": "Web coin purchase (UPI). Credits the pack + the +10% web bonus (PDD \u00a721.4).\n\nDev stub: simulates a captured Razorpay webhook. Production credits only after the\nsignature-verified `payment.captured` webhook, idempotent by payment id \u2014 until\nthat handler exists, a configured deployment refuses (501), exactly like\n`/iap/verify`, because this stub credits coins on the caller's word alone.",
         "operationId": "web_order_v1_web_orders_post",
         "parameters": [
           {
@@ -1465,6 +1465,7 @@
           "ops"
         ],
         "summary": "Health",
+        "description": "Liveness: the process is up and the catalog is loaded.",
         "operationId": "health_health_get",
         "responses": {
           "200": {
@@ -2272,6 +2273,11 @@
           "email": {
             "type": "string",
             "title": "Email",
+            "default": ""
+          },
+          "order_ref": {
+            "type": "string",
+            "title": "Order Ref",
             "default": ""
           }
         },
