@@ -5,38 +5,68 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWallet } from "./WalletProvider";
 import { api } from "@/lib/api";
-import {
-  Series,
-  isFreeEpisode,
-  FREE_EPISODES,
-  EPISODE_COIN_PRICE,
-  BUNDLE_DISCOUNT_PCT,
-  bundleCost,
-  coinsToRupees,
-  fmt,
-} from "@/lib/catalog";
+import { Series, fmt } from "@/lib/catalog";
+
+/**
+ * The server decides. Every render of this page starts with the playback
+ * endpoint: it answers either with a signed stream (entitled — free or
+ * unlocked) or with the paywall and every number the paywall shows (price,
+ * balance, how many episodes are left, the exact bundle offer). Nothing here
+ * computes a price or remembers an unlock.
+ */
+type Access =
+  | { kind: "loading" }
+  | { kind: "error" }
+  | { kind: "play"; url: string; free: boolean }
+  | { kind: "locked"; price: number; balance: number; remaining: number; bundle: number };
 
 export default function Player({ series, n }: { series: Series; n: number }) {
   const w = useWallet();
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [access, setAccess] = useState<Access>({ kind: "loading" });
   const [videoOk, setVideoOk] = useState(false);
   const [streamError, setStreamError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const [busy, setBusy] = useState<"episode" | "bundle" | null>(null);
 
   const ep = series.episodes.find((e) => e.number === n) || series.episodes[0];
-  const free = isFreeEpisode(n);
-  // Access is resolved on the client once the wallet has hydrated.
-  const accessible = free || (w.ready && w.hasUnlocked(series.slug, n));
-  const locked = w.ready && !accessible;
 
-  const bundle = bundleCost(series);
-  const remaining = series.episodes.filter((e) => !isFreeEpisode(e.number) && !w.hasUnlocked(series.slug, e.number)).length;
-  const need = EPISODE_COIN_PRICE - w.balance;
-
-  // Attach hls.js only when the episode is watchable.
+  // 1. Ask the server whether this viewer may watch this episode. Re-asked
+  //    whenever identity or the wallet changes (sign-in, purchase, unlock).
   useEffect(() => {
-    if (!accessible) return;
+    if (!w.ready) return;
+    let cancelled = false;
+    setAccess({ kind: "loading" });
+    setVideoOk(false);
+    api
+      .playback(series.slug, n)
+      .then((pb) => {
+        if (cancelled) return;
+        if (pb.locked) {
+          setAccess({
+            kind: "locked",
+            price: pb.price_coins,
+            balance: pb.balance,
+            remaining: pb.remaining_locked,
+            bundle: pb.bundle_offer_coins,
+          });
+        } else if (pb.hls_master_url) {
+          setAccess({ kind: "play", url: pb.hls_master_url, free: pb.free });
+        } else {
+          setAccess({ kind: "error" });
+        }
+      })
+      .catch(() => !cancelled && setAccess({ kind: "error" }));
+    return () => {
+      cancelled = true;
+    };
+  }, [series.slug, n, w.ready, w.signed, w.balance, retryKey]);
+
+  // 2. Attach hls.js only once the server has handed us a stream.
+  const src = access.kind === "play" ? access.url : null;
+  useEffect(() => {
+    if (!src) return;
     const video = videoRef.current;
     if (!video) return;
     let hls: { destroy: () => void } | null = null;
@@ -45,22 +75,6 @@ export default function Player({ series, n }: { series: Series; n: number }) {
     setStreamError(false);
     (async () => {
       try {
-        // Authoritative source: the playback endpoint returns the signed HLS
-        // master for entitled viewers (locally: the generated /media stream).
-        // A failure here is an ERROR, never a silent substitute — playing a
-        // stand-in stream as if it were the entitled episode misleads.
-        let src: string | null = null;
-        try {
-          const pb = await api.playback(series.slug, n);
-          if (pb && pb.hls_master_url) src = pb.hls_master_url as string;
-        } catch {
-          /* handled below as the error state */
-        }
-        if (cancelled) return;
-        if (!src) {
-          setStreamError(true);
-          return;
-        }
         const reveal = () => !cancelled && setVideoOk(true);
         // Prefer hls.js wherever MSE exists: Chrome answers "maybe" to the
         // native canPlayType probe but cannot actually demux HLS.
@@ -89,7 +103,7 @@ export default function Player({ series, n }: { series: Series; n: number }) {
               .playback(series.slug, n)
               .then((fresh) => {
                 if (cancelled) return;
-                if (fresh && fresh.hls_master_url) inst.loadSource(fresh.hls_master_url as string);
+                if (!fresh.locked && fresh.hls_master_url) inst.loadSource(fresh.hls_master_url);
                 else setStreamError(true);
               })
               .catch(() => !cancelled && setStreamError(true));
@@ -108,9 +122,33 @@ export default function Player({ series, n }: { series: Series; n: number }) {
       cancelled = true;
       if (hls) hls.destroy();
     };
-  }, [accessible, series.slug, n, retryKey]);
+  }, [src, series.slug, n]);
 
   const goto = (num: number) => router.push(`/watch/${series.slug}/${num}`);
+  const playing = access.kind === "play";
+  const locked = access.kind === "locked" ? access : null;
+
+  const unlockOne = async () => {
+    if (!locked || busy) return;
+    setBusy("episode");
+    const r = await w.unlockEpisode(series.slug, n);
+    setBusy(null);
+    if (r.ok) w.toast(`Episode ${n} unlocked · −${fmt(r.spent)} coins`);
+    else if (r.reason === "insufficient") w.toast("Not enough coins — top up to unlock");
+    else w.toast("Couldn't confirm the unlock — you weren't charged");
+    setRetryKey((k) => k + 1);   // re-ask the server either way
+  };
+
+  const unlockAll = async () => {
+    if (!locked || busy) return;
+    setBusy("bundle");
+    const r = await w.unlockBundle(series.slug);
+    setBusy(null);
+    if (r.ok) w.toast(`Unlocked all ${locked.remaining} episodes · −${fmt(r.spent)} coins`);
+    else if (r.reason === "insufficient") w.toast("Not enough coins for the full bundle");
+    else w.toast("Couldn't confirm the bundle — you weren't charged");
+    setRetryKey((k) => k + 1);
+  };
 
   return (
     <div className="playerpage">
@@ -119,7 +157,7 @@ export default function Player({ series, n }: { series: Series; n: number }) {
           className="vfill"
           style={{ "--v1": series.c1, "--v2": series.c2, opacity: videoOk ? 0 : 1 } as CSSProperties}
         />
-        {accessible && (
+        {playing && (
           <video
             ref={videoRef}
             playsInline
@@ -144,31 +182,28 @@ export default function Player({ series, n }: { series: Series; n: number }) {
           </div>
         </div>
 
-        {accessible && (
-          <>
-            <div className="subt">{free ? "" : ""}</div>
-            <div className="pbottom">
-              <div className="ptitle">
-                {free ? `Free episode ${n} of ${FREE_EPISODES}` : "Unlocked episode"} · {series.language}
-              </div>
-              <div className="seek">
-                <i style={{ width: "38%" }} />
-              </div>
-              <div className="pctrl">
-                <button onClick={() => n > 1 && goto(n - 1)} aria-label="Previous">
-                  ‹‹
-                </button>
-                <button onClick={() => n < series.episodeCount && goto(n + 1)} aria-label="Next episode">
-                  ▶▶
-                </button>
-                <span>0:23 / 1:04</span>
-              </div>
+        {playing && (
+          <div className="pbottom">
+            <div className="ptitle">
+              {access.free ? `Free episode ${n}` : "Unlocked episode"} · {series.language}
             </div>
-          </>
+            <div className="seek">
+              <i style={{ width: "38%" }} />
+            </div>
+            <div className="pctrl">
+              <button onClick={() => n > 1 && goto(n - 1)} aria-label="Previous">
+                ‹‹
+              </button>
+              <button onClick={() => n < series.episodeCount && goto(n + 1)} aria-label="Next episode">
+                ▶▶
+              </button>
+              <span>0:23 / 1:04</span>
+            </div>
+          </div>
         )}
 
-        {locked && <Paywall />}
-        {accessible && streamError && <StreamError />}
+        {locked && <Paywall {...locked} />}
+        {(access.kind === "error" || (playing && streamError)) && <StreamError />}
       </div>
     </div>
   );
@@ -196,7 +231,8 @@ export default function Player({ series, n }: { series: Series; n: number }) {
     );
   }
 
-  function Paywall() {
+  function Paywall({ price, balance, remaining, bundle }: Extract<Access, { kind: "locked" }>) {
+    const need = price - balance;
     return (
       <div className="overlay">
         <div className="ocard">
@@ -208,8 +244,8 @@ export default function Player({ series, n }: { series: Series; n: number }) {
           {!w.signed ? (
             <>
               <p style={{ marginTop: -6 }}>
-                Your first {FREE_EPISODES} episodes were free. Sign in with your phone to unlock the rest with
-                coins — about ₹{coinsToRupees(EPISODE_COIN_PRICE)} an episode.
+                The free episodes are behind you. Sign in with your phone to unlock the rest with coins —
+                this one is {fmt(price)} coins.
               </p>
               <button className="btn p" onClick={() => w.openSignIn(`/watch/${series.slug}/${n}`)}>
                 Sign in to continue
@@ -219,7 +255,7 @@ export default function Player({ series, n }: { series: Series; n: number }) {
             <>
               <span className="balance">
                 <span className="coin" />
-                {fmt(w.balance)} <small>coins in your wallet</small>
+                {fmt(balance)} <small>coins in your wallet</small>
               </span>
               {need > 0 ? (
                 <>
@@ -227,34 +263,27 @@ export default function Player({ series, n }: { series: Series; n: number }) {
                     Get coins · you need {fmt(need)} more
                   </Link>
                   <button className="btn s" disabled>
-                    Unlock for {EPISODE_COIN_PRICE}
+                    Unlock for {fmt(price)}
                   </button>
                 </>
               ) : (
                 <>
-                  <button
-                    className="btn p"
-                    onClick={() => {
-                      if (w.unlockEpisode(series.slug, n, EPISODE_COIN_PRICE))
-                        w.toast(`Episode ${n} unlocked · −${EPISODE_COIN_PRICE} coins`);
-                    }}
-                  >
-                    <span className="coin s" /> Unlock for {EPISODE_COIN_PRICE} coins
+                  <button className="btn p" disabled={busy !== null} onClick={unlockOne}>
+                    <span className="coin s" /> {busy === "episode" ? "Unlocking…" : `Unlock for ${fmt(price)} coins`}
                   </button>
                   {remaining > 1 && (
                     <button
                       className="btn s"
+                      disabled={busy !== null}
                       onClick={() => {
-                        if (w.balance < bundle) {
+                        if (balance < bundle) {
                           w.toast("Not enough coins for the full bundle");
                           return;
                         }
-                        if (w.unlockBundle(series.slug, bundle))
-                          w.toast(`Unlocked all ${remaining} episodes · −${fmt(bundle)} coins`);
+                        unlockAll();
                       }}
                     >
-                      Unlock all {remaining} left · {fmt(bundle)}{" "}
-                      <span style={{ color: "var(--coin)" }}>−{BUNDLE_DISCOUNT_PCT}%</span>
+                      {busy === "bundle" ? "Unlocking…" : `Unlock all ${remaining} left · ${fmt(bundle)}`}
                     </button>
                   )}
                 </>

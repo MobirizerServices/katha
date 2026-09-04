@@ -53,6 +53,10 @@ class CoinPack(BaseModel):
     currency: str
     coins: int
     bonus_coins: int = 0
+    # What a WEB purchase of this pack additionally credits (+10% web bonus,
+    # or the pack's own bonus if larger) — rendered by the web store, never
+    # computed there.
+    web_bonus_coins: int = 0
 
 
 class PlaybackLocked(BaseModel):

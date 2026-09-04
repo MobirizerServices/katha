@@ -64,42 +64,30 @@ describe("guestLogin", () => {
 });
 
 describe("otpLogin", () => {
-  it("requests then verifies the OTP and stores the returned token", async () => {
-    fetchMock
-      .mockResolvedValueOnce(okJson({})) // otp/request
-      .mockResolvedValueOnce(okJson({ access_token: "otp-tok" })); // otp/verify
-
-    const tok = await api.otpLogin("+91 99999 00000");
+  it("verifies the code the viewer typed and stores the returned token", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ access_token: "otp-tok" }));
+    const tok = await api.otpLogin("+91 99999 00000", "8642");
     expect(tok).toBe("otp-tok");
     expect(getToken()).toBe("otp-tok");
-
-    const [reqUrl, reqInit] = callArgs(0);
-    expect(reqUrl).toBe(`${BASE}/v1/auth/otp/request`);
-    expect(JSON.parse(reqInit.body as string)).toEqual({ phone: "+91 99999 00000" });
-
-    const [verUrl, verInit] = callArgs(1);
+    const [verUrl, verInit] = callArgs(0);
     expect(verUrl).toBe(`${BASE}/v1/auth/otp/verify`);
-    // default code is 1234
-    expect(JSON.parse(verInit.body as string)).toEqual({ phone: "+91 99999 00000", code: "1234" });
+    expect(JSON.parse(verInit.body as string)).toEqual({ phone: "+91 99999 00000", code: "8642" });
   });
 
   it("sends the guest bearer on verify so the server merges the wallet", async () => {
     localStorage.setItem(TOKEN_KEY, "guest-tok");
-    fetchMock
-      .mockResolvedValueOnce(okJson({})) // otp/request
-      .mockResolvedValueOnce(okJson({ access_token: "member-tok" }));
-    await api.otpLogin("+91 2");
-    const headers = callArgs(1)[1].headers as Record<string, string>;
+    fetchMock.mockResolvedValueOnce(okJson({ access_token: "member-tok" }));
+    await api.otpLogin("+91 2", "1111");
+    const headers = callArgs(0)[1].headers as Record<string, string>;
     expect(headers["Authorization"]).toBe("Bearer guest-tok");
     expect(getToken()).toBe("member-tok"); // guest token replaced after merge
   });
 
-  it("passes a custom OTP code through to verify", async () => {
-    fetchMock
-      .mockResolvedValueOnce(okJson({}))
-      .mockResolvedValueOnce(okJson({ access_token: "t" }));
-    await api.otpLogin("+91 1", "9999");
-    expect(JSON.parse(callArgs(1)[1].body as string)).toEqual({ phone: "+91 1", code: "9999" });
+  it("a rejected code surfaces as an ApiError, leaving the guest token in place", async () => {
+    localStorage.setItem(TOKEN_KEY, "guest-tok");
+    fetchMock.mockResolvedValueOnce(errResp(401, "incorrect or expired code"));
+    await expect(api.otpLogin("+91 2", "0000")).rejects.toMatchObject({ status: 401 });
+    expect(getToken()).toBe("guest-tok");
   });
 });
 
@@ -188,5 +176,66 @@ describe("error handling", () => {
 
   it("exposes the configured base url", () => {
     expect(api.base).toBe(BASE);
+  });
+});
+
+
+describe("profile, packs, config, playback", () => {
+  it("me() reads the signed profile with the bearer", async () => {
+    localStorage.setItem(TOKEN_KEY, "tok");
+    fetchMock.mockResolvedValueOnce(okJson({ user_id: "u", kind: "phone", display_name: "Asha",
+                                             language: "hi", phone: "+91 1" }));
+    const me = await api.me();
+    expect(me.kind).toBe("phone");
+    const [url, init] = callArgs(0);
+    expect(url).toBe(`${BASE}/v1/me`);
+    expect(headerOf(init, "Authorization")).toBe("Bearer tok");
+  });
+
+  it("packs() and config() are public reads of the IN storefront and pricing facts", async () => {
+    localStorage.setItem(TOKEN_KEY, "tok");
+    fetchMock.mockResolvedValueOnce(okJson([{ sku: "coins_popular_in", coins: 1300, web_bonus_coins: 130 }]));
+    const packs = await api.packs();
+    expect(packs[0].web_bonus_coins).toBe(130);
+    expect(callArgs(0)[0]).toBe(`${BASE}/v1/iap/packs?storefront=IN`);
+    expect(headerOf(callArgs(0)[1], "Authorization")).toBeUndefined();
+    fetchMock.mockResolvedValueOnce(okJson({ episode_coin_price: 30, coin_rupee_rate: 0.15 }));
+    const cfg = await api.config();
+    expect(cfg.episode_coin_price).toBe(30);
+    expect(callArgs(1)[0]).toBe(`${BASE}/v1/config`);
+  });
+
+  it("otpRequest sends the phone without a bearer; otpLogin sends the typed code with it", async () => {
+    localStorage.setItem(TOKEN_KEY, "guest");
+    fetchMock.mockResolvedValueOnce(okJson({ request_id: "r" }));
+    await api.otpRequest("+91 2");
+    expect(JSON.parse(callArgs(0)[1].body as string)).toEqual({ phone: "+91 2" });
+    expect(headerOf(callArgs(0)[1], "Authorization")).toBeUndefined();
+    fetchMock.mockResolvedValueOnce(okJson({ access_token: "member" }));
+    await api.otpLogin("+91 2", "4321");
+    expect(JSON.parse(callArgs(1)[1].body as string)).toEqual({ phone: "+91 2", code: "4321" });
+    expect(headerOf(callArgs(1)[1], "Authorization")).toBe("Bearer guest");
+    expect(getToken()).toBe("member");
+  });
+
+  it("playback returns the server's locked payload verbatim", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ locked: true, episode_id: "s:e11", price_coins: 45,
+                                             balance: 10, remaining_locked: 3, bundle_offer_coins: 101 }));
+    const pb = await api.playback("s", 11);
+    expect(pb.locked && pb.bundle_offer_coins).toBe(101);
+    expect(callArgs(0)[0]).toBe(`${BASE}/v1/series/s/episodes/11/playback`);
+  });
+});
+
+
+describe("webOrder payment id", () => {
+  it("sends order_ref when a payment id is given, and omits it otherwise", async () => {
+    localStorage.setItem(TOKEN_KEY, "tok");
+    fetchMock.mockResolvedValue(okJson({ balance_bought: 0, balance_bonus: 0, total: 0 }));
+    await api.webOrder("coins_popular_in", "a@b.c", "pay_123");
+    expect(JSON.parse(callArgs(0)[1].body as string)).toEqual(
+      { sku: "coins_popular_in", email: "a@b.c", order_ref: "pay_123" });
+    await api.webOrder("coins_popular_in");
+    expect(JSON.parse(callArgs(1)[1].body as string)).toEqual({ sku: "coins_popular_in", email: "" });
   });
 });

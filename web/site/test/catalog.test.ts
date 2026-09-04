@@ -4,18 +4,17 @@ import {
   EPISODE_COIN_PRICE,
   BUNDLE_DISCOUNT_PCT,
   RUPEES_PER_COIN,
-  WEB_BONUS_PCT,
   COIN_PACKS,
+  PACK_PRESENTATION,
   SERIES,
   coinsToRupees,
-  webBonusCoins,
-  webTotalCoins,
   isFreeEpisode,
   bundleCost,
   fullLockedCost,
   getSeries,
   allSlugs,
   fmt,
+  jsonLdString,
   type Series,
 } from "@/lib/catalog";
 
@@ -25,7 +24,6 @@ describe("pricing constants", () => {
     expect(EPISODE_COIN_PRICE).toBe(30);
     expect(BUNDLE_DISCOUNT_PCT).toBe(25);
     expect(RUPEES_PER_COIN).toBe(0.15);
-    expect(WEB_BONUS_PCT).toBe(10);
   });
 
   it("ships the five product coin packs at the documented prices", () => {
@@ -49,20 +47,12 @@ describe("coinsToRupees", () => {
   });
 });
 
-describe("web bonus math (+10%)", () => {
-  it("adds a rounded +10% bonus on the base", () => {
-    expect(webBonusCoins(1300)).toBe(130);
-    expect(webTotalCoins(1300)).toBe(1430);
-  });
-  it("rounds the bonus to the nearest coin", () => {
-    // 99 * 10% = 9.9 -> rounds to 10
-    expect(webBonusCoins(99)).toBe(10);
-    expect(webTotalCoins(99)).toBe(109);
-  });
-  it("each pack's web total is base + 10%", () => {
-    for (const p of COIN_PACKS) {
-      expect(webTotalCoins(p.coins)).toBe(p.coins + Math.round(p.coins * 0.1));
-    }
+describe("pack presentation", () => {
+  it("maps every product SKU to its store name and badge, and nothing numeric", () => {
+    expect(Object.keys(PACK_PRESENTATION)).toHaveLength(5);
+    expect(PACK_PRESENTATION["coins_popular_in"]).toMatchObject({ name: "Popular", highlight: true });
+    expect(PACK_PRESENTATION["coins_starter_in"].gold).toBe(true);
+    expect("coins" in PACK_PRESENTATION["coins_starter_in"]).toBe(false);
   });
 });
 
@@ -171,5 +161,15 @@ describe("coverUrl", () => {
       `${API_BASE}/media/kaanch-ka-mahal/cover_9x16.jpg`);
     expect(coverUrl("kaanch-ka-mahal", true)).toBe(
       `${API_BASE}/media/kaanch-ka-mahal/cover_16x9.jpg`);
+  });
+});
+
+
+describe("jsonLdString", () => {
+  it("escapes '<' so a value can never close the inline script element", () => {
+    const out = jsonLdString({ name: "</script><img src=x onerror=1>" });
+    expect(out).not.toContain("</script>");
+    expect(out).toContain("\\u003c/script>");
+    expect(JSON.parse(out).name).toBe("</script><img src=x onerror=1>");
   });
 });

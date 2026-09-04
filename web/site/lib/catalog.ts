@@ -7,8 +7,7 @@ import seed from "./seed_catalog.json";
 export const FREE_EPISODES = seed._meta.pricing_profile.free_episode_count; // 10
 export const EPISODE_COIN_PRICE = seed._meta.pricing_profile.episode_coin_price; // 30
 export const BUNDLE_DISCOUNT_PCT = seed._meta.pricing_profile.bundle_discount_pct; // 25
-export const RUPEES_PER_COIN = 0.15; // 1 coin ~= Rs 0.15
-export const WEB_BONUS_PCT = 10; // web store adds +10% bonus coins
+export const RUPEES_PER_COIN = 0.15; // 1 coin ~= Rs 0.15 (marketing copy only; live rate from /v1/config)
 
 /** Rupee estimate for a coin amount, e.g. 30 coins -> "4.5". */
 export function coinsToRupees(coins: number): string {
@@ -27,22 +26,17 @@ export interface CoinPack {
 
 // App Store / IAP packs (product facts). Web store layers a +10% bonus on top.
 export const COIN_PACKS: CoinPack[] = [
-  { sku: "coins_starter_in", name: "Starter", coins: 600, priceInr: 99, tag: "2x on first pack", gold: true },
+  { sku: "coins_starter_in", name: "Starter", coins: 600, priceInr: 99, tag: "Best to start", gold: true },
   { sku: "coins_popular_in", name: "Popular", coins: 1300, priceInr: 199, tag: "Most chosen", highlight: true },
   { sku: "coins_value_in", name: "Value", coins: 3500, priceInr: 499 },
   { sku: "coins_binge_in", name: "Binge", coins: 7500, priceInr: 999 },
   { sku: "coins_mega_in", name: "Mega", coins: 16000, priceInr: 1999 },
 ];
 
-/** Web-store bonus coins for a base coin amount (+10%, rounded). */
-export function webBonusCoins(base: number): number {
-  return Math.round((base * WEB_BONUS_PCT) / 100);
-}
-
-/** Total coins a web purchase grants (base + 10% web bonus). */
-export function webTotalCoins(base: number): number {
-  return base + webBonusCoins(base);
-}
+/** How the store PRESENTS each SKU (name, badge, emphasis). Coin counts,
+ * prices and the web bonus come from the server (/v1/iap/packs), never here. */
+export const PACK_PRESENTATION: Record<string, { name: string; tag?: string; gold?: boolean; highlight?: boolean }> =
+  Object.fromEntries(COIN_PACKS.map((p) => [p.sku, { name: p.name, tag: p.tag, gold: p.gold, highlight: p.highlight }]));
 
 /* ----------------------------- series model ------------------------------ */
 export interface Episode {

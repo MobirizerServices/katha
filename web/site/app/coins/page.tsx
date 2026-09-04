@@ -1,31 +1,46 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SiteFooter from "@/components/SiteFooter";
 import { useWallet } from "@/components/WalletProvider";
-import {
-  COIN_PACKS,
-  CoinPack,
-  webBonusCoins,
-  webTotalCoins,
-  coinsToRupees,
-  EPISODE_COIN_PRICE,
-  fmt,
-} from "@/lib/catalog";
+import { api, type PackDTO, type ConfigDTO } from "@/lib/api";
+import { PACK_PRESENTATION, fmt } from "@/lib/catalog";
 
+/**
+ * The coin store renders what the server sells: pack sizes, prices and the
+ * web bonus all come from /v1/iap/packs; the per-episode estimate uses the
+ * pricing facts from /v1/config. No number on this page is made up here.
+ */
 export default function CoinsPage() {
   const w = useWallet();
-  const [paying, setPaying] = useState<CoinPack | null>(null);
+  const [packs, setPacks] = useState<PackDTO[] | null>(null);
+  const [cfg, setCfg] = useState<ConfigDTO | null>(null);
+  const [paying, setPaying] = useState<PackDTO | null>(null);
 
-  // Starter doubles on the very first pack; web bonus applies to the base.
-  const baseCoins = (p: CoinPack) => (p.sku === "coins_starter_in" && w.firstPack ? p.coins * 2 : p.coins);
+  useEffect(() => {
+    let cancelled = false;
+    api.packs().then((p) => !cancelled && setPacks(p)).catch(() => !cancelled && setPacks([]));
+    api.config().then((c) => !cancelled && setCfg(c)).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const rupees = (minor: number) => fmt(Math.round(minor / 100));
+  const perEpisode = (p: PackDTO): string | null => {
+    if (!cfg || cfg.episode_coin_price <= 0) return null;
+    const episodes = (p.coins + p.web_bonus_coins) / cfg.episode_coin_price;
+    return (p.price_minor / 100 / episodes).toFixed(1);
+  };
+  const episodeRupees = cfg ? (cfg.episode_coin_price * cfg.coin_rupee_rate).toFixed(1) : null;
 
   return (
     <>
       <div className="storehead">
         <h1>Get coins</h1>
         <p>
-          Unlock episodes for about ₹{coinsToRupees(EPISODE_COIN_PRICE)} each. Coins never expire while your
-          account exists, and web purchases add a <b style={{ color: "var(--coin)" }}>+10% web bonus</b>.
+          {episodeRupees ? `Unlock episodes for about ₹${episodeRupees} each. ` : "Unlock episodes with coins. "}
+          Coins never expire while your account exists, and web purchases add a{" "}
+          <b style={{ color: "var(--coin)" }}>web bonus</b>.
         </p>
       </div>
 
@@ -39,16 +54,19 @@ export default function CoinsPage() {
         </div>
       </div>
 
-      <div className="packs">
-        {COIN_PACKS.map((p) => {
-          const base = baseCoins(p);
-          const bonus = webBonusCoins(base);
-          const total = base + bonus;
-          const perEp = (p.priceInr / (total / EPISODE_COIN_PRICE)).toFixed(1);
+      <div className="packs" aria-busy={packs === null}>
+        {packs === null && <p className="muted">Loading packs…</p>}
+        {packs !== null && packs.length === 0 && (
+          <p className="muted" role="alert">The store is unavailable right now. Try again in a moment.</p>
+        )}
+        {packs?.map((p) => {
+          const pres = PACK_PRESENTATION[p.sku] || { name: p.sku };
+          const total = p.coins + p.web_bonus_coins;
+          const per = perEpisode(p);
           return (
             <button
               key={p.sku}
-              className={`pack ${p.highlight ? "hi" : ""}`}
+              className={`pack ${pres.highlight ? "hi" : ""}`}
               onClick={() => {
                 if (!w.signed) {
                   w.openSignIn("/coins");
@@ -58,21 +76,17 @@ export default function CoinsPage() {
                 setPaying(p);
               }}
             >
-              {p.tag && (
-                <span className={`tagt ${p.gold ? "gold" : ""}`}>
-                  {p.sku === "coins_starter_in" && w.firstPack ? "2× ON FIRST PACK" : p.tag}
-                </span>
-              )}
+              {pres.tag && <span className={`tagt ${pres.gold ? "gold" : ""}`}>{pres.tag}</span>}
               <span className="coinsrow">
                 <span className="coin" />
                 {fmt(total)}
               </span>
               <span className="bonus">
-                {fmt(base)} + {fmt(bonus)} = {fmt(total)} coins
+                {fmt(p.coins)} + {fmt(p.web_bonus_coins)} = {fmt(total)} coins
               </span>
-              <span className="math">includes +10% web bonus</span>
-              <span className="price">₹{fmt(p.priceInr)}</span>
-              <span className="per">≈ ₹{perEp} per episode</span>
+              <span className="math">includes the web bonus</span>
+              <span className="price">₹{rupees(p.price_minor)}</span>
+              {per && <span className="per">≈ ₹{per} per episode</span>}
             </button>
           );
         })}
@@ -89,10 +103,11 @@ export default function CoinsPage() {
       {paying && (
         <PayModal
           pack={paying}
-          base={baseCoins(paying)}
           onClose={() => setPaying(null)}
-          onPaid={(email) => {
-            w.purchase(baseCoins(paying), paying.priceInr, paying.sku, email);
+          onPay={async (email) => {
+            // The wallet only changes when the server says the order is
+            // captured; the toast carries the coins it actually credited.
+            await w.purchase(paying.sku, email);
             setPaying(null);
           }}
         />
@@ -103,36 +118,34 @@ export default function CoinsPage() {
 
 function PayModal({
   pack,
-  base,
   onClose,
-  onPaid,
+  onPay,
 }: {
-  pack: CoinPack;
-  base: number;
+  pack: PackDTO;
   onClose: () => void;
-  onPaid: (email: string) => void;
+  onPay: (email: string) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
-  const bonus = webBonusCoins(base);
-  const pay = () => {
+  const total = pack.coins + pack.web_bonus_coins;
+  const pay = async () => {
     setBusy(true);
-    setTimeout(() => onPaid(email.trim()), 1200); // simulate UPI confirmation
+    await onPay(email.trim());
   };
   return (
     <>
-      <div className="scrim" onClick={onClose} />
+      <div className="scrim" onClick={busy ? undefined : onClose} />
       <div className="modal" role="dialog" aria-modal="true" aria-label="Pay by UPI">
         <div className="mh">
-          <h2>Pay ₹{fmt(pack.priceInr)} by UPI</h2>
-          <button className="x" onClick={onClose} aria-label="Close">
+          <h2>Pay ₹{fmt(Math.round(pack.price_minor / 100))} by UPI</h2>
+          <button className="x" onClick={onClose} aria-label="Close" disabled={busy}>
             &times;
           </button>
         </div>
         <div className="mb">
           <p className="d">
-            You&rsquo;ll get <b style={{ color: "var(--text)" }}>{fmt(base)} coins</b> +{" "}
-            <b style={{ color: "var(--coin)" }}>{fmt(bonus)} web bonus</b> = {fmt(webTotalCoins(base))} coins.
+            You&rsquo;ll get <b style={{ color: "var(--text)" }}>{fmt(pack.coins)} coins</b> +{" "}
+            <b style={{ color: "var(--coin)" }}>{fmt(pack.web_bonus_coins)} web bonus</b> = {fmt(total)} coins.
             GST invoice by email.
           </p>
           {!busy && (
@@ -150,7 +163,7 @@ function PayModal({
           )}
           {busy ? (
             <p className="d" style={{ textAlign: "center", padding: "12px 0" }}>
-              Waiting for UPI confirmation… Approve the request in your UPI app.
+              Confirming your payment…
             </p>
           ) : (
             <>

@@ -59,6 +59,7 @@ def playback(slug: str, number: int, response: Response, user: str = Depends(cur
             "locked": False,
             "episode_id": eid,
             "entitled": True,
+            "free": is_free,
             "hls_master_url": _signed_url(eid, user),
             "expires_at": iso_plus(6),
             "resume_position_ms": _resume_ms(user, eid),
@@ -66,11 +67,16 @@ def playback(slug: str, number: int, response: Response, user: str = Depends(cur
         }
 
     store.emit(user, "paywall_view", ref=eid, value=series.episode_coin_price)
-    remaining_locked = series.episode_count - series.free_episode_count
+    # The bundle offer is for the episodes this viewer does NOT own yet —
+    # exactly the set unlock-all charges for — so the paywall never advertises
+    # a different number from the one the ledger debits.
+    not_owned = [n for n in range(series.free_episode_count + 1, series.episode_count + 1)
+                 if not store.ledger.is_entitled(user, catalog.episode_id(slug, n))]
     return {
         "locked": True,
         "episode_id": eid,
         "price_coins": series.episode_coin_price,
         "balance": store.ledger.balance(user).total,
-        "bundle_offer_coins": catalog.bundle_price(series, remaining_locked),
+        "remaining_locked": len(not_owned),
+        "bundle_offer_coins": catalog.bundle_price(series, len(not_owned)),
     }

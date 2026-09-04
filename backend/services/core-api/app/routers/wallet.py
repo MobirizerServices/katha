@@ -60,6 +60,12 @@ def effective_packs() -> dict:
     return merged
 
 
+def web_bonus_for(pack: dict) -> int:
+    """The +10% web bonus (PDD §19 decision 11), or the pack's own bonus if
+    larger — the single rule both /iap/packs and /web/orders apply."""
+    return max(pack.get("bonus", 0), pack["coins"] * WEB_BONUS_PCT // 100)
+
+
 @router.get("/iap/packs", response_model=list[CoinPack])
 def packs(storefront: str = "IN", channel: str = "app") -> list[CoinPack]:
     """SKU list per storefront and sales channel.
@@ -75,7 +81,8 @@ def packs(storefront: str = "IN", channel: str = "app") -> list[CoinPack]:
         return is_web_sku if channel == "web" else (channel == "all" or not is_web_sku)
     return [
         CoinPack(sku=sku, storefront=p["storefront"], price_minor=p["price_minor"],
-                 currency=p["currency"], coins=p["coins"], bonus_coins=p["bonus"])
+                 currency=p["currency"], coins=p["coins"], bonus_coins=p["bonus"],
+                 web_bonus_coins=web_bonus_for(p))
         for sku, p in packs_cfg.items()
         if (storefront == "ALL" or p["storefront"] in (storefront, "WEB")) and _visible(sku)
     ]
@@ -131,7 +138,7 @@ def web_order(req: WebOrderRequest, user: str = Depends(current_user)) -> Wallet
                         reference_id=req.sku, idempotency_key=f"web:{order}", created_at=now_iso())
     # Every WEB purchase earns the +10% web bonus (PDD §19 decision 11), funded by the
     # absent App Store commission. Any explicit pack bonus is honoured too, whichever is larger.
-    web_bonus = max(pack.get("bonus", 0), pack["coins"] * WEB_BONUS_PCT // 100)
+    web_bonus = web_bonus_for(pack)
     if web_bonus:
         store.ledger.credit(user, TxType.BONUS, coins=web_bonus, reference_type="web_order",
                             reference_id=req.sku, idempotency_key=f"webbonus:{order}",

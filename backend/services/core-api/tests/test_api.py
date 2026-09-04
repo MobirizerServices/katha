@@ -128,3 +128,37 @@ def test_config_exposes_pricing_and_flags():
     assert c["free_episode_count"] == 10
     assert c["episode_coin_price"] == 30
     assert c["flags"]["store.web_enabled"] is True
+
+
+def test_paywall_bundle_offer_matches_what_unlock_all_charges():
+    """S1/S4: the locked payload is what the web paywall renders, so its bundle
+    offer must be for the episodes NOT yet owned — the set unlock-all debits."""
+    h = {"Authorization": "Bearer offer-user"}
+    client.post("/v1/iap/verify", headers=h, json={"jws": "r-offer", "sku": "coins_value_in"})
+    first = client.post("/v1/series/kaanch-ka-mahal/episodes/11/playback", headers=h).json()
+    assert first["locked"] and first["remaining_locked"] == 50
+    assert first["bundle_offer_coins"] == 1125
+    client.post("/v1/series/kaanch-ka-mahal/episodes/11/unlock", headers=h,
+                json={"idempotency_key": "o1"})
+    later = client.post("/v1/series/kaanch-ka-mahal/episodes/12/playback", headers=h).json()
+    assert later["remaining_locked"] == 49
+    assert later["bundle_offer_coins"] == 49 * 30 * 75 // 100
+    charged = client.post("/v1/series/kaanch-ka-mahal/unlock-all", headers=h,
+                          json={"idempotency_key": "o2"}).json()
+    assert charged["spent_bonus"] + charged["spent_bought"] == later["bundle_offer_coins"]
+    # an entitled answer says whether the episode was free or bought
+    free = client.post("/v1/series/kaanch-ka-mahal/episodes/1/playback", headers=h).json()
+    assert free["free"] is True and free["locked"] is False
+    bought = client.post("/v1/series/kaanch-ka-mahal/episodes/11/playback", headers=h).json()
+    assert bought["free"] is False and bought["locked"] is False
+
+
+def test_packs_expose_the_web_bonus_the_web_order_credits():
+    packs = {p["sku"]: p for p in client.get("/v1/iap/packs?storefront=IN&channel=all").json()}
+    assert packs["coins_popular_in"]["web_bonus_coins"] == 130
+    assert packs["coins_starter_in"]["web_bonus_coins"] == 60
+    assert packs["coins_web_popular_in"]["web_bonus_coins"] == 130   # its own bonus, not less
+    h = {"Authorization": "Bearer packs-web-user"}
+    w = client.post("/v1/web/orders", headers=h,
+                    json={"sku": "coins_starter_in", "order_ref": "p1"}).json()
+    assert w["balance_bonus"] == packs["coins_starter_in"]["web_bonus_coins"]

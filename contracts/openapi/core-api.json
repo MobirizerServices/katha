@@ -1649,6 +1649,11 @@
             "type": "integer",
             "title": "Bonus Coins",
             "default": 0
+          },
+          "web_bonus_coins": {
+            "type": "integer",
+            "title": "Web Bonus Coins",
+            "default": 0
           }
         },
         "type": "object",

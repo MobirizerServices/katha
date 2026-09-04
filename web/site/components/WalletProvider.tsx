@@ -1,62 +1,71 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { webBonusCoins } from "@/lib/catalog";
+import { fmt } from "@/lib/catalog";
 import { api, getToken, clearToken } from "@/lib/api";
 
 /**
  * Wallet + auth state for the web watch app, wired to the LIVE core-api.
- * The backend append-only ledger is the source of truth: purchases and unlocks
- * hit the API and the wallet is reconciled from the server response. UI updates
- * are optimistic (PDD principle: never make a paying user wait), then corrected.
+ *
+ * The backend append-only ledger is the source of truth. This provider never
+ * decides what an episode costs, whether it is unlocked, or how many coins a
+ * purchase grants: every money action awaits the server and reconciles the
+ * wallet from its answer. Access to an episode is asked of the playback
+ * endpoint by the Player, not remembered here.
  */
 
 let _keySeq = 0;
 const nextKey = (p: string) => `${p}:${Date.now()}:${_keySeq++}`;
 
-interface Unlocked {
-  [slug: string]: "all" | number[]; // "all" for a bundle, else list of episode numbers
+/** A payment id for one checkout. `crypto.randomUUID` is absent on insecure
+ * origins (LAN-IP device testing), so fall back rather than throw mid-purchase. */
+function paymentRef(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  } catch { /* fall through */ }
+  return `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 interface WalletState {
-  signed: boolean;
+  signed: boolean;   // derived from the server profile (kind !== guest)
   phone: string;
   name: string;
-  bought: number; // purchased coins
-  bonus: number; // bonus coins (spent first)
-  firstPack: boolean;
-  unlocked: Unlocked;
+  bought: number;    // purchased coins (server projection)
+  bonus: number;     // bonus coins, spent first (server projection)
 }
 
-const INITIAL: WalletState = {
-  signed: false,
-  phone: "",
-  name: "",
-  bought: 0,
-  bonus: 0,
-  firstPack: true,
-  unlocked: {},
-};
+const INITIAL: WalletState = { signed: false, phone: "", name: "", bought: 0, bonus: 0 };
+
+export type UnlockOutcome =
+  | { ok: true; spent: number }
+  | { ok: false; reason: "insufficient" | "error" };
 
 export interface WalletCtx extends WalletState {
   balance: number;
   ready: boolean;
-  signIn: (phone: string) => void;
+  /** Verify the typed OTP; resolves false (and toasts) when the server rejects it. */
+  signIn: (phone: string, code: string) => Promise<boolean>;
   signOut: () => void;
   openSignIn: (afterHref?: string) => void;
-  hasUnlocked: (slug: string, n: number) => boolean;
-  unlockEpisode: (slug: string, n: number, price: number) => boolean;
-  unlockBundle: (slug: string, cost: number) => boolean;
-  purchase: (base: number, priceInr: number, sku: string, email?: string) => void;
+  /** Ask the ledger to unlock; the wallet is reconciled from the answer. */
+  unlockEpisode: (slug: string, n: number) => Promise<UnlockOutcome>;
+  unlockBundle: (slug: string) => Promise<UnlockOutcome>;
+  /** Buy a pack; resolves the coins the server credited, or null on failure. */
+  purchase: (sku: string, email?: string) => Promise<number | null>;
+  refreshWallet: () => Promise<void>;
   toast: (msg: string) => void;
 }
 
 const Ctx = createContext<WalletCtx | null>(null);
-const STORAGE_KEY = "katha.wallet.v1";
+const STORAGE_KEY = "katha.wallet.v2";
 
 export function useWallet(): WalletCtx {
   const c = useContext(Ctx);
   if (!c) throw new Error("useWallet must be used within WalletProvider");
   return c;
+}
+
+function fromProfile(p: { kind: string; phone: string | null; display_name: string }) {
+  return { signed: p.kind !== "guest", phone: p.phone || "", name: p.display_name || "" };
 }
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
@@ -67,8 +76,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const afterHref = useRef<string | undefined>(undefined);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // hydrate local unlocked-cache + establish a live session (guest token) and
-  // fetch the authoritative wallet from core-api.
+  // Establish a live session (guest token) and load the authoritative wallet
+  // and profile. The cached copy only paints the first frame / offline view.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -79,19 +88,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       } catch { /* ignore */ }
       try {
         if (!getToken()) await api.guestLogin();
-        const w = await api.wallet();
+        const [w, me] = await Promise.all([api.wallet(), api.me()]);
         if (!cancelled)
-          setState((s) => ({
-            ...s,
-            ...cached,
-            bought: w.balance_bought,
-            bonus: w.balance_bonus,
-            signed: !!cached.signed,
-            phone: cached.phone || "",
-            name: cached.name || "",
-          }));
+          setState({ bought: w.balance_bought, bonus: w.balance_bonus, ...fromProfile(me) });
       } catch {
-        // API offline: fall back to the cached view so the UI still renders.
+        // API offline: paint the cached view so the UI still renders; nothing
+        // money-related can happen until the server answers anyway.
         if (!cancelled) setState((s) => ({ ...s, ...cached }));
       }
       if (!cancelled) setReady(true);
@@ -99,8 +101,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, []);
 
-  // A ref that always holds the latest state, so money decisions can be made
-  // synchronously (React does not guarantee setState updaters run inline).
+  // Always the latest state, for money maths done outside React's render.
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -108,10 +109,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     try {
       const w = await api.wallet();
       setState((s) => ({ ...s, bought: w.balance_bought, bonus: w.balance_bonus }));
-    } catch { /* keep optimistic view */ }
+    } catch { /* keep the last server view */ }
   }, []);
 
-  // persist
+  // persist the display cache
   useEffect(() => {
     if (!ready) return;
     try {
@@ -128,35 +129,35 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = useCallback(
-    (phone: string) => {
-      // Real OTP login against core-api — switches identity to this phone user,
-      // then loads that user's authoritative wallet.
-      (async () => {
-        try {
-          await api.otpLogin(phone, "1234");
-          const w = await api.wallet();
-          setState((s) => ({
-            ...s, signed: true, phone, name: "Meera",
-            bought: w.balance_bought, bonus: w.balance_bonus,
-          }));
-        } catch {
-          setState((s) => ({ ...s, signed: true, phone, name: "Meera" }));
-        }
-        setSignInOpen(false);
-        toast("Signed in as " + phone);
-        if (afterHref.current) {
-          const href = afterHref.current;
-          afterHref.current = undefined;
-          setTimeout(() => { window.location.href = href; }, 60);
-        }
-      })();
+    async (phone: string, code: string): Promise<boolean> => {
+      try {
+        await api.otpLogin(phone, code);
+      } catch {
+        toast("That code didn't work — check it and try again");
+        return false;
+      }
+      // Signed in: identity and wallet come from the server, never assumed.
+      try {
+        const [w, me] = await Promise.all([api.wallet(), api.me()]);
+        setState({ bought: w.balance_bought, bonus: w.balance_bonus, ...fromProfile(me) });
+      } catch {
+        setState((s) => ({ ...s, signed: true, phone }));
+      }
+      setSignInOpen(false);
+      toast("Signed in as " + phone);
+      if (afterHref.current) {
+        const href = afterHref.current;
+        afterHref.current = undefined;
+        setTimeout(() => { window.location.href = href; }, 60);
+      }
+      return true;
     },
     [toast]
   );
 
   const signOut = useCallback(() => {
     clearToken();
-    setState((s) => ({ ...s, signed: false, phone: "", name: "", bought: 0, bonus: 0, unlocked: {} }));
+    setState(INITIAL);
     toast("Signed out");
     // re-establish a guest session for continued browsing
     api.guestLogin().then(() => refreshWallet()).catch(() => {});
@@ -167,72 +168,57 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setSignInOpen(true);
   }, []);
 
-  const hasUnlocked = useCallback(
-    (slug: string, n: number) => {
-      const u = state.unlocked[slug];
-      if (u === "all") return true;
-      return Array.isArray(u) && u.includes(n);
-    },
-    [state.unlocked]
-  );
+  const applyWallet = (w: { balance_bought: number; balance_bonus: number }) =>
+    setState((s) => ({ ...s, bought: w.balance_bought, bonus: w.balance_bonus }));
 
-  // Spend `amount` coins, bonus first. Returns false if insufficient.
-  const spend = (s: WalletState, amount: number): WalletState | null => {
-    if (s.bonus + s.bought < amount) return null;
-    const useBonus = Math.min(s.bonus, amount);
-    return { ...s, bonus: s.bonus - useBonus, bought: s.bought - (amount - useBonus) };
+  const failure = async (e: unknown): Promise<UnlockOutcome> => {
+    await refreshWallet();
+    const status = (e as { status?: number } | null)?.status;
+    return { ok: false, reason: status === 402 ? "insufficient" : "error" };
   };
 
   const unlockEpisode = useCallback(
-    (slug: string, n: number, price: number): boolean => {
-      // Decide affordability synchronously from the latest state.
-      const s0 = stateRef.current;
-      if (s0.bonus + s0.bought < price) return false;
-      // Optimistic UI update.
-      setState((s) => {
-        const spent = spend(s, price)!;
-        const prev = spent.unlocked[slug];
-        const list = prev === "all" ? "all" : Array.isArray(prev) ? [...prev, n] : [n];
-        return { ...spent, unlocked: { ...spent.unlocked, [slug]: list } };
-      });
-      // Fire the real ledger unlock and reconcile the wallet from the server.
-      api.unlockEpisode(slug, n, nextKey(`unlock:${slug}:${n}`))
-        .then((r) => setState((s) => ({ ...s, bought: r.wallet.balance_bought, bonus: r.wallet.balance_bonus })))
-        .catch(() => { refreshWallet(); toast("Couldn't confirm the unlock — balance restored"); });
-      return true;
+    async (slug: string, n: number): Promise<UnlockOutcome> => {
+      try {
+        const r = await api.unlockEpisode(slug, n, nextKey(`unlock:${slug}:${n}`));
+        applyWallet(r.wallet);
+        return { ok: true, spent: r.spent_bonus + r.spent_bought };
+      } catch (e) {
+        return failure(e);
+      }
     },
-    [refreshWallet, toast]
+    [refreshWallet]
   );
 
-  const unlockBundle = useCallback((slug: string, cost: number): boolean => {
-    const s0 = stateRef.current;
-    if (s0.bonus + s0.bought < cost) return false;
-    setState((s) => {
-      const spent = spend(s, cost)!;
-      return { ...spent, unlocked: { ...spent.unlocked, [slug]: "all" } };
-    });
-    api.unlockAll(slug, nextKey(`bundle:${slug}`))
-      .then((r) => setState((s) => ({ ...s, bought: r.wallet.balance_bought, bonus: r.wallet.balance_bonus })))
-      .catch(() => { refreshWallet(); toast("Couldn't confirm the bundle — balance restored"); });
-    return true;
-  }, [refreshWallet, toast]);
+  const unlockBundle = useCallback(
+    async (slug: string): Promise<UnlockOutcome> => {
+      try {
+        const r = await api.unlockAll(slug, nextKey(`bundle:${slug}`));
+        applyWallet(r.wallet);
+        return { ok: true, spent: r.spent_bonus + r.spent_bought };
+      } catch (e) {
+        return failure(e);
+      }
+    },
+    [refreshWallet]
+  );
 
   const purchase = useCallback(
-    (base: number, priceInr: number, sku: string, email = "") => {
-      // Optimistic credit, then reconcile from the real web-order (ledger + web bonus).
-      const bonus = webBonusCoins(base);
-      setState((s) => ({
-        ...s,
-        bought: s.bought + base,
-        bonus: s.bonus + bonus,
-        firstPack: sku === "coins_starter_in" ? false : s.firstPack,
-      }));
-      toast((base + bonus).toLocaleString("en-IN") + " coins added · invoice emailed");
-      // One payment id per checkout: repeat purchases of the same pack each
-      // credit, while a retry of THIS order stays idempotent server-side.
-      api.webOrder(sku, email, crypto.randomUUID())
-        .then((w) => setState((s) => ({ ...s, bought: w.balance_bought, bonus: w.balance_bonus })))
-        .catch(() => refreshWallet());
+    async (sku: string, email = ""): Promise<number | null> => {
+      const before = stateRef.current.bought + stateRef.current.bonus;
+      try {
+        // One payment id per checkout: repeat purchases of the same pack each
+        // credit, while a retry of THIS order stays idempotent server-side.
+        const w = await api.webOrder(sku, email, paymentRef());
+        applyWallet(w);
+        const credited = Math.max(0, w.total - before);
+        toast(`${fmt(credited)} coins added · invoice emailed`);
+        return credited;
+      } catch {
+        await refreshWallet();
+        toast("Payment couldn't be confirmed — nothing was charged");
+        return null;
+      }
     },
     [toast, refreshWallet]
   );
@@ -244,10 +230,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signOut,
     openSignIn,
-    hasUnlocked,
     unlockEpisode,
     unlockBundle,
     purchase,
+    refreshWallet,
     toast,
   };
 
@@ -264,17 +250,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ------------------------- phone OTP sign-in (stub) ----------------------- */
+/* ---------------------------- phone OTP sign-in --------------------------- */
 function SignInModal({
   onClose,
   onVerified,
 }: {
   onClose: () => void;
-  onVerified: (phone: string) => void;
+  onVerified: (phone: string, code: string) => Promise<boolean>;
 }) {
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("+91 98765 43210");
   const [digits, setDigits] = useState(["", "", "", ""]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
   const setDigit = (i: number, v: string) => {
@@ -285,6 +273,31 @@ function SignInModal({
       return next;
     });
     if (d && i < 3) refs.current[i + 1]?.focus();
+  };
+
+  const number = () => phone.trim() || "+91 98765 43210";
+
+  const sendCode = async () => {
+    setError(null);
+    try {
+      await api.otpRequest(number());
+    } catch {
+      // Delivery problems surface at verify; keep the flow moving.
+    }
+    setStep("otp");
+  };
+
+  const verify = async () => {
+    const code = digits.join("");
+    if (code.length !== 4) {
+      setError("Enter all 4 digits");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const ok = await onVerified(number(), code);
+    setBusy(false);
+    if (!ok) setError("That code didn't match. Try again.");
   };
 
   return (
@@ -313,7 +326,7 @@ function SignInModal({
               <button
                 className="btn p"
                 style={{ width: "100%", marginTop: 16 }}
-                onClick={() => setStep("otp")}
+                onClick={sendCode}
               >
                 Send code
               </button>
@@ -323,7 +336,7 @@ function SignInModal({
             </>
           ) : (
             <>
-              <p className="d">Sent to {phone}. Demo: any 4 digits work.</p>
+              <p className="d">Enter the 4-digit code we texted to {phone}.</p>
               <div className="otp">
                 {digits.map((d, i) => (
                   <input
@@ -342,12 +355,18 @@ function SignInModal({
                   />
                 ))}
               </div>
+              {error && (
+                <p role="alert" style={{ color: "var(--danger, #e5484d)", fontSize: 13, margin: "10px 0 0" }}>
+                  {error}
+                </p>
+              )}
               <button
                 className="btn p"
                 style={{ width: "100%", marginTop: 16 }}
-                onClick={() => onVerified(phone.trim() || "+91 98765 43210")}
+                disabled={busy}
+                onClick={verify}
               >
-                Verify
+                {busy ? "Checking…" : "Verify"}
               </button>
             </>
           )}
