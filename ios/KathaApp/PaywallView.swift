@@ -23,7 +23,11 @@ struct PaywallView: View {
 
     private var price: Int { playback.priceCoins ?? detail.episodeCoinPrice }
     private var bundleCoins: Int? { playback.bundleOfferCoins }
-    private var remainingLocked: Int { detail.episodeCount - detail.freeEpisodeCount }
+    /// Episodes still to buy — from the server (the set unlock-all charges for),
+    /// so an already-owned episode never inflates the "one by one" comparison.
+    private var remainingLocked: Int {
+        playback.remainingLocked ?? (detail.episodeCount - detail.freeEpisodeCount)
+    }
     private var balance: Int { model.wallet.total }
     private var canAfford: Bool { balance >= price }
 
@@ -53,9 +57,11 @@ struct PaywallView: View {
                         Text("\(price) coins")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(Katha.Color.text)
-                        Text("≈ ₹\(rupees(price, rate: model.rupeeRate))")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Katha.Color.text2)
+                        if let rate = model.rupeeRate {
+                            Text("≈ ₹\(rupees(price, rate: rate))")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Katha.Color.text2)
+                        }
                     }
                     Spacer()
                     HStack(spacing: 5) {
@@ -93,9 +99,11 @@ struct PaywallView: View {
                                 Text("Unlock all \(remainingLocked) remaining · \(bundle) coins")
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundStyle(Katha.Color.text)
-                                Text("≈ ₹\(rupees(bundle, rate: model.rupeeRate)) vs ₹\(rupees(remainingLocked * price, rate: model.rupeeRate)) one by one")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Katha.Color.text2)
+                                if let rate = model.rupeeRate {
+                                    Text("≈ ₹\(rupees(bundle, rate: rate)) vs ₹\(rupees(remainingLocked * price, rate: rate)) one by one")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Katha.Color.text2)
+                                }
                             }
                             Spacer()
                             Text("Save \(detail.bundleDiscountPct)%")

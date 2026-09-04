@@ -157,6 +157,9 @@ class ProgressItemBody(BaseModel):
     number: int
     position_ms: int = 0
     duration_ms: int = 0
+    # Reports are fire-and-forget and can land out of order; a smaller position
+    # is ignored unless the client says the viewer actually scrubbed back.
+    rewind: bool = False
 
 
 class ProgressBatchBody(BaseModel):

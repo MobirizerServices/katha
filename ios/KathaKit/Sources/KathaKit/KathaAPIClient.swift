@@ -6,6 +6,7 @@ import FoundationNetworking
 /// Errors surfaced by ``KathaAPIClient``.
 public enum KathaAPIError: Error, Equatable, Sendable {
     case badStatus(Int)
+    case unauthorized           // 401: the token expired or was revoked — start over
     case notEntitled            // 402 on an unlock — wallet cannot cover the cost
     case decoding(String)
     case invalidResponse
@@ -38,6 +39,14 @@ public actor KathaAPIClient {
 
     public func setAuthToken(_ token: String?) {
         self.authToken = token
+    }
+
+    private var unauthorizedHandler: (@Sendable () -> Void)?
+
+    /// Called once per 401 (a token that expired or was invalidated server-side)
+    /// so the app can drop the dead session instead of failing every call.
+    public func onUnauthorized(_ handler: (@Sendable () -> Void)?) {
+        unauthorizedHandler = handler
     }
 
     // MARK: - Auth & identity
@@ -225,6 +234,10 @@ public actor KathaAPIClient {
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw KathaAPIError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
+            if http.statusCode == 401 {
+                unauthorizedHandler?()
+                throw KathaAPIError.unauthorized
+            }
             throw KathaAPIError.badStatus(http.statusCode)
         }
         return try decode(data)

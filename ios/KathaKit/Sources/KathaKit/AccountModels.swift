@@ -135,14 +135,17 @@ public struct ProgressReport: Codable, Hashable, Sendable {
     public let number: Int
     public let positionMs: Int
     public let durationMs: Int
+    /// The viewer scrubbed backwards: the server may move the resume point back.
+    public let rewind: Bool
 
     enum CodingKeys: String, CodingKey {
-        case slug, number
+        case slug, number, rewind
         case positionMs = "position_ms"
         case durationMs = "duration_ms"
     }
 
-    public init(slug: String, number: Int, positionMs: Int, durationMs: Int) {
+    public init(slug: String, number: Int, positionMs: Int, durationMs: Int, rewind: Bool = false) {
+        self.rewind = rewind
         self.slug = slug; self.number = number
         self.positionMs = positionMs; self.durationMs = durationMs
     }

@@ -611,10 +611,13 @@ struct DeleteAccountSheet: View {
 
 /// FAQ copy renders the SERVER's pricing profile, never a baked-in number.
 @MainActor func faqCoinsAnswer(_ model: AppModel) -> String {
-    let free = model.freeEpisodesDefault
-    let price = model.appConfig?.episodeCoinPrice ?? 30
+    guard let free = model.freeEpisodesDefault, let price = model.appConfig?.episodeCoinPrice else {
+        return "The first episodes of every series are free; after that each one costs coins. " +
+               "Buy packs once — coins never expire."
+    }
+    let rupee = model.rupeeRate.map { " (about ₹\(rupees(price, rate: $0)))" } ?? ""
     return "The first \(free) episodes of every series are free. After that, " +
-           "each episode costs \(price) coins (about ₹\(rupees(price, rate: model.rupeeRate))). " +
+           "each episode costs \(price) coins\(rupee). " +
            "Buy packs once — coins never expire."
 }
 

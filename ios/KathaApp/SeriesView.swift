@@ -101,7 +101,7 @@ struct SeriesView: View {
                     .font(.system(size: 15))
                     .foregroundStyle(Katha.Color.text2)
 
-                Text("Free · \(d.freeEpisodeCount) episodes, then \(d.episodeCoinPrice) coins (≈ ₹\(rupees(d.episodeCoinPrice, rate: model.rupeeRate))) each")
+                Text("Free · \(d.freeEpisodeCount) episodes, then \(d.episodeCoinPrice) coins\(model.rupeeRate.map { " (≈ ₹\(rupees(d.episodeCoinPrice, rate: $0)))" } ?? "") each")
                     .font(.system(size: 13))
                     .foregroundStyle(Katha.Color.text2)
 

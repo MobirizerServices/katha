@@ -102,11 +102,17 @@ class Store:
         return self.engagement.setdefault(user_id, UserEngagement())
 
     def record_progress(self, user_id: str, slug: str, number: int, position_ms: int,
-                        duration_ms: int) -> ProgressItem:
+                        duration_ms: int, *, rewind: bool = False) -> ProgressItem:
         eng = self._eng(user_id)
         eid = catalog.episode_id(slug, number)
+        position_ms = max(0, position_ms)
+        prev = eng.progress.get(eid)
+        if prev is not None and position_ms < prev.position_ms and not rewind:
+            # A late report from earlier in the episode (reports are unordered)
+            # must not roll the resume point back; only an explicit rewind does.
+            position_ms = prev.position_ms
         item = ProgressItem(slug=slug, number=number, episode_id=eid,
-                            position_ms=max(0, position_ms), duration_ms=max(0, duration_ms))
+                            position_ms=position_ms, duration_ms=max(0, duration_ms))
         eng.progress[eid] = item
         # Move to the front of the continue-watching order.
         if eid in eng.order:

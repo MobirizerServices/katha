@@ -1962,6 +1962,11 @@
             "type": "integer",
             "title": "Duration Ms",
             "default": 0
+          },
+          "rewind": {
+            "type": "boolean",
+            "title": "Rewind",
+            "default": false
           }
         },
         "type": "object",

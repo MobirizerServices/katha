@@ -375,3 +375,20 @@ def test_core_api_medium_gates(monkeypatch):
     v = c.post("/v1/auth/otp/verify", headers={"Authorization": "Bearer gst_stolen"},
                json={"phone": "+919333333333", "code": "1234"})
     assert v.status_code == 200
+
+
+def test_progress_does_not_regress_unless_rewound():
+    """I10: an out-of-order earlier report keeps the later resume point; an
+    explicit rewind moves it back."""
+    from app.main import app as core_app
+    c = TestClient(core_app)
+    h = {"Authorization": "Bearer prog-user"}
+    put = lambda pos, **kw: c.put("/v1/progress", headers=h, json={"items": [  # noqa: E731
+        {"slug": "kaanch-ka-mahal", "number": 1, "position_ms": pos, "duration_ms": 60000, **kw}]})
+    assert put(35000).status_code == 200
+    put(30000)                                   # landed late
+    resume = c.post("/v1/series/kaanch-ka-mahal/episodes/1/playback", headers=h).json()
+    assert resume["resume_position_ms"] == 35000
+    put(5000, rewind=True)                       # the viewer scrubbed back
+    resume = c.post("/v1/series/kaanch-ka-mahal/episodes/1/playback", headers=h).json()
+    assert resume["resume_position_ms"] == 5000

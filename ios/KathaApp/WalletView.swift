@@ -89,9 +89,11 @@ struct WalletView: View {
                     .foregroundStyle(Katha.Color.text)
                     .contentTransition(.numericText())
                     .animation(Katha.Motion.spring, value: model.wallet.total)
-                Text("≈ ₹\(rupees(model.wallet.total, rate: model.rupeeRate))")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Katha.Color.text2)
+                if let rate = model.rupeeRate {
+                    Text("≈ ₹\(rupees(model.wallet.total, rate: rate))")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Katha.Color.text2)
+                }
             }
             Text("\(model.wallet.balanceBought) bought · \(model.wallet.balanceBonus) bonus — bonus is spent first. Coins never expire.")
                 .font(.system(size: 12))

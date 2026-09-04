@@ -35,7 +35,8 @@ def put_progress(body: ProgressBatchBody, user: str = Depends(current_user)) -> 
             raise HTTPException(status_code=404, detail=f"episode not found: {it.slug} e{it.number}")
         eid = catalog.episode_id(it.slug, it.number)
         delta = store.progress_delta(user, eid, it.position_ms)
-        store.record_progress(user, it.slug, it.number, it.position_ms, it.duration_ms)
+        store.record_progress(user, it.slug, it.number, it.position_ms, it.duration_ms,
+                              rewind=it.rewind)
         if delta > 0:
             store.emit(user, "play_progress", ref=eid, value=delta)
     return _continue(user)

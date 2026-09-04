@@ -212,6 +212,10 @@ public struct PlaybackResponse: Codable, Hashable, Sendable {
     public let priceCoins: Int?
     public let balance: Int?
     public let bundleOfferCoins: Int?
+    /// Episodes the viewer does not own yet — the set the bundle offer covers.
+    public let remainingLocked: Int?
+    /// Entitled: whether this episode is free (vs bought).
+    public let free: Bool?
 
     public var isEntitled: Bool { !locked }
 
@@ -223,14 +227,19 @@ public struct PlaybackResponse: Codable, Hashable, Sendable {
         case priceCoins = "price_coins"
         case balance
         case bundleOfferCoins = "bundle_offer_coins"
+        case remainingLocked = "remaining_locked"
+        case free
     }
 
     public init(locked: Bool, episodeId: String, hlsMasterUrl: String? = nil,
                 resumePositionMs: Int? = nil, priceCoins: Int? = nil,
-                balance: Int? = nil, bundleOfferCoins: Int? = nil) {
+                balance: Int? = nil, bundleOfferCoins: Int? = nil,
+                remainingLocked: Int? = nil, free: Bool? = nil) {
         self.locked = locked; self.episodeId = episodeId
         self.hlsMasterUrl = hlsMasterUrl; self.resumePositionMs = resumePositionMs
         self.priceCoins = priceCoins; self.balance = balance; self.bundleOfferCoins = bundleOfferCoins
+        self.remainingLocked = remainingLocked
+        self.free = free
     }
 }
 

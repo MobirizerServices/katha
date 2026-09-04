@@ -126,7 +126,7 @@ struct FeedView: View {
                 Text("Daily check-in")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Katha.Color.text)
-                Text("Claim today's \(model.checkinCoins) coins")
+                Text(model.checkinCoins.map { "Claim today's \($0) coins" } ?? "Claim today's coins")
                     .font(.system(size: 13))
                     .foregroundStyle(Katha.Color.text2)
             }
@@ -236,7 +236,7 @@ private struct HeroCard: View {
                         .foregroundStyle(Katha.Color.text)
                         .multilineTextAlignment(.leading)
                         .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
-                    Text("\(series.genres.first ?? "") · \(series.episodeCount) episodes · First \(model.freeEpisodesDefault) free")
+                    Text("\(series.genres.first ?? "") · \(series.episodeCount) episodes\(model.freeEpisodesDefault.map { " · First \($0) free" } ?? "")")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Katha.Color.text2)
                         .lineLimit(1)

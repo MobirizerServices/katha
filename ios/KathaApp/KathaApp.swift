@@ -182,6 +182,7 @@ final class AppModel {
         }
         #endif
         self.api = KathaAPIClient(baseURL: base)
+        self.progress = ProgressReporter(api: self.api)
 
         // Load persisted preferences into the observed stored properties.
         let d = UserDefaults.standard
@@ -200,10 +201,18 @@ final class AppModel {
     /// Establish a session: reuse the stored token, else start as a guest.
     // Remote config: the server owns every business number the UI shows.
     var appConfig: AppConfig?
-    var rupeeRate: Double { appConfig?.coinRupeeRate ?? 0.15 }
-    var checkinCoins: Int { appConfig?.checkinCoins ?? 5 }
-    var freeEpisodesDefault: Int { appConfig?.freeEpisodeCount ?? 10 }
-    var firstPack2x: Bool { appConfig?.flags["offers.first_pack_2x"] ?? true }
+    // Optional on purpose: until /v1/config has answered, the UI shows no ₹
+    // equivalents, no check-in amount and no offer badge, rather than a number
+    // made up on the client.
+    var rupeeRate: Double? { appConfig?.coinRupeeRate }
+    var checkinCoins: Int? { appConfig?.checkinCoins }
+    var freeEpisodesDefault: Int? { appConfig?.freeEpisodeCount }
+    var firstPack2x: Bool { appConfig?.flags["offers.first_pack_2x"] ?? false }
+    /// Shown once when a dead session was replaced by a fresh guest (I8).
+    var sessionNotice: String?
+    private var recoveringSession = false
+    /// Serialized, coalesced watch-progress reports (I10).
+    @ObservationIgnored let progress: ProgressReporter
     var updateRequired: Bool {
         guard let min = appConfig?.minAppVersion else { return false }
         let current = Bundle.main.object(
@@ -217,6 +226,9 @@ final class AppModel {
 
     func bootstrap() async {
         setupNotifications()
+        await api.onUnauthorized { [weak self] in
+            Task { @MainActor in await self?.sessionLost() }
+        }
         await loadConfig()
         if let token = storedToken {
             await api.setAuthToken(token)
@@ -298,6 +310,28 @@ final class AppModel {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 
+    /// The server said 401 mid-session (30-day token expired, or "sign out all
+    /// devices" / account deletion from elsewhere): drop the dead token and
+    /// continue as a fresh guest instead of failing every call until a
+    /// force-quit.
+    func sessionLost() async {
+        guard !recoveringSession else { return }
+        recoveringSession = true
+        defer { recoveringSession = false }
+        let wasMember = isSignedIn
+        storedToken = nil
+        profile = nil
+        wallet = WalletStore()
+        continueItems = []; myListSlugs = []; myListSeries = []
+        await api.setAuthToken(nil)
+        await startGuest()
+        await refreshWallet()
+        await loadEngagement()
+        sessionNotice = wasMember
+            ? "You were signed out. Sign in again to see your coins and your place."
+            : "Your session expired — we started a fresh one."
+    }
+
     private func startGuest() async {
         if let auth = try? await api.guestLogin() {
             storedToken = auth.accessToken
@@ -316,10 +350,11 @@ final class AppModel {
         } catch { return false }
     }
 
-    func signInWithApple() async -> Bool {
+    /// `identityToken` is the JWT from ASAuthorizationAppleIDCredential; the
+    /// server verifies it against Apple's keys.
+    func signInWithApple(identityToken: String, fullName: String? = nil) async -> Bool {
         do {
-            // Dev stub token; production passes ASAuthorization's identityToken.
-            let auth = try await api.appleLogin(identityToken: "dev-apple-token")
+            let auth = try await api.appleLogin(identityToken: identityToken, fullName: fullName)
             storedToken = auth.accessToken
             profile = auth.user
             await refreshWallet()
@@ -500,6 +535,13 @@ struct MainTabView: View {
             // Force update below config.min_app_version (server-decided).
             if model.updateRequired {
                 UpdateRequiredView()
+            }
+
+            // A dead session was replaced (I8): say so once, then get out of the way.
+            if let notice = model.sessionNotice {
+                VStack { Spacer(); ToastView(text: notice).padding(.bottom, 90) }
+                    .task { try? await Task.sleep(for: .seconds(4)); model.sessionNotice = nil }
+                    .transition(.opacity)
             }
 
             // 3.6: a drop that lands while the app is open shows the in-app card.

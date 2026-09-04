@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 import KathaKit
 
@@ -18,6 +19,7 @@ struct LoginSheet: View {
     @State private var code = ""
     @State private var working = false
     @State private var error: String?
+    @State private var apple = AppleSignInCoordinator()
     private enum Step { case phone, otp }
 
     var body: some View {
@@ -113,7 +115,7 @@ struct LoginSheet: View {
                 Text("Enter the code")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(Katha.Color.text)
-                Text("Sent by SMS to \(phone). Dev build: any 4 digits work.")
+                Text("Sent by SMS to \(phone).\(devOtpHint)")
                     .font(.system(size: 14))
                     .foregroundStyle(Katha.Color.text2)
             }
@@ -172,15 +174,43 @@ struct LoginSheet: View {
         }
     }
 
+    /// The OTP hint about the dev stub is compiled out of Release.
+    private var devOtpHint: String {
+        #if DEBUG
+        return " Dev build: any 4 digits work."
+        #else
+        return ""
+        #endif
+    }
+
     private func appleSignIn() async {
-        // Dev stub: production uses ASAuthorizationController for a real identity
-        // token; the API contract is identical.
         working = true; defer { working = false }
-        if await model.signInWithApple() {
+        let ok: Bool
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["KATHA_FAKE_APPLE"] == "1" {
+            // XCUITest harness on simulators without an Apple ID: the server's
+            // dev stub accepts this token. Compiled out of Release.
+            ok = await model.signInWithApple(identityToken: "dev-apple-token")
+            finish(ok); return
+        }
+        #endif
+        do {
+            let r = try await apple.signIn()
+            ok = await model.signInWithApple(identityToken: r.token, fullName: r.name)
+        } catch let e as ASAuthorizationError where e.code == .canceled {
+            return
+        } catch {
+            ok = false
+        }
+        finish(ok)
+    }
+
+    private func finish(_ ok: Bool) {
+        if ok {
             dismiss()
             onSignedIn?()
         } else {
-            error = "Apple sign-in isn't available right now."
+            error = "Apple sign-in didn't go through. Try again or use your phone number."
         }
     }
 }

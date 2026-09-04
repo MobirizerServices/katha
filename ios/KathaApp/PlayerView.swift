@@ -25,8 +25,19 @@ final class PlayerEngine {
 
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
+    private var statusObserver: NSKeyValueObservation?
 
     init() {
+        // Playback category: audible with the ringer switch off, like every
+        // video app. The default (.soloAmbient) obeys the mute switch, which
+        // reads as "no sound" to viewers.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        // isPlaying follows the player itself (the system pauses it in the
+        // background; a hand-maintained flag then needs two taps to resume).
+        statusObserver = player.observe(\.timeControlStatus, options: [.new]) { [weak self] p, _ in
+            let playing = p.timeControlStatus != .paused
+            DispatchQueue.main.async { self?.isPlaying = playing }
+        }
         timeObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(value: 1, timescale: 2), queue: .main
         ) { [weak self] time in
@@ -66,6 +77,7 @@ final class PlayerEngine {
     }
 
     func load(url: URL, resumeMs: Int) {
+        try? AVAudioSession.sharedInstance().setActive(true)
         ended = false; failed = false
         currentSeconds = 0; durationSeconds = 0
         let item: AVPlayerItem
@@ -102,6 +114,7 @@ final class PlayerEngine {
     deinit {
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        statusObserver?.invalidate()
     }
 }
 
@@ -159,6 +172,7 @@ struct PlayerView: View {
     /// next, so two quick swipes can never race: only the load for the episode
     /// on screen may touch the engine or debit an auto-unlock.
     @State private var loadTask: Task<Void, Never>?
+    @Environment(\.scenePhase) private var scenePhase
 
     private var episodeTitle: String {
         detail?.episodes.first { $0.number == current }?.title ?? "Episode \(current)"
@@ -215,7 +229,27 @@ struct PlayerView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIScreen.capturedDidChangeNotification)) { _ in
             captured = UIScreen.main.isCaptured && !PlayerView.allowCapture
-            if captured { engine.pause() }
+            if captured {
+                // Stop, not pause: nothing (audio included) plays into the
+                // recording, and any in-flight load or auto-unlock is dropped.
+                loadTask?.cancel()
+                engine.stop()
+            } else {
+                startLoad(for: current)      // recording ended: resume properly
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.userDidTakeScreenshotNotification)) { _ in
+            if playback?.isEntitled == true && !PlayerView.allowCapture {
+                toast = "Screenshots of episodes aren't allowed"
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Leaving the foreground pauses and flushes progress; the engine's
+            // isPlaying follows the player, so returning needs one tap, not two.
+            if phase != .active {
+                engine.pause()
+                reportProgress(force: true)
+            }
         }
         .onChange(of: engine.currentSeconds) { _, s in
             // abs(): a seek BACK must keep reporting too, or resume freezes at
@@ -337,7 +371,17 @@ struct PlayerView: View {
             Text("Episode \(current) is locked")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Katha.Color.text)
-            KathaPrimaryButton(title: "Unlock for \(playback?.priceCoins ?? detail?.episodeCoinPrice ?? model.appConfig?.episodeCoinPrice ?? 30) coins  ·  ≈ ₹\(rupees(playback?.priceCoins ?? detail?.episodeCoinPrice ?? model.appConfig?.episodeCoinPrice ?? 30, rate: model.rupeeRate))") {
+            // The price comes from the playback answer (or the series); with
+            // neither known yet the button carries no number at all.
+            let price = playback?.priceCoins ?? detail?.episodeCoinPrice
+            let title: String = {
+                guard let price else { return "Unlock episode" }
+                if let rate = model.rupeeRate {
+                    return "Unlock for \(price) coins  ·  ≈ ₹\(rupees(price, rate: rate))"
+                }
+                return "Unlock for \(price) coins"
+            }()
+            KathaPrimaryButton(title: title) {
                 showPaywall = true
             }
             .padding(.horizontal, 44)
@@ -518,9 +562,14 @@ struct PlayerView: View {
         let pos = Int(engine.currentSeconds * 1000)
         let dur = Int(engine.durationSeconds * 1000)
         guard force || pos > 0 else { return }
+        // A position behind the last one we sent means the viewer scrubbed
+        // back; the server moves the resume point back ONLY when told so.
+        let rewind = engine.currentSeconds + 1 < lastReported
         lastReported = engine.currentSeconds
-        let report = ProgressReport(slug: slug, number: current, positionMs: pos, durationMs: dur)
-        Task { try? await model.api.reportProgress([report]) }
+        let report = ProgressReport(slug: slug, number: current, positionMs: pos,
+                                    durationMs: dur, rewind: rewind)
+        let reporter = model.progress
+        Task { await reporter.submit(report) }
     }
 
     // MARK: formatting
