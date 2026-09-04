@@ -209,3 +209,169 @@ def test_archive_rights_gate_is_an_allow_list():
     files = [{"name": "big.mp4", "size": str(3 * 1024 ** 3)}, {"name": "ok.mp4", "size": "1000"}]
     assert fa.pick_video(files) == "ok.mp4"
     assert fa.pick_video([files[0]]) is None
+
+
+# ===================== Medium batch: backend + admin ===========================
+
+def test_audit_hash_covers_every_column_and_tail_deletion(shared, monkeypatch):
+    """B8: rewriting role/IP/UA or deleting the newest rows is detected."""
+    import sqlite3
+    monkeypatch.setenv("KATHA_AUDIT_HMAC_KEY", "k-test")
+    for i in range(4):
+        shared.audit_append(ts=TS, actor_id="a", actor_role="admin", action="x",
+                            target=f"t{i}", detail="d", ip="10.0.0.1", user_agent="ua")
+    assert shared.audit_list()["chain_ok"] is True
+    path = shared.db.url.split("///")[1]
+    con = sqlite3.connect(path)
+    con.execute("UPDATE audit_log SET ip='9.9.9.9' WHERE id=2"); con.commit()
+    assert shared.audit_list()["chain_ok"] is False
+    con.execute("UPDATE audit_log SET ip='10.0.0.1' WHERE id=2"); con.commit()
+    assert shared.audit_list()["chain_ok"] is True
+    con.execute("DELETE FROM audit_log WHERE id=4"); con.commit()      # truncate the tail
+    assert shared.audit_list()["chain_ok"] is False
+    con.close()
+
+
+def test_audit_annotate_and_timeline_beyond_the_old_window(shared):
+    """A7: row 1 is annotatable and a user's oldest admin action is on their
+    timeline after 600 later rows."""
+    a = TestClient(admin_main.app)
+    first = shared.audit_append(ts=TS, actor_id="a", actor_role="admin", action="dpdp.export",
+                                target="u-old", detail="first")
+    for i in range(600):
+        shared.audit_append(ts=TS, actor_id="a", actor_role="admin", action="x",
+                            target=f"other{i}", detail="d")
+    r = a.patch(f"/admin/v1/audit/{first['id']}/note", headers=ADMIN, json={"note": "seen"})
+    assert r.status_code == 200
+    assert a.patch("/admin/v1/audit/999999/note", headers=ADMIN, json={"note": "x"}).status_code == 404
+    tl = a.get("/admin/v1/users/u-old/timeline", headers=FIN_A).json()["events"]
+    assert any(e["kind"] == "admin" and e["detail"] == "first" for e in tl)
+
+
+def test_erase_scrubs_grievance_and_outbox_and_kills_tokens(shared):
+    """A9: after erasure the grievance contact/body and outbox copies are gone,
+    the JWT version moved, and the export lists every table."""
+    from katha_infra import comms
+    shared.upsert_profile("u-dpdp", phone="+919111111111", kind="phone", language="hi", created_at=TS)
+    shared.grievance_create(gid="G-1", user_id="u-dpdp", contact="+919111111111", channel="app",
+                            subject="Refund", body="my card 4111", created_at=TS)
+    inv = comms.build_invoice(shared, user_id="u-dpdp", order_ref="web:x", sku="coins_popular_in",
+                              coins=1300, bonus=130, total_minor=19900, now=TS)
+    comms.send_email(shared, to="me@x.dev", subject=f"Your Katha invoice {inv['id']}",
+                     body_html="<p>hi</p>", now=TS)
+    shared.device_touch("u-dpdp", ua="UA", ip="1.2.3.4", ts=TS)
+    v0 = shared.token_version("u-dpdp")
+    a = TestClient(admin_main.app)
+    exp = a.get("/admin/v1/users/u-dpdp/export", headers=ADMIN).json()
+    assert {"grievances", "devices", "invoices", "events"} <= set(exp)
+    assert exp["grievances"][0]["id"] == "G-1" and exp["devices"]
+    assert a.post("/admin/v1/users/u-dpdp/erase", headers=ADMIN).status_code == 200
+    g = next(x for x in shared.grievance_list() if x["id"] == "G-1")
+    assert g["contact"] == "" and "4111" not in g["body"]
+    ob = shared.outbox_list()
+    assert all(inv["id"] not in (o.get("recipient") or "") and o["recipient"] != "me@x.dev"
+               for o in ob if inv["id"] in (o.get("subject") or ""))
+    assert shared.token_version("u-dpdp") == v0 + 1
+    assert shared.invoices_for("u-dpdp")           # the financial record stays
+
+
+def test_adjust_idempotency_key_and_atomic_cap(shared):
+    """A10: the same client key lands once; the cap is charged once."""
+    a = TestClient(admin_main.app)
+    body = {"user_id": "u-idem", "coins": 300, "reason_code": "goodwill", "idempotency_key": "click-1"}
+    r1 = a.post("/admin/v1/wallet/adjust", headers=SUPPORT, json=body).json()
+    r2 = a.post("/admin/v1/wallet/adjust", headers=SUPPORT, json=body).json()
+    assert r1["wallet"]["total"] == 300 and r2["wallet"]["total"] == 300 and r2.get("replayed")
+    assert shared.wallet("u-idem")["total"] == 300
+    from katha_domain.timeutil import now_iso
+    assert int(shared.kv_get(f"adjcap:sam:{now_iso()[:10]}")) == 300
+    # racing requests cannot both squeeze under the cap
+    shared.kv_set("config:adjust.daily_cap", "500")
+    gate = threading.Barrier(2)
+    codes = []
+
+    def go(i):
+        gate.wait()
+        codes.append(TestClient(admin_main.app).post(
+            "/admin/v1/wallet/adjust", headers=SUPPORT,
+            json={"user_id": f"u-cap{i}", "coins": 150, "reason_code": "goodwill"}).status_code)
+    ts = [threading.Thread(target=go, args=(i,)) for i in range(2)]
+    for t in ts: t.start()
+    for t in ts: t.join()
+    assert sorted(codes) == [200, 409]
+
+
+def test_step_up_uses_auth_time_and_asks_the_idp_to_reauthenticate(monkeypatch):
+    """A11: a session whose IdP authentication is old is refused for money even
+    if the cookie is fresh; the step-up login carries max_age=0/prompt=login."""
+    from admin_app import oidc
+    monkeypatch.setenv("KATHA_ADMIN_AUTH", "oidc")
+    monkeypatch.delenv("KATHA_OIDC_ISSUER", raising=False)
+    monkeypatch.setattr(admin_main, "SHARED", None)
+    a = TestClient(admin_main.app)
+    r = a.get("/admin/v1/auth/login?step_up=1", follow_redirects=False)
+    assert "max_age=0" in r.headers["location"] and "prompt=login" in r.headers["location"]
+    import time as _t
+    stale = oidc.sign_payload({"email": "ops@katha.dev", "name": "", "sid": "s",
+                               "iat": _t.time(), "auth_time": _t.time() - 3600,
+                               "exp": _t.time() + 3600})
+    a.cookies.set(oidc.SESSION_COOKIE, stale)
+    r = a.post("/admin/v1/approvals/nope/approve", headers={"X-Katha-CSRF": "1"})
+    assert r.status_code == 403 and "step-up" in r.json()["detail"]
+    assert r.headers["X-Katha-Login"].endswith("step_up=1")
+
+
+def test_invoice_number_follows_the_indian_financial_year(shared):
+    """B12: February belongs to the FY that started the previous April; late
+    31 March UTC is already 1 April IST."""
+    assert shared.next_invoice_number("2026-09-01T00:00:00+00:00").startswith("KATHA-INV-2627-")
+    assert shared.next_invoice_number("2027-02-10T00:00:00+00:00").startswith("KATHA-INV-2627-")
+    assert shared.next_invoice_number("2027-03-31T23:00:00+00:00").startswith("KATHA-INV-2728-")
+    assert shared.next_invoice_number("2027-03-31T10:00:00+00:00").startswith("KATHA-INV-2627-")
+
+
+def test_otp_resend_keeps_the_attempt_count_and_is_capped(monkeypatch):
+    """B11: a resend is not a fresh guessing budget, and resends are capped."""
+    from katha_infra import otp
+    monkeypatch.setenv("KATHA_OTP_PROVIDER", "console")
+    monkeypatch.delenv("KATHA_REDIS_URL", raising=False)
+    otp._mem.clear(); otp._resends.clear()
+    phone = "+919222222222"
+    otp.generate_and_send(phone)
+    code = otp._mem[phone][0]
+    for _ in range(4):
+        otp.verify(phone, "0000" if code != "0000" else "1111")
+    otp.generate_and_send(phone)                     # resend: count carries (4)
+    assert otp._mem[phone][2] == 4
+    assert otp.verify(phone, "0000" if otp._mem[phone][0] != "0000" else "1111") is False
+    assert otp.verify(phone, otp._mem[phone][0]) is False     # budget spent: even the right code fails
+    otp.generate_and_send(phone)                     # 3rd code: still allowed
+    with pytest.raises(otp.ResendLimited):
+        otp.generate_and_send(phone)                 # 4th within the hour: refused
+
+
+def test_core_api_medium_gates(monkeypatch):
+    """C3/C4/C5 in a configured deployment: free episodes are granted not sold,
+    a raw bearer personalizes nothing, and no header is 401."""
+    from app.auth import issue_token
+    from app.main import app as core_app
+    from app.store import store
+    c = TestClient(core_app)
+    # C3 (any mode): unlocking a free episode charges nothing
+    c.post("/v1/iap/verify", headers={"Authorization": "Bearer free-unlocker"},
+           json={"jws": "r", "sku": "coins_popular_in"})
+    r = c.post("/v1/series/kaanch-ka-mahal/episodes/1/unlock",
+               headers={"Authorization": "Bearer free-unlocker"}, json={"idempotency_key": "f1"})
+    assert r.status_code == 200 and r.json()["spent_bought"] == 0
+    assert r.json()["wallet"]["total"] == 1300
+    assert store.ledger.is_entitled("free-unlocker", "kaanch-ka-mahal:e1")
+    # C4/C5: stubs off
+    monkeypatch.setenv("KATHA_DEV_STUBS", "0")
+    assert c.get("/v1/wallet").status_code == 401
+    assert c.get("/v1/home", headers={"Authorization": "Bearer usr_victim"}).status_code == 200
+    tok = issue_token("usr_real")
+    assert c.get("/v1/wallet", headers={"Authorization": f"Bearer {tok}"}).status_code == 200
+    # a raw guest id on login merges nothing when stubs are off
+    v = c.post("/v1/auth/otp/verify", headers={"Authorization": "Bearer gst_stolen"},
+               json={"phone": "+919333333333", "code": "1234"})
+    assert v.status_code == 200

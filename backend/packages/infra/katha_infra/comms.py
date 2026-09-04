@@ -156,7 +156,7 @@ def build_invoice(shared: SharedStore, *, user_id: str, order_ref: str, sku: str
     is carved out of the pack price (₹99 = ₹83.90 + ₹15.10 GST @18%)."""
     taxable = round(total_minor * 100 / (100 + GST_RATE_PCT))
     gst = total_minor - taxable
-    number = shared.next_invoice_number(now[:4])
+    number = shared.next_invoice_number(now)
     inv = {
         "id": number, "user_id": user_id, "order_ref": order_ref, "sku": sku,
         "coins": coins, "bonus_coins": bonus, "total_minor": total_minor,

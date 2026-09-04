@@ -80,6 +80,7 @@ def _managed_admin(monkeypatch):
     monkeypatch.setenv("KATHA_ADMIN_CORS", "https://admin.katha.example")
     monkeypatch.setenv("KATHA_ADMIN_IP_ALLOWLIST", "10.8.0.0/24")
     monkeypatch.setenv("KATHA_ADMIN_USERS", "ops@katha.example:admin")
+    monkeypatch.setenv("KATHA_AUDIT_HMAC_KEY", "a-real-audit-hmac-key")
 
 
 def test_managed_admin_requires_oidc_and_session_secret(monkeypatch):
@@ -104,6 +105,7 @@ def test_managed_admin_requires_oidc_and_session_secret(monkeypatch):
     ("KATHA_ADMIN_CORS", "", "KATHA_ADMIN_CORS"),
     ("KATHA_ADMIN_IP_ALLOWLIST", " ", "KATHA_ADMIN_IP_ALLOWLIST"),
     ("KATHA_ADMIN_USERS", "", "KATHA_ADMIN_USERS"),
+    ("KATHA_AUDIT_HMAC_KEY", "", "KATHA_AUDIT_HMAC_KEY"),
 ])
 def test_managed_admin_refuses_each_missing_posture_item(monkeypatch, var, bad, needle):
     _managed_admin(monkeypatch)

@@ -95,7 +95,9 @@ def test_csrf_required_for_cookie_mutations(oidc_mode):
 def test_logout_clears_the_session(oidc_mode):
     client = TestClient(app)
     sign_in(client, "ops@katha.dev")
-    assert client.post("/admin/v1/auth/logout").json() == {"ok": True}
+    assert client.post("/admin/v1/auth/logout").status_code == 403     # CSRF, like every mutation
+    assert client.post("/admin/v1/auth/logout",
+                       headers={"X-Katha-CSRF": "1"}).json() == {"ok": True}
     assert client.get("/admin/v1/auth/me").json()["authenticated"] is False
     assert client.get("/admin/v1/overview").status_code == 401
     assert any(a.action == "auth.logout" for a in store.audit)

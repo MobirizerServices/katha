@@ -300,8 +300,14 @@ def test_health_metrics_matrix(shared):
     h = admin.get("/admin/v1/health/full").json()
     assert h["checks"]["database"] == "ok"
     assert h["status"] in ("ok", "degraded", "down")
-    m = admin.get("/admin/v1/metrics").json()
+    assert admin.get("/admin/v1/metrics").status_code == 401     # A8: gated
+    m = admin.get("/admin/v1/metrics", headers=ADMIN_H).json()
     assert any("/admin/v1/health/full" in k for k in m)
+    # keyed by ROUTE TEMPLATE: no user id from a path ever appears as a key
+    admin.get("/admin/v1/users/usr_secret_person/export", headers=ADMIN_H)
+    m = admin.get("/admin/v1/metrics", headers=ADMIN_H).json()
+    assert not any("usr_secret_person" in k for k in m)
+    assert any(k.endswith("/users/{user_id}/export") for k in m)
     mx = admin.get("/admin/v1/access/matrix", headers=SUPPORT).json()
     assert any(row["capability"].startswith("Coin adjustment") for row in mx["matrix"])
 
@@ -639,7 +645,7 @@ def test_rupee_rate_and_ui_metrics(shared):
     assert pol["retention"]["events_days"] == 365
     assert a.post("/admin/v1/metrics/ui", headers=ADMIN_H,
                   json={"view": "overview"}).json() == {"ok": True}
-    assert a.get("/admin/v1/metrics").json()["ui"]["overview"] >= 1
+    assert a.get("/admin/v1/metrics", headers=ADMIN_H).json()["ui"]["overview"] >= 1
 
 
 def test_rate_limit_trips(shared, monkeypatch):

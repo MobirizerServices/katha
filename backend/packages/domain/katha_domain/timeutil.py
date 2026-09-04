@@ -23,3 +23,15 @@ def ist_day() -> str:
 
 def iso_plus(hours: int) -> str:
     return (datetime.now(timezone.utc) + timedelta(hours=hours)).isoformat(timespec="seconds")
+
+
+def fy_code(iso_ts: str) -> str:
+    """Indian financial-year code for a UTC timestamp, judged on the IST date:
+    2026-09-01 → "2627"; 2027-02-10 → "2627"; 2027-04-01 IST → "2728".
+    31 March 23:00 UTC is already 1 April in IST, so the conversion matters."""
+    dt = datetime.fromisoformat(iso_ts)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    d = dt.astimezone(IST).date()
+    start = d.year if d.month >= 4 else d.year - 1
+    return f"{start % 100:02d}{(start + 1) % 100:02d}"

@@ -7,7 +7,8 @@ the bearer value (any string that isn't a valid JWT) — so
 dev/test harness. User ids are deterministic hashes echoed in API responses, so
 this fallback is impersonation-by-design and must never survive into a real
 deployment: any non-JWT bearer is a 401 once a real secret is configured.
-A missing header is a stable guest.
+A missing header is the stable "guest-dev" account in dev only; a configured
+deployment answers 401 (clients start a real guest via /v1/auth/guest).
 
 Login is stubbed: OTP verify accepts any 4-digit code, Apple accepts any token.
 Real App-Attest / SIWA / OTP-provider verification replaces the stubs; the token
@@ -94,8 +95,13 @@ def current_user(request: Request,
             user = token
         else:
             raise HTTPException(status_code=401, detail="invalid or expired token")
+    elif dev_stubs_enabled():
+        user = "guest-dev"                 # dev/test: one well-known anonymous account
     else:
-        user = "guest-dev"
+        # A configured deployment never pools anonymous traffic into one shared
+        # wallet/history: clients mint a real guest via POST /v1/auth/guest.
+        raise HTTPException(status_code=401, detail="sign in or start a guest session",
+                            headers={"WWW-Authenticate": "Bearer"})
     store.touch_seen(user,
                      ua=request.headers.get("user-agent", ""),
                      ip=request.client.host if request.client else "")

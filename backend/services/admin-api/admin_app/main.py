@@ -121,7 +121,8 @@ async def _metrics_mw(request: Request, call_next):
         ok = False
         raise
     finally:
-        m = REQUEST_METRICS[f"{request.method} {request.url.path}"]
+        route = request.scope.get("route")
+        m = REQUEST_METRICS[f"{request.method} {getattr(route, 'path', '<unmatched>')}"]
         m["count"] += 1
         m["ms"] += (time.monotonic() - t0) * 1000
         if not ok:
@@ -187,11 +188,16 @@ def _step_up(request: Request) -> None:
     ident = oidc.session_identity(request)
     if ident is None:
         return
-    if time.time() - float(ident.get("iat", 0)) > STEP_UP_MAX_AGE_S:
+    # auth_time is when the IdP last saw the person prove who they are (the
+    # callback records it from the ID token); a silent SSO redirect that mints
+    # a new session without a fresh login does NOT move it.
+    authed_at = float(ident.get("auth_time") or ident.get("iat", 0))
+    if time.time() - authed_at > STEP_UP_MAX_AGE_S:
         raise HTTPException(
             status_code=403,
-            detail="step-up required: your session is older than "
-                   f"{STEP_UP_MAX_AGE_S // 60} min — sign in again to move money")
+            detail="step-up required: you last signed in more than "
+                   f"{STEP_UP_MAX_AGE_S // 60} min ago — sign in again to move money",
+            headers={"X-Katha-Login": "/admin/v1/auth/login?step_up=1"})
 
 
 def _daily_cap_check(actor: Actor, coins: int) -> None:
@@ -201,13 +207,15 @@ def _daily_cap_check(actor: Actor, coins: int) -> None:
         return
     cap = int(SHARED.kv_get("config:adjust.daily_cap") or 2000)
     key = f"adjcap:{actor.id}:{now_iso()[:10]}"
-    used = int(SHARED.kv_get(key) or 0)
-    if used + abs(coins) > cap:
+    # One atomic add, then give it back if it overshot: two requests racing
+    # can no longer both read the same "used" and both squeeze under the cap.
+    used_after = SHARED.kv_incr(key, by=abs(coins))
+    if used_after > cap:
+        SHARED.kv_incr(key, by=-abs(coins))
         raise HTTPException(
             status_code=409,
-            detail=f"daily adjustment cap reached: {used:,} of {cap:,} coins "
+            detail=f"daily adjustment cap reached: {used_after - abs(coins):,} of {cap:,} coins "
                    "already today — an admin can raise config:adjust.daily_cap")
-    SHARED.kv_set(key, str(used + abs(coins)))
 
 
 def _admin_user_view(u: dict) -> dict:
@@ -625,12 +633,28 @@ def wallet_adjust(
                 f"requested by {actor.id} — needs a second person")
         return {"status": "pending_approval", "approval": _approval_view(ap)}
 
-    # Within the threshold: apply immediately.
-    ref = f"adjust:{uuid.uuid4().hex[:12]}"
+    # Within the threshold: apply immediately. A client idempotency key (the
+    # panel sends one per click) makes a retried/double-fired request land
+    # once: the ledger dedupes on the ref, and a replay is answered without a
+    # second audit row.
+    client_key = (body.get("idempotency_key") or "").strip()[:64]
+    ref = (f"adjust:{actor.id}:{client_key}" if client_key
+           else f"adjust:{uuid.uuid4().hex[:12]}")
+    if client_key and _adjust_already_applied(user_id, ref):
+        if SHARED is not None:   # the cap was charged above for a request that changes nothing
+            SHARED.kv_incr(f"adjcap:{actor.id}:{now_iso()[:10]}", by=-abs(coins))
+        return {"status": "applied", "ref": ref, "replayed": True,
+                "wallet": _wallet_view(user_id)}
     _apply_adjust(user_id, coins, reason_code, ref)
     audit(actor, "wallet.adjust.applied", user_id,
           {"coins": coins, "reason_code": reason_code, "ref": ref}, request)
     return {"status": "applied", "ref": ref, "wallet": _wallet_view(user_id)}
+
+
+def _adjust_already_applied(user_id: str, ref: str) -> bool:
+    txs = (SHARED.transactions(user_id) if SHARED is not None
+           else store.ledger.transactions(user_id))
+    return any(t.idempotency_key == ref for t in txs)
 
 
 @router.post("/approvals/{approval_id}/approve", tags=["wallet"])
@@ -678,11 +702,9 @@ def user_timeline(user_id: str, limit: int = 100,
             events.append({"ts": t.created_at, "kind": "ledger", "type": t.type.value,
                            "detail": t.reference_id,
                            "net": t.amount_bought + t.amount_bonus})
-        admin_rows = SHARED.audit_list(limit=500)["rows"]
-        for r in admin_rows:
-            if r["entity"] == user_id:
-                events.append({"ts": r["ts"], "kind": "admin", "type": r["action"],
-                               "detail": r["change"], "net": 0})
+        for r in SHARED.audit_for_target(user_id, limit=limit):
+            events.append({"ts": r["ts"], "kind": "admin", "type": r["action"],
+                           "detail": r["change"], "net": 0})
     events.sort(key=lambda e: e["ts"], reverse=True)
     return {"user_id": user_id, "events": events[:limit]}
 
@@ -1013,7 +1035,9 @@ def attention(actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,
 
 
 @router.get("/metrics", tags=["ops"])
-def metrics():
+def metrics(actor: Actor = Depends(require(Role.ANALYST, Role.RO))):
+    """Request counters per ROUTE TEMPLATE (never the raw path: user ids and
+    slugs would leak and the map would grow per distinct URL)."""
     out = {path: {**m, "avg_ms": round(m["ms"] / m["count"], 1) if m["count"] else 0}
            for path, m in REQUEST_METRICS.items()}
     out["ui"] = dict(UI_METRICS)   # which views operators actually open (#112)
@@ -1381,8 +1405,7 @@ def audit_annotate(row_id: int, request: Request = None, body: dict = Body(...),
         raise HTTPException(status_code=400, detail="note must be 1-300 chars")
     if SHARED is None:
         raise HTTPException(status_code=503, detail="needs persistence")
-    if not any(r["id"] == row_id
-               for r in SHARED.audit_list(limit=500)["rows"]):
+    if SHARED.audit_get(row_id) is None:
         raise HTTPException(status_code=404, detail="no such audit row")
     record = {"note": note, "by": actor.id, "at": now_iso()}
     SHARED.kv_set(f"auditnote:{row_id}", _json.dumps(record))

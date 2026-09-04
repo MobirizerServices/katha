@@ -184,6 +184,12 @@ def unlock_episode(slug: str, number: int, req: UnlockRequest,
     if series is None or not is_served(slug) or not (1 <= number <= series.episode_count):
         raise HTTPException(status_code=404, detail="episode not found")
     eid = catalog.episode_id(slug, number)
+    if number <= series.free_episode_count:
+        # A free episode is granted, never sold: unlocking it before playing it
+        # must not debit the full price.
+        store.ensure_free(user, slug, number)
+        return UnlockResponse(episode_ids=[eid], spent_bonus=0, spent_bought=0,
+                              wallet=_wallet_response(user))
     try:
         res = store.ledger.unlock(user, [eid], price_per_episode=series.episode_coin_price,
                                   reference_type="episode", reference_id=eid,

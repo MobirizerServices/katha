@@ -1020,6 +1020,18 @@
     "/admin/v1/auth/login": {
       "get": {
         "operationId": "auth_login_admin_v1_auth_login_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "step_up",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Step Up",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1028,6 +1040,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Auth Login"
@@ -2784,7 +2806,42 @@
     },
     "/admin/v1/metrics": {
       "get": {
+        "description": "Request counters per ROUTE TEMPLATE (never the raw path: user ids and\nslugs would leak and the map would grow per distinct URL).",
         "operationId": "metrics_admin_v1_metrics_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-actor-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Actor-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Role"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -2793,6 +2850,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Metrics",

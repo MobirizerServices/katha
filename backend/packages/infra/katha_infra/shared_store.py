@@ -305,25 +305,26 @@ class SharedStore:
                 row.value = value
             await s.commit()
 
-    def kv_incr(self, key: str) -> int:
-        """Atomically increment an integer-valued key and return the new value.
+    def kv_incr(self, key: str, by: int = 1) -> int:
+        """Atomically add `by` to an integer-valued key and return the new value.
 
         A single in-place UPDATE ... RETURNING (row-locked by the DB), so
         concurrent callers each get a distinct value — the counter behind
-        statutory sequences must never be read-modify-write."""
-        return self.db.run(self._kv_incr(key))
+        statutory sequences (and the daily adjustment cap) must never be
+        read-modify-write."""
+        return self.db.run(self._kv_incr(key, by))
 
-    async def _kv_incr(self, key: str) -> int:
+    async def _kv_incr(self, key: str, by: int = 1) -> int:
         from sqlalchemy import Integer, String, cast, update
         from sqlalchemy.exc import IntegrityError
         stmt = (update(KVRow).where(KVRow.key == key)
-                .values(value=cast(cast(KVRow.value, Integer) + 1, String))
+                .values(value=cast(cast(KVRow.value, Integer) + by, String))
                 .returning(KVRow.value))
         async with self.db.session_factory() as s:
             val = (await s.execute(stmt)).scalar_one_or_none()
             if val is None:
                 try:
-                    s.add(KVRow(key=key, value="1"))
+                    s.add(KVRow(key=key, value=str(by)))
                     await s.commit()
                     return 1
                 except IntegrityError:
@@ -352,12 +353,39 @@ class SharedStore:
     # concurrent admin actions take the same prev_hash and the chain reads as
     # tampered forever. SQLite gets the same guarantee from BEGIN IMMEDIATE.
     _AUDIT_LOCK_KEY = 0x4155444954
+    _AUDIT_HEAD_KEY = "audit:head"
+
+    @staticmethod
+    def _audit_mac(payload: str) -> str:
+        """Keyed digest over a link. With KATHA_AUDIT_HMAC_KEY set (managed envs)
+        an attacker who can write the table still cannot recompute a valid chain;
+        without it (dev) it degrades to a plain SHA-256 integrity check."""
+        import hashlib
+        import hmac
+        import os
+        key = os.environ.get("KATHA_AUDIT_HMAC_KEY", "")
+        if key:
+            return hmac.new(key.encode(), payload.encode(), hashlib.sha256).hexdigest()
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+    @classmethod
+    def _audit_digest(cls, prev_hash: str, **fields) -> str:
+        """Every column is in the hash (role, IP and user agent included) with an
+        unambiguous encoding, so no field can be rewritten undetected."""
+        import json as _json
+        payload = _json.dumps([prev_hash, fields], separators=(",", ":"), sort_keys=True)
+        return cls._audit_mac(payload)
+
+    @classmethod
+    def _audit_head_mac(cls, row_id: int, digest: str, count: int) -> str:
+        return cls._audit_mac(f"head|{row_id}|{digest}|{count}")
 
     async def _audit_append(self, ts, actor_id, actor_role, action, target,
                             detail, ip, user_agent) -> dict:
-        import hashlib
-        from sqlalchemy import insert, text
+        import json as _json
+        from sqlalchemy import func, insert, text, update
         tbl = AuditLogRow.__table__
+        kv = KVRow.__table__
         async with self.db.engine.connect() as conn:
             if self.db.url.startswith("sqlite"):
                 await conn.exec_driver_sql("BEGIN IMMEDIATE")
@@ -366,14 +394,20 @@ class SharedStore:
                                    {"k": self._AUDIT_LOCK_KEY})
             prev_hash = (await conn.scalar(
                 select(tbl.c.hash).order_by(tbl.c.id.desc()).limit(1))) or ""
-            digest = hashlib.sha256(
-                f"{prev_hash}|{ts}|{actor_id}|{action}|{target}|{detail}".encode()
-            ).hexdigest()
-            res = await conn.execute(insert(tbl).values(
-                ts=ts, actor_id=actor_id, actor_role=actor_role, action=action,
-                target=target, detail=detail, ip=ip, user_agent=user_agent,
-                prev_hash=prev_hash, hash=digest))
+            fields = dict(ts=ts, actor_id=actor_id, actor_role=actor_role, action=action,
+                          target=target, detail=detail, ip=ip, user_agent=user_agent)
+            digest = self._audit_digest(prev_hash, **fields)
+            res = await conn.execute(insert(tbl).values(**fields, prev_hash=prev_hash, hash=digest))
             row_id = res.inserted_primary_key[0]
+            # Anchor the head in the same transaction: deleting the newest rows
+            # would otherwise leave a perfectly valid, shorter chain.
+            count = await conn.scalar(select(func.count(tbl.c.id)))
+            head = _json.dumps({"id": row_id, "hash": digest, "count": count,
+                                "mac": self._audit_head_mac(row_id, digest, count)})
+            upd = await conn.execute(update(kv).where(kv.c.key == self._AUDIT_HEAD_KEY)
+                                     .values(value=head))
+            if upd.rowcount == 0:
+                await conn.execute(insert(kv).values(key=self._AUDIT_HEAD_KEY, value=head))
             await conn.commit()
         return {"id": row_id, "hash": digest}
 
@@ -382,7 +416,6 @@ class SharedStore:
         return self.db.run(self._audit_list(actor, q, limit, before_id))
 
     async def _audit_list(self, actor, q, limit, before_id) -> dict:
-        import hashlib
         async with self.db.session_factory() as s:
             stmt = select(AuditLogRow).order_by(AuditLogRow.id.desc())
             if actor:
@@ -391,15 +424,28 @@ class SharedStore:
                 stmt = stmt.where(AuditLogRow.id < before_id)
             rows = (await s.execute(stmt.limit(limit))).scalars().all()
             allrows = (await s.execute(select(AuditLogRow).order_by(AuditLogRow.id))).scalars().all()
+            head_raw = await s.get(KVRow, self._AUDIT_HEAD_KEY)
         chain_ok, prev = True, ""
         for r in allrows:
-            want = hashlib.sha256(
-                f"{prev}|{r.ts}|{r.actor_id}|{r.action}|{r.target}|{r.detail}".encode()
-            ).hexdigest()
+            want = self._audit_digest(
+                prev, ts=r.ts, actor_id=r.actor_id, actor_role=r.actor_role, action=r.action,
+                target=r.target, detail=r.detail, ip=r.ip, user_agent=r.user_agent)
             if r.prev_hash != prev or r.hash != want:
                 chain_ok = False
                 break
             prev = r.hash
+        if chain_ok and allrows:
+            # The anchored head must name exactly the last row and the row count.
+            import json as _json
+            try:
+                head = _json.loads(head_raw.value) if head_raw else {}
+            except ValueError:
+                head = {}
+            last = allrows[-1]
+            if (head.get("id") != last.id or head.get("hash") != last.hash
+                    or head.get("count") != len(allrows)
+                    or head.get("mac") != self._audit_head_mac(last.id, last.hash, len(allrows))):
+                chain_ok = False
         out = [{"id": r.id, "ts": r.ts, "actor": r.actor_id, "actor_role": r.actor_role,
                 "action": r.action, "entity": r.target, "change": r.detail,
                 "ip": r.ip, "user_agent": r.user_agent, "hash": r.hash[:12]}
@@ -410,6 +456,31 @@ class SharedStore:
                    if needle in r["action"].lower() or needle in r["entity"].lower()
                    or needle in r["change"].lower()]
         return {"rows": out, "chain_ok": chain_ok, "total": len(allrows)}
+
+    def audit_get(self, row_id: int) -> dict | None:
+        return self.db.run(self._audit_get(row_id))
+
+    async def _audit_get(self, row_id) -> dict | None:
+        async with self.db.session_factory() as s:
+            r = await s.get(AuditLogRow, row_id)
+        return self._audit_dict(r) if r else None
+
+    def audit_for_target(self, target: str, limit: int = 500) -> list[dict]:
+        """Admin actions aimed at one entity (a user id, a slug), newest first —
+        an indexed lookup, so the timeline never depends on a window."""
+        return self.db.run(self._audit_for_target(target, limit))
+
+    async def _audit_for_target(self, target, limit) -> list[dict]:
+        async with self.db.session_factory() as s:
+            rows = (await s.execute(select(AuditLogRow).where(AuditLogRow.target == target)
+                                    .order_by(AuditLogRow.id.desc()).limit(limit))).scalars().all()
+        return [self._audit_dict(r) for r in rows]
+
+    @staticmethod
+    def _audit_dict(r) -> dict:
+        return {"id": r.id, "ts": r.ts, "actor": r.actor_id, "actor_role": r.actor_role,
+                "action": r.action, "entity": r.target, "change": r.detail,
+                "ip": r.ip, "user_agent": r.user_agent, "hash": r.hash[:12]}
 
     # ---- grievances (IT Rules: ack 24 h, resolve 15 d — admin review #073) --
     def grievance_create(self, *, gid: str, user_id: str, contact: str, channel: str,
@@ -464,6 +535,8 @@ class SharedStore:
 
     # ---- DPDP tools (admin review #032) -------------------------------------
     def export_user(self, user_id: str) -> dict:
+        """DPDP data-access export: EVERY table that holds this person's data —
+        profile, money, entitlements, grievances, devices, invoices, events."""
         profile = self.db.run(self._profile(user_id))
         return {
             "user_id": user_id,
@@ -472,7 +545,19 @@ class SharedStore:
             "transactions": [t.__dict__ | {"type": t.type.value}
                              for t in self.transactions(user_id)],
             "entitlements": self.entitlements(user_id),
+            "grievances": [g for g in self.grievance_list() if g.get("user_id") == user_id],
+            "devices": self.devices(user_id),
+            "invoices": self.invoices_for(user_id),
+            "events": self.db.run(self._events_for(user_id)),
         }
+
+    async def _events_for(self, user_id: str, limit: int = 5000) -> list[dict]:
+        from .models import EventRow
+        async with self.db.session_factory() as s:
+            rows = (await s.execute(select(EventRow).where(EventRow.user_id == user_id)
+                                    .order_by(EventRow.id.desc()).limit(limit))).scalars().all()
+        return [{"ts": r.ts, "name": r.name, "ref": r.ref, "value": r.value,
+                 "channel": r.channel} for r in rows]
 
     async def _profile(self, user_id: str) -> dict:
         async with self.db.session_factory() as s:
@@ -486,20 +571,38 @@ class SharedStore:
         return self.db.run(self._erase_user(user_id, ts))
 
     async def _erase_user(self, user_id: str, ts: str) -> bool:
-        from sqlalchemy import delete
+        from sqlalchemy import delete, or_, update
 
-        from .models import DeviceRow, PushTokenRow
+        from .models import DeviceRow, GrievanceRow, InvoiceRow, OutboxRow, PushTokenRow
         async with self.db.session_factory() as s:
             p = await s.get(UserProfileRow, user_id)
             if p is None:
                 return False
+            phone = p.phone
             p.phone = ""            # PII scrubbed; the money ledger is retained
             p.kind = "erased"
             p.last_seen = ts
+            # Every outstanding JWT dies now: an erased account must not keep
+            # authenticating on a 30-day token.
+            p.token_version = (p.token_version or 0) + 1
             # device identifiers and push tokens are PII-adjacent: gone too
             await s.execute(delete(PushTokenRow)
                             .where(PushTokenRow.user_id == user_id))
             await s.execute(delete(DeviceRow).where(DeviceRow.user_id == user_id))
+            # Grievances: the statutory record (id, subject, dates, status) stays;
+            # the contact and free-text body are the person's data and go.
+            await s.execute(update(GrievanceRow).where(GrievanceRow.user_id == user_id)
+                            .values(contact="", body="[erased at the user's request]"))
+            # Outbox copies addressed to this person (invoice emails carry the
+            # invoice ids; OTP/pushes carry the phone or a device token).
+            inv_ids = (await s.execute(select(InvoiceRow.id)
+                                       .where(InvoiceRow.user_id == user_id))).scalars().all()
+            conds = [OutboxRow.recipient == phone] if phone else []
+            conds += [OutboxRow.subject.contains(i) for i in inv_ids]
+            conds += [OutboxRow.body.contains(i) for i in inv_ids]
+            if conds:
+                await s.execute(update(OutboxRow).where(or_(*conds))
+                                .values(recipient="", body="[erased at the user's request]"))
             await s.commit()
             return True
 
@@ -779,13 +882,17 @@ class SharedStore:
                  "detail": r.detail, "created_at": r.created_at} for r in rows]
 
     # ---- invoices ------------------------------------------------------------
-    def next_invoice_number(self, year: str) -> str:
+    def next_invoice_number(self, at: str) -> str:
         """Sequential per financial-year prefix, via the KV counter.
 
         The increment is a single atomic UPDATE (`kv_incr`), never a
         read-modify-write: invoice numbers are a statutory GST sequence, so two
         concurrent purchases must never mint the same one."""
-        fy = f"{year[2:]}{int(year) % 100 + 1:02d}"          # 2026 → "2627"
+        # Indian financial year (1 April – 31 March) of the IST date: a sale at
+        # 2027-02-10 belongs to FY 2026-27 → "2627"; the statutory sequence
+        # resets on 1 April, not 1 January.
+        from katha_domain.timeutil import fy_code
+        fy = fy_code(at)
         n = self.kv_incr(f"invoiceseq:{fy}")
         return f"KATHA-INV-{fy}-{n:06d}"
 

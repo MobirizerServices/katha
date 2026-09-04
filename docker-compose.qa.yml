@@ -73,6 +73,7 @@ services:
       KATHA_ADMIN_CORS: ${PUBLIC_ADMIN_ORIGIN}                # https://admin-... (the SPA origin)
       KATHA_ADMIN_IP_ALLOWLIST: ${KATHA_ADMIN_IP_ALLOWLIST}   # VPN/office CIDRs, comma-separated
       KATHA_ADMIN_USERS: ${KATHA_ADMIN_USERS}                 # bootstrap operators, a@x:admin,b@x:support
+      KATHA_AUDIT_HMAC_KEY: ${KATHA_AUDIT_HMAC_KEY}           # keys the audit chain (openssl rand -hex 32)
     depends_on:
       backend: { condition: service_started }
 

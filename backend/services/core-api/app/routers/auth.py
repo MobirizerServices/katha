@@ -107,10 +107,15 @@ def _merge_guest_from(authorization: str | None, *, into: str) -> None:
     """A login sent with a guest bearer folds that guest into the member."""
     if not authorization or not authorization.lower().startswith("bearer "):
         return
-    from ..auth import decode_token
+    from ..auth import decode_token, dev_stubs_enabled
     token = authorization.split(" ", 1)[1].strip()
     payload = decode_token(token)
-    guest = payload["sub"] if payload else token
+    if payload:
+        guest = payload["sub"]
+    elif dev_stubs_enabled():
+        guest = token                      # dev: a raw guest id as the bearer
+    else:
+        return                             # an unverifiable bearer merges nothing
     store.merge_guest(guest, into)
 
 
@@ -123,10 +128,16 @@ def otp_request(body: OtpRequestBody, request: Request) -> OtpRequestResponse:
     # (verify accepts any 4-digit code).
     try:
         from katha_infra import otp as _otp
-        if _otp.enabled():                          # pragma: no cover - needs provider
-            _otp.generate_and_send(body.phone.strip())
     except ImportError:
-        pass
+        _otp = None
+    if _otp is not None and _otp.enabled():
+        try:
+            _otp.generate_and_send(body.phone.strip())
+        except _otp.ResendLimited as e:
+            raise HTTPException(status_code=429,
+                                detail="too many codes requested for this number — "
+                                       "use the one you have or try again later",
+                                headers={"Retry-After": str(e.retry_after_s)})
     return OtpRequestResponse(request_id=f"otp_{uuid.uuid4().hex[:12]}", phone=body.phone)
 
 

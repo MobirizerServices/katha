@@ -92,6 +92,7 @@ def enforce(service: str) -> None:
         if not os.environ.get("KATHA_ADMIN_IP_ALLOWLIST", "").strip():
             problems.append("KATHA_ADMIN_IP_ALLOWLIST is empty (the back office must sit behind "
                             "the VPN/office CIDRs — see the security posture doc)")
+        _require_secret("KATHA_AUDIT_HMAC_KEY", dev_default=None, problems=problems)
         if not os.environ.get("KATHA_ADMIN_USERS", "").strip():
             problems.append("KATHA_ADMIN_USERS is not set (the default bootstrap admin "
                             "ops@katha.dev is a dev convenience)")

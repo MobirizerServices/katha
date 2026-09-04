@@ -22,7 +22,19 @@ import time
 _log = logging.getLogger("katha.otp")
 _TTL_S = 300
 _MAX_ATTEMPTS = 5
+_RESEND_CAP = 3            # fresh codes per phone per window
+_RESEND_WINDOW_S = 3600
 _mem: dict[str, tuple[str, float, int]] = {}   # phone -> (code, expires_at, attempts)
+_resends: dict[str, list[float]] = {}          # phone -> request timestamps (in-memory)
+
+
+class ResendLimited(Exception):
+    """Too many fresh codes for one phone: a resend must not be a free attempt
+    counter reset, nor an SMS-pumping lever."""
+
+    def __init__(self, retry_after_s: int):
+        super().__init__(f"retry after {retry_after_s}s")
+        self.retry_after_s = retry_after_s
 
 
 def enabled() -> bool:
@@ -42,13 +54,36 @@ def _redis():
         return None
 
 
+def _check_resend(phone: str) -> None:
+    r = _redis()
+    if r is not None:  # pragma: no cover - needs a live Redis
+        key = f"otp:resend:{phone}"
+        n = r.incr(key)
+        if n == 1:
+            r.expire(key, _RESEND_WINDOW_S)
+        if n > _RESEND_CAP:
+            raise ResendLimited(max(1, r.ttl(key)))
+        return
+    now = time.time()
+    hits = [t for t in _resends.get(phone, []) if now - t < _RESEND_WINDOW_S]
+    if len(hits) >= _RESEND_CAP:
+        _resends[phone] = hits
+        raise ResendLimited(int(_RESEND_WINDOW_S - (now - hits[0])) + 1)
+    hits.append(now)
+    _resends[phone] = hits
+
+
 def _store_code(phone: str, code: str) -> None:
+    """Store a fresh code. Wrong-attempt counts CARRY OVER from the previous
+    code: a resend never hands the guesser a fresh budget."""
     r = _redis()
     if r is not None:  # pragma: no cover - needs a live Redis
         r.setex(f"otp:code:{phone}", _TTL_S, code)
-        r.delete(f"otp:tries:{phone}")
+        r.expire(f"otp:tries:{phone}", _RESEND_WINDOW_S)   # keep counting, bounded
         return
-    _mem[phone] = (code, time.time() + _TTL_S, 0)
+    prev = _mem.get(phone)
+    attempts = prev[2] if prev else 0
+    _mem[phone] = (code, time.time() + _TTL_S, attempts)
 
 
 def _provider() -> str:
@@ -60,6 +95,7 @@ def generate_and_send(phone: str) -> None:
     own code (we never see it); every other provider gets one we generate
     and store, and verify() compares against that."""
     provider = _provider()
+    _check_resend(phone)
     if provider == "twilio":
         _twilio_start(phone)
         return
@@ -131,10 +167,15 @@ def verify(phone: str, code: str) -> bool:
     if rec is None:
         return False
     stored, expires, attempts = rec
-    if time.time() > expires or attempts >= _MAX_ATTEMPTS:
-        _mem.pop(phone, None)
+    if attempts >= _MAX_ATTEMPTS:
+        # Budget spent: keep the record (so a resend inherits the count) but
+        # never accept a code until the window has cleared it.
+        _mem[phone] = ("", expires, attempts)
         return False
-    if secrets.compare_digest(stored, code):
+    if time.time() > expires:
+        _mem[phone] = ("", expires, attempts)       # expired: the code is gone, the count stays
+        return False
+    if stored and secrets.compare_digest(stored, code):
         _mem.pop(phone, None)
         return True
     _mem[phone] = (stored, expires, attempts + 1)

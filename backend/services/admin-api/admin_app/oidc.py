@@ -39,7 +39,7 @@ import urllib.parse
 import urllib.request
 
 import jwt as pyjwt
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.responses import JSONResponse
 
@@ -257,9 +257,13 @@ def _discovery(issuer: str) -> dict:
 def _jwks_key(issuer: str, kid: str):
     if kid not in _JWKS and time.time() - _JWKS_FETCHED_AT["t"] > 30:
         _JWKS_FETCHED_AT["t"] = time.time()
+        fresh = {}
         for k in _http_json(_discovery(issuer)["jwks_uri"]).get("keys", []):
             if k.get("kty") == "RSA":
-                _JWKS[k["kid"]] = pyjwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(k))
+                fresh[k["kid"]] = pyjwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(k))
+        # Replace, don't merge: a key the IdP retired must stop verifying tokens.
+        _JWKS.clear()
+        _JWKS.update(fresh)
     if kid not in _JWKS:
         raise AuthFlowError(f"unknown signing key {kid}")
     return _JWKS[kid]
@@ -315,7 +319,7 @@ def verify_id_token(id_token: str, nonce: str) -> dict:
 router = APIRouter(prefix="/admin/v1")
 
 
-def _authorize_url(state: str, nonce: str, challenge: str) -> str:
+def _authorize_url(state: str, nonce: str, challenge: str, *, step_up: bool = False) -> str:
     if internal_idp():
         base = "/admin/v1/devidp/authorize"
         endpoint = base
@@ -328,18 +332,23 @@ def _authorize_url(state: str, nonce: str, challenge: str) -> str:
         "code_challenge": challenge, "code_challenge_method": "S256",
         **({"hd": os.environ["KATHA_OIDC_HD"]}
            if os.environ.get("KATHA_OIDC_HD") else {}),
+        # Step-up: the IdP must make the person authenticate again NOW, not
+        # silently reuse its own SSO session (max_age=0 + prompt=login).
+        **({"max_age": "0", "prompt": "login"} if step_up else {}),
     })
     return f"{endpoint}?{q}"
 
 
 @router.get("/auth/login")
-def auth_login():
+def auth_login(step_up: bool = False):
     state, nonce = secrets.token_urlsafe(24), secrets.token_urlsafe(24)
     verifier = secrets.token_urlsafe(48)
     challenge = _b64(hashlib.sha256(verifier.encode()).digest())
-    resp = RedirectResponse(_authorize_url(state, nonce, challenge), status_code=302)
+    resp = RedirectResponse(_authorize_url(state, nonce, challenge, step_up=step_up),
+                            status_code=302)
     resp.set_cookie(FLOW_COOKIE,
                     sign_payload({"state": state, "nonce": nonce, "v": verifier,
+                                  "step_up": step_up,
                                   "exp": time.time() + FLOW_TTL_S}),
                     max_age=FLOW_TTL_S, httponly=True, samesite="lax",
                     secure=_cookie_secure(), path="/admin/v1/auth")
@@ -387,6 +396,13 @@ def auth_callback(request: Request, code: str = "", state: str = "",
                         path="/")
         return resp
 
+    # When the IdP reports when the person actually authenticated, that is the
+    # step-up clock; the dev IdP (no auth_time) authenticates on every visit.
+    auth_time = float(claims.get("auth_time") or time.time())
+    if flow.get("step_up") and time.time() - auth_time > 120:
+        # The IdP ignored max_age/prompt and replayed an old session: refuse
+        # to treat it as a fresh sign-in.
+        return fail("the identity provider did not re-authenticate you — try again")
     resp = RedirectResponse("/", status_code=302)
     resp.delete_cookie(FLOW_COOKIE, path="/admin/v1/auth")
     resp.set_cookie(SESSION_COOKIE,
@@ -394,6 +410,7 @@ def auth_callback(request: Request, code: str = "", state: str = "",
                                   "name": claims.get("name", ""),
                                   "sid": secrets.token_hex(8),
                                   "iat": time.time(),
+                                  "auth_time": auth_time,
                                   "exp": time.time() + SESSION_TTL_S}),
                     max_age=SESSION_TTL_S, httponly=True, samesite="lax",
                     secure=_cookie_secure(), path="/")
@@ -426,6 +443,10 @@ def auth_me(request: Request):
 def auth_logout(request: Request):
     from .main import audit
     from .rbac import Actor
+    # Same CSRF rule as every other mutation: a cross-site form must not be
+    # able to sign an operator out mid-task.
+    if request.headers.get("x-katha-csrf") != "1":
+        raise HTTPException(status_code=403, detail="missing X-Katha-CSRF header")
     ident = session_identity(request)
     if ident is not None:
         role = directory_role(ident["email"]) or "ro"

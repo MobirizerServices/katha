@@ -42,10 +42,14 @@ def _served(summaries: list[SeriesSummary]) -> list[SeriesSummary]:
 def _bearer_user(authorization: str | None) -> str | None:
     if not authorization or not authorization.lower().startswith("bearer "):
         return None
-    from ..auth import decode_token
+    from ..auth import decode_token, dev_stubs_enabled
     token = authorization.split(" ", 1)[1].strip()
     payload = decode_token(token)
-    return payload["sub"] if payload else token
+    if payload:
+        return payload["sub"]
+    # A bad token personalizes nothing; the raw-id fallback is a dev stub only —
+    # in a configured deployment it would hand out any user's watch-based rail.
+    return token if dev_stubs_enabled() else None
 
 
 @router.get("/home", response_model=HomeResponse)
