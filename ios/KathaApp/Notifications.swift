@@ -43,6 +43,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         let title = content.title
         let body = content.body
         if let parsed {
+            let model = self.model          // AppModel is main-actor isolated (Sendable); self is not
             Task { @MainActor in
                 model.incomingDrop = DropAlert(slug: parsed.slug, episode: parsed.episode,
                                                title: title, body: body)
@@ -58,6 +59,7 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     ) {
         let parsed = Self.parse(response.notification.request.content.userInfo)
         if let parsed {
+            let model = self.model
             Task { @MainActor in
                 model.pendingRoute = EpisodeRoute(slug: parsed.slug, number: parsed.episode)
                 model.incomingDrop = nil

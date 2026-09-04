@@ -276,11 +276,13 @@ final class AppModel {
         // Provisional: granted without a prompt, delivers quietly until the user
         // promotes it (the toggle in Settings asks for full alerts).
         UNUserNotificationCenter.current().requestAuthorization(
-            options: [.alert, .sound, .badge, .provisional]) { granted, _ in
+            options: [.alert, .sound, .badge, .provisional]) { [weak self] granted, _ in
             guard granted else { return }
-            Task { @MainActor in
-                PushDelegate.onToken = { [weak self] hex in
-                    Task { try? await self?.api.registerPush(token: hex) }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let api = self.api
+                PushDelegate.onToken = { hex in
+                    Task { try? await api.registerPush(token: hex) }
                 }
                 UIApplication.shared.registerForRemoteNotifications()
             }

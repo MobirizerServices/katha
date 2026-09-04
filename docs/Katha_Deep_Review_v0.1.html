@@ -137,7 +137,8 @@
 <p class="sub">Every finding above was worked through in the commits after this review (C1 → the Lows), each with regression tests. What is not fixed is listed explicitly.</p>
 <ul class="plain">
   <li><b>Fixed (60 of 64).</b> All 7 Critical, all 21 High, all 26 Medium, and 6 of 10 Low findings. Backend 310 tests, web/admin 232, web/site 89, KathaKit 83; both web coverage gates green; the app builds in Debug and Release; both OpenAPI contracts regenerated.</li>
-  <li><b>Deferred, by design.</b> C6 guest-merge device binding (needs App Attest; the merge still requires holding the guest bearer). I12's Swift 6 strict-concurrency on the app target. The CI security job stays non-blocking and actions stay on major tags until the advisory backlog is triaged. XCUITest is still run on a developer Mac, not in CI.</li>
+  <li><b>Deferred, by design.</b> C6 guest-merge device binding (needs App Attest; the merge still requires holding the guest bearer). The CI security job stays non-blocking until the advisory backlog is triaged. XCUITest is still run on a developer Mac, not in CI.</li>
+  <li><b>Done after the first pass.</b> The app target now compiles in Swift 6 language mode with zero concurrency diagnostics (I12), and every CI action is pinned to a commit SHA (D7).</li>
   <li><b>Verified by reading, not by running.</b> The Postgres branches of the ledger lock and the audit-chain lock (advisory locks) — no local Postgres was available; the SQLite branches are exercised by the concurrency tests. The StoreKit purchase sheet and the real Sign in with Apple flow need a device.</li>
   <li><b>Still open as a design choice.</b> The web site keeps its bearer in localStorage behind the new CSP; moving to an httpOnly cookie session needs a core-api cookie mode with CSRF and is a separate piece of work.</li>
 </ul>

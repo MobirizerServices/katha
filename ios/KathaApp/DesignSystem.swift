@@ -65,6 +65,7 @@ public enum Katha {
 
 /// Physical feedback on the moments that matter: taps confirm, money succeeds,
 /// gates warn. Coalesced here so screens never construct generators inline.
+@MainActor
 enum Haptics {
     static func tap() { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
     static func success() { UINotificationFeedbackGenerator().notificationOccurred(.success) }

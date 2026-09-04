@@ -1,0 +1,27 @@
+{
+  "object" : {
+    "artifacts" : [
+
+    ],
+    "dependencies" : [
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "kathakit",
+          "kind" : "fileSystem",
+          "location" : "/Users/pawankumar/Desktop/Katha/ios/KathaKit",
+          "name" : "KathaKit"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/pawankumar/Desktop/Katha/ios/KathaKit"
+        },
+        "subpath" : "kathakit"
+      }
+    ],
+    "prebuilts" : [
+
+    ]
+  },
+  "version" : 7
+}

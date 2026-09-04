@@ -73,7 +73,11 @@ target.build_configurations.each do |cfg|
   s['GENERATE_INFOPLIST_FILE'] = 'NO'
   s['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
   s['TARGETED_DEVICE_FAMILY'] = '1'
-  s['SWIFT_VERSION'] = '5.0'
+  # Swift 6 language mode: the app target has the real concurrency
+  # (AVFoundation callbacks, notification delegates, StoreKit streams), and
+  # every data-race diagnostic is a compile error, not a warning.
+  s['SWIFT_VERSION'] = '6.0'
+  s['SWIFT_STRICT_CONCURRENCY'] = 'complete'
   s['MARKETING_VERSION'] = '1.0.0'
   s['CURRENT_PROJECT_VERSION'] = '1'
   if ENV['KATHA_TEAM'] && !ENV['KATHA_TEAM'].empty?

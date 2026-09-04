@@ -1,5 +1,5 @@
 import SwiftUI
-import AVFoundation
+@preconcurrency import AVFoundation
 import UIKit
 import KathaKit
 
@@ -11,9 +11,11 @@ import KathaKit
 
 // MARK: - Engine
 
-/// Owns the AVPlayer and republishes its state for SwiftUI. Used from the main
-/// thread only (observers are delivered on .main).
+/// Owns the AVPlayer and republishes its state for SwiftUI. Main-actor
+/// isolated: every observer hops (or is delivered) onto the main actor before
+/// touching state, which is what the compiler now checks.
 @Observable
+@MainActor
 final class PlayerEngine {
     let player = AVPlayer()
     var isPlaying = false
@@ -23,9 +25,11 @@ final class PlayerEngine {
     var currentSeconds: Double = 0
     var durationSeconds: Double = 0
 
-    private var timeObserver: Any?
-    private var endObserver: NSObjectProtocol?
-    private var statusObserver: NSKeyValueObservation?
+    // Written once in init, read once in deinit (which is nonisolated): kept
+    // outside the actor's isolation on purpose, and outside observation.
+    @ObservationIgnored nonisolated(unsafe) private var timeObserver: Any?
+    @ObservationIgnored nonisolated(unsafe) private var endObserver: NSObjectProtocol?
+    @ObservationIgnored nonisolated(unsafe) private var statusObserver: NSKeyValueObservation?
 
     init() {
         // Playback category: audible with the ringer switch off, like every
@@ -36,25 +40,31 @@ final class PlayerEngine {
         // background; a hand-maintained flag then needs two taps to resume).
         statusObserver = player.observe(\.timeControlStatus, options: [.new]) { [weak self] p, _ in
             let playing = p.timeControlStatus != .paused
-            DispatchQueue.main.async { self?.isPlaying = playing }
+            Task { @MainActor in self?.isPlaying = playing }
         }
         timeObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(value: 1, timescale: 2), queue: .main
         ) { [weak self] time in
-            guard let self else { return }
-            self.currentSeconds = max(0, time.seconds)
-            if let d = self.player.currentItem?.duration.seconds, d.isFinite, d > 0 {
-                self.durationSeconds = d
+            // Delivered on .main by contract; tell the compiler so.
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.currentSeconds = max(0, time.seconds)
+                if let d = self.player.currentItem?.duration.seconds, d.isFinite, d > 0 {
+                    self.durationSeconds = d
+                }
+                self.isBuffering = self.player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+                if self.player.currentItem?.status == .failed { self.failed = true; self.isPlaying = false }
             }
-            self.isBuffering = self.player.timeControlStatus == .waitingToPlayAtSpecifiedRate
-            if self.player.currentItem?.status == .failed { self.failed = true; self.isPlaying = false }
         }
         endObserver = NotificationCenter.default.addObserver(
             forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main
         ) { [weak self] note in
-            guard let self, (note.object as? AVPlayerItem) === self.player.currentItem else { return }
-            self.ended = true
-            self.isPlaying = false
+            let item = note.object as? AVPlayerItem
+            MainActor.assumeIsolated {
+                guard let self, item === self.player.currentItem else { return }
+                self.ended = true
+                self.isPlaying = false
+            }
         }
     }
 
@@ -73,7 +83,7 @@ final class PlayerEngine {
         item.preferredPeakBitRate = bitrateCap
         item.preferredForwardBufferDuration = 6
         warmed = (url, item)
-        Task { _ = try? await item.asset.load(.isPlayable) }
+        Task { @MainActor in _ = try? await item.asset.load(.isPlayable) }
     }
 
     func load(url: URL, resumeMs: Int) {
