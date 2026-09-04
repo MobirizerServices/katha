@@ -28,6 +28,11 @@ target.resources_build_phase.add_file_reference(assets_ref, true)
 privacy_ref = group.new_reference('PrivacyInfo.xcprivacy')
 target.resources_build_phase.add_file_reference(privacy_ref, true)
 
+# StoreKit configuration for local/simulator purchases (the five coin packs as
+# consumables). Not a bundle resource; the shared scheme below points the run
+# action at it so Product.products(for:) resolves without App Store Connect.
+storekit_ref = group.new_reference('Katha.storekit')
+
 # The display face (Anton, OFL) — folder reference so the license ships too.
 fonts_ref = group.new_reference('Fonts')
 target.resources_build_phase.add_file_reference(fonts_ref, true)
@@ -107,16 +112,26 @@ ui_target.build_configurations.each do |cfg|
 end
 
 project.save
+
 puts "Wrote #{proj_path}"
 puts "Targets: #{project.targets.map(&:name).join(', ')}"
 puts "Sources: #{target.source_build_phase.files.count} files"
 puts "UI tests: #{ui_target.source_build_phase.files.count} files"
 puts "Package deps: #{target.package_product_dependencies.map(&:product_name).join(', ')}"
 
-# Shared scheme so xcodebuild -scheme works headlessly (build, run and test).
+# Shared scheme so xcodebuild -scheme works headlessly (build, run and test),
+# with the StoreKit configuration attached to the run action so purchases work
+# on a simulator straight away — no Edit Scheme ▸ Run ▸ Options step.
 scheme = Xcodeproj::XCScheme.new
 scheme.add_build_target(target)
 scheme.set_launch_target(target)
 scheme.add_test_target(ui_target)
+# xcodeproj has no API for this element, so write the XML Xcode itself writes.
+# The identifier is a path relative to the .xcscheme file
+# (xcshareddata/xcschemes/ → ../../KathaApp/Katha.storekit).
+launch_xml = scheme.launch_action.xml_element
+launch_xml.delete_element('StoreKitConfigurationFileReference')
+launch_xml.add_element('StoreKitConfigurationFileReference',
+                       'identifier' => '../../KathaApp/Katha.storekit')
 scheme.save_as(proj_path, 'KathaApp', true)
-puts "Scheme: KathaApp (shared, with test action)"
+puts "Scheme: KathaApp (shared, with test action + StoreKit config)"

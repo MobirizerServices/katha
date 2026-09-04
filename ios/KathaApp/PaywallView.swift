@@ -152,7 +152,7 @@ struct PaywallView: View {
                 HStack(spacing: 6) {
                     Button(restored ? "Purchases restored" : "Restore purchases") {
                         Task {
-                            await model.refreshWallet()
+                            await model.restorePurchases()
                             restored = true
                         }
                     }
@@ -212,15 +212,18 @@ struct PaywallView: View {
 
     private func buy(_ pack: CoinPack) async {
         buyingSku = pack.sku; defer { buyingSku = nil }
-        // Production: StoreKit 2 purchase → send tx.jwsRepresentation. Dev: stub JWS.
-        do {
-            let w = try await model.api.verifyIAP(jws: "dev-jws-\(pack.sku)-\(UUID().uuidString)", sku: pack.sku)
-            model.wallet.reconcile(with: w)
+        // StoreKit 2 purchase → Apple's signed transaction → the ledger credits.
+        switch await model.buy(sku: pack.sku) {
+        case .credited:
             Haptics.success()
             errorText = nil
-        } catch {
+        case .cancelled:
+            break
+        case .pending:
+            errorText = "Waiting for approval. Your coins will land as soon as the purchase is approved."
+        case .failed(let reason):
             Haptics.warning()
-            errorText = "Payment didn't go through. You weren't charged."
+            errorText = reason
         }
     }
 }

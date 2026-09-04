@@ -1,0 +1,100 @@
+{
+  "identifier" : "9B6D1F1E-3C2A-4C8B-9A1D-4E5F6A7B8C90",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "99",
+      "familyShareable" : false,
+      "internalID" : "1000001",
+      "localizations" : [
+        {
+          "description" : "600 coins — enough for 20 episodes",
+          "displayName" : "Starter",
+          "locale" : "en_IN"
+        }
+      ],
+      "productID" : "coins_starter_in",
+      "referenceName" : "Starter (600 coins)",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "199",
+      "familyShareable" : false,
+      "internalID" : "1000002",
+      "localizations" : [
+        {
+          "description" : "1,300 coins — finishes a series and the next",
+          "displayName" : "Popular",
+          "locale" : "en_IN"
+        }
+      ],
+      "productID" : "coins_popular_in",
+      "referenceName" : "Popular (1300 coins)",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "499",
+      "familyShareable" : false,
+      "internalID" : "1000003",
+      "localizations" : [
+        {
+          "description" : "3,500 coins — best for binge weekends",
+          "displayName" : "Value",
+          "locale" : "en_IN"
+        }
+      ],
+      "productID" : "coins_value_in",
+      "referenceName" : "Value (3500 coins)",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "999",
+      "familyShareable" : false,
+      "internalID" : "1000004",
+      "localizations" : [
+        {
+          "description" : "7,500 coins — about five series",
+          "displayName" : "Binge",
+          "locale" : "en_IN"
+        }
+      ],
+      "productID" : "coins_binge_in",
+      "referenceName" : "Binge (7500 coins)",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "1999",
+      "familyShareable" : false,
+      "internalID" : "1000005",
+      "localizations" : [
+        {
+          "description" : "16,000 coins — lowest price per coin",
+          "displayName" : "Mega",
+          "locale" : "en_IN"
+        }
+      ],
+      "productID" : "coins_mega_in",
+      "referenceName" : "Mega (16000 coins)",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "",
+    "_developerTeamID" : "",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_IN",
+    "_storefront" : "IND",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

@@ -131,10 +131,16 @@ final class AppModel {
             else { defaults.removeObject(forKey: "katha.pin") }
         }
     }
+    /// The session bearer lives in the Keychain (see KeychainStore) — it
+    /// authorises money for 30 days and must not ride along in a backup.
+    private static let tokenKey = "session.token"
     private var storedToken: String? {
-        get { defaults.string(forKey: "katha.token") }
-        set { defaults.set(newValue, forKey: "katha.token") }
+        get { KeychainStore.get(Self.tokenKey) }
+        set { KeychainStore.set(newValue, for: Self.tokenKey) }
     }
+
+    /// StoreKit 2 bridge to the ledger (PaywallView / WalletView buy through it).
+    let store = CoinStore()
 
     init(baseURL: URL? = nil) {
         let env = ProcessInfo.processInfo.environment
@@ -145,6 +151,13 @@ final class AppModel {
                         "katha.checkin.day", "katha.recentSearches", "katha.coachmarks.seen"] {
                 UserDefaults.standard.removeObject(forKey: key)
             }
+            KeychainStore.delete(Self.tokenKey)
+        }
+        // One-time migration: builds before the Keychain move kept the bearer
+        // in UserDefaults. Move it, then scrub the old copy.
+        if let legacy = UserDefaults.standard.string(forKey: "katha.token") {
+            KeychainStore.set(legacy, for: Self.tokenKey)
+            UserDefaults.standard.removeObject(forKey: "katha.token")
         }
         // Base URL resolution: test env override → Info.plist KathaAPIBase (set
         // to the dev Mac's LAN IP for real-device builds — 127.0.0.1 would be
@@ -206,6 +219,11 @@ final class AppModel {
         }
         await loadHome(lang: contentLanguage)
         await loadEngagement()
+        // Paid-but-uncredited transactions from an interrupted purchase are
+        // re-sent now; later ones (Ask to Buy approvals, other devices) arrive
+        // on the updates stream.
+        store.startListening(api: api) { [weak self] w in self?.wallet.reconcile(with: w) }
+        if await store.syncPending(api: api) > 0 { await refreshWallet() }
         // Dev hook: KATHA_NUDGE_SECONDS schedules the drip nudge immediately so
         // the foreground banner is demoable without backgrounding the app.
         if ProcessInfo.processInfo.environment["KATHA_NUDGE_SECONDS"] != nil {
@@ -334,6 +352,24 @@ final class AppModel {
 
     func refreshWallet() async {
         if let w = try? await api.wallet() { wallet.reconcile(with: w) }
+    }
+
+    // MARK: Coins (StoreKit 2 → ledger)
+
+    /// Buy a coin pack. The wallet changes only when the ledger says it did.
+    func buy(sku: String) async -> PurchaseOutcome {
+        let outcome = await store.buy(sku: sku, api: api)
+        if case .credited(let w) = outcome { wallet.reconcile(with: w) }
+        return outcome
+    }
+
+    /// Restore purchases: re-send anything paid but not yet credited, then
+    /// re-read the wallet. Returns how many transactions were credited.
+    @discardableResult
+    func restorePurchases() async -> Int {
+        let n = await store.restore(api: api)
+        await refreshWallet()
+        return n
     }
 
     func loadEngagement() async {

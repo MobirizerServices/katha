@@ -51,7 +51,7 @@ struct WalletView: View {
                 }
 
                 Button(restored ? "Purchases restored" : "Restore purchases") {
-                    Task { await model.refreshWallet(); await reload(); restored = true }
+                    Task { await model.restorePurchases(); await reload(); restored = true }
                 }
                 .font(.system(size: 13))
                 .foregroundStyle(Katha.Color.text2)
@@ -188,9 +188,8 @@ struct WalletView: View {
 
     private func buy(_ pack: CoinPack) async {
         buying = pack.sku; defer { buying = nil }
-        // Production: StoreKit 2 signed transaction; dev build stubs the JWS.
-        if let w = try? await model.api.verifyIAP(jws: "dev-jws-\(pack.sku)-\(UUID().uuidString)", sku: pack.sku) {
-            model.wallet.reconcile(with: w)
+        // StoreKit 2 purchase → Apple's signed transaction → the ledger credits.
+        if case .credited = await model.buy(sku: pack.sku) {
             history = (try? await model.api.walletTransactions()) ?? history
         }
     }
