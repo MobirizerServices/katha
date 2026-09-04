@@ -184,6 +184,10 @@ class Ledger:
             cost = total_cost
         else:
             cost = price_per_episode * len(to_unlock)
+        if to_unlock and cost <= 0:
+            # A zero price would KeyError below; a negative one would turn the
+            # debit into a credit. Free episodes are granted, never unlocked.
+            raise LedgerError(f"unlock price must be positive, got {cost}")
         if cost == 0:
             # Everything already owned — no-op, return existing entitlements.
             ents = [self._entitlements[(user_id, e)] for e in episode_ids]

@@ -1129,7 +1129,7 @@
         ]
       },
       "post": {
-        "description": "Draft a series in the panel (#043) \u2014 metadata first, media later. It\nreaches the public catalog only when its status is flipped to live.",
+        "description": "Draft a series in the panel (#043) \u2014 metadata first, media later. It\nreaches the public catalog only when its status is flipped to live.\n\nThe draft is validated with the SAME bounds the finance pricing lever\nenforces (coin_price 1-1000, free window 0-100): a content-role draft\nis a price the ledger will charge once live, so it can never be zero,\nnegative, or unbounded \u2014 and its shape is typed, so a bad draft can\nnever make the public catalog unparseable.",
         "operationId": "create_series_admin_v1_catalog_series_post",
         "parameters": [
           {

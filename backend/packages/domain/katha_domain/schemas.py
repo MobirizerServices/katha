@@ -1,7 +1,7 @@
 """Pydantic v2 API contracts shared across services (source for OpenAPI → clients)."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Episode(BaseModel):
@@ -186,3 +186,57 @@ class CheckinResponse(BaseModel):
 
 
 AuthToken.model_rebuild()
+
+
+# ---- back-office draft (admin review #043) -----------------------------------
+CONTENT_RATINGS = ("U", "U/A 7+", "U/A 13+", "U/A 16+", "A")   # IT Rules 2021
+LANGUAGES = ("hi", "ta", "te")
+
+
+class SeriesDraft(BaseModel):
+    """What the panel may submit to draft a series. Bounds match the finance
+    pricing lever so a draft can never carry a price the ledger must refuse."""
+    model_config = {"extra": "ignore", "str_strip_whitespace": True}
+
+    slug: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{2,39}$")
+    title: str = Field(min_length=1, max_length=120)
+    episode_count: int = Field(ge=1, le=200)
+    language: str = "hi"
+    genres: list[str] = Field(default_factory=list, max_length=8)
+    synopsis: str = Field(default="", max_length=2000)
+    rating: str = "U/A 13+"
+    coin_price: int | None = Field(default=None, ge=1, le=1000)
+    free_episodes: int | None = Field(default=None, ge=0, le=100)
+
+    @field_validator("slug", mode="before")
+    @classmethod
+    def _lower(cls, v):
+        return v.strip().lower() if isinstance(v, str) else v
+
+    @field_validator("language")
+    @classmethod
+    def _language(cls, v: str) -> str:
+        if v not in LANGUAGES:
+            raise ValueError(f"must be one of {', '.join(LANGUAGES)}")
+        return v
+
+    @field_validator("rating")
+    @classmethod
+    def _rating(cls, v: str) -> str:
+        if v not in CONTENT_RATINGS:
+            raise ValueError(f"must be one of {', '.join(CONTENT_RATINGS)}")
+        return v
+
+    @field_validator("genres")
+    @classmethod
+    def _genres(cls, v: list[str]) -> list[str]:
+        out = [g.strip() for g in v if g and g.strip()]
+        if any(len(g) > 40 for g in out):
+            raise ValueError("each genre is at most 40 characters")
+        return out
+
+    @model_validator(mode="after")
+    def _free_within_count(self):
+        if self.free_episodes is not None and self.free_episodes > self.episode_count:
+            raise ValueError("free_episodes cannot exceed episode_count")
+        return self

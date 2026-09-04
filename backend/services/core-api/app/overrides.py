@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import json as _json
 
+from pydantic import ValidationError
+
 from katha_domain import catalog
 from katha_domain.schemas import Episode, SeriesDetail, SeriesSummary
 
@@ -56,13 +58,24 @@ def apply_pricing(s: SeriesDetail) -> SeriesDetail:
 
 
 def draft_series(slug: str) -> SeriesDetail | None:
-    """A series created in the back office (#043), stored whole in the KV."""
+    """A series created in the back office (#043), stored whole in the KV.
+    A draft that does not parse is treated as absent: one bad row in the
+    control plane must never take the public catalog down."""
+    try:
+        return _draft_series(slug)
+    except (ValueError, TypeError, ValidationError):
+        return None
+
+
+def _draft_series(slug: str) -> SeriesDetail | None:
     d = _kv_json(f"series:{slug}")
-    if not d.get("title"):
+    if not isinstance(d, dict) or not d.get("title"):
         return None
     count = int(d.get("episode_count", 0))
     price = int(d.get("coin_price", catalog.pricing()["episode_coin_price"]))
     free = int(d.get("free_episodes", catalog.pricing()["free_episode_count"]))
+    if count < 1 or price < 1 or free < 0:
+        raise ValueError("draft out of bounds")
     return SeriesDetail(
         slug=slug, title=d["title"], genres=d.get("genres", []),
         episode_count=count, primary_language=d.get("language", "hi"),

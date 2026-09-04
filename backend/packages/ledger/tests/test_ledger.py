@@ -239,3 +239,19 @@ def test_same_user_reusing_a_key_for_a_different_operation_is_a_conflict():
         L.credit("u", TxType.PURCHASE, coins=999, reference_type="iap",
                  reference_id="p", idempotency_key="buy", created_at=TS)
     assert L.balance("u").total == 570
+
+
+# ---- an unlock never charges zero or negative ---------------------------------
+@pytest.mark.parametrize("price,total", [(0, None), (-100, None), (30, 0), (30, -5)])
+def test_non_positive_unlock_cost_is_refused(price, total):
+    from katha_ledger import LedgerError
+    L = fresh()
+    L.credit("u", TxType.PURCHASE, coins=100, reference_type="iap",
+             reference_id="p", idempotency_key="buy", created_at=TS)
+    with pytest.raises(LedgerError):
+        L.unlock("u", ["s:e11"], price_per_episode=price, reference_type="episode",
+                 reference_id="s:e11", idempotency_key="k", created_at=TS,
+                 total_cost=total)
+    assert L.balance("u").total == 100
+    assert not L.is_entitled("u", "s:e11")
+    assert len(L.transactions("u")) == 1

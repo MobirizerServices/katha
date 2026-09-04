@@ -6,6 +6,7 @@ one temp shared DB.
 """
 import json
 
+import json as _json
 import pytest
 from fastapi.testclient import TestClient
 
@@ -1353,3 +1354,59 @@ def test_guest_merge_over_persistent_ledger(shared):
         assert core_store.ledger.balance(gid).total == 0   # guest zeroed
     finally:
         core_store.ledger = Ledger()
+
+
+# --- A1/A4: drafts are typed and bounded; a bad draft never breaks the catalog --
+
+def test_draft_price_and_shape_are_validated(shared):
+    a = _admin()
+    base = {"slug": "bounded-draft", "title": "Bounded", "episode_count": 12}
+    bad = [
+        {**base, "coin_price": -100},            # would pay users to unlock
+        {**base, "coin_price": 0},
+        {**base, "coin_price": 5000},
+        {**base, "free_episodes": 13},           # more free than exist
+        {**base, "genres": "notalist"},          # A4: shape
+        {**base, "language": "fr"},
+        {**base, "rating": "18+"},
+        {**base, "title": ""},
+        {**base, "slug": "X"},
+    ]
+    for body in bad:
+        r = a.post("/admin/v1/catalog/series", headers=ADMIN_H, json=body)
+        assert r.status_code == 400, body
+    # nothing was stored, and the public catalog still serves
+    assert shared.kv_get("series:bounded-draft") is None
+    assert _core().get("/v1/series").status_code == 200
+    # a well-formed draft with an explicit price lands with that price
+    ok = a.post("/admin/v1/catalog/series", headers=ADMIN_H,
+                json={**base, "coin_price": 45, "genres": [" Thriller ", ""],
+                      "rating": "U/A 16+"})
+    assert ok.status_code == 200
+    assert ok.json()["coin_price"] == 45 and ok.json()["genres"] == ["Thriller"]
+    # the free window defaults to the platform default, capped by the count
+    tiny = a.post("/admin/v1/catalog/series", headers=ADMIN_H,
+                  json={"slug": "tiny-draft", "title": "Tiny", "episode_count": 3})
+    assert tiny.json()["free_episodes"] == 3
+
+
+def test_a_corrupt_draft_row_never_takes_the_catalog_down(shared):
+    """Rows written around the API (a migration, a fat-fingered KV edit) are
+    skipped, not served as a 500 — and can still be archived/overwritten."""
+    core, a = _core(), _admin()
+    shared.kv_set("series:wrong-shape", _json.dumps(
+        {"title": "Wrong", "episode_count": 4, "genres": "notalist"}))
+    shared.kv_set("series:negative", _json.dumps(
+        {"title": "Neg", "episode_count": 4, "coin_price": -100}))
+    for key in ("wrong-shape", "negative"):
+        shared.kv_set(f"status:{key}", "live")
+    assert core.get("/v1/series").status_code == 200
+    assert core.get("/v1/home").status_code == 200
+    assert core.get("/v1/series/wrong-shape").status_code == 404
+    assert core.get("/v1/series/negative").status_code == 404
+    assert a.get("/admin/v1/catalog/series", headers=ADMIN_H).status_code == 200
+    # and neither can be unlocked (nothing to charge, nothing to grant)
+    r = core.post("/v1/series/negative/episodes/2/unlock",
+                  headers={"Authorization": "Bearer draft-victim"},
+                  json={"idempotency_key": "k"})
+    assert r.status_code == 404

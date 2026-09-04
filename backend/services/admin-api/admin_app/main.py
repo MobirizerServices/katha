@@ -14,6 +14,7 @@ import uuid
 from collections import defaultdict
 from pathlib import Path
 
+from pydantic import ValidationError
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -1190,33 +1191,37 @@ def set_series_rights(slug: str, request: Request = None, body: dict = Body(...)
 def create_series(request: Request = None, body: dict = Body(...),
                   actor: Actor = Depends(require(Role.CONTENT))):
     """Draft a series in the panel (#043) — metadata first, media later. It
-    reaches the public catalog only when its status is flipped to live."""
-    import re as _re
-    slug = (body.get("slug") or "").strip().lower()
-    title = (body.get("title") or "").strip()
-    if not _re.fullmatch(r"[a-z0-9][a-z0-9-]{2,39}", slug):
-        raise HTTPException(status_code=400,
-                            detail="slug: 3-40 chars, a-z 0-9 and hyphens")
-    if not title:
-        raise HTTPException(status_code=400, detail="title required")
-    count = int(body.get("episode_count") or 0)
-    if not (1 <= count <= 200):
-        raise HTTPException(status_code=400, detail="episode_count must be 1-200")
+    reaches the public catalog only when its status is flipped to live.
+
+    The draft is validated with the SAME bounds the finance pricing lever
+    enforces (coin_price 1-1000, free window 0-100): a content-role draft
+    is a price the ledger will charge once live, so it can never be zero,
+    negative, or unbounded — and its shape is typed, so a bad draft can
+    never make the public catalog unparseable.
+    """
+    from katha_domain.schemas import SeriesDraft
+    try:
+        d = SeriesDraft.model_validate(body)
+    except ValidationError as e:
+        first = e.errors()[0]
+        loc = ".".join(str(x) for x in first.get("loc", ())) or "body"
+        raise HTTPException(status_code=400, detail=f"{loc}: {first.get('msg')}")
+    slug = d.slug
     if _series_exists(slug):
         raise HTTPException(status_code=409, detail="slug already exists")
     if SHARED is None:
         raise HTTPException(status_code=503, detail="needs persistence")
+    prof = catalog.pricing()
     draft = {
-        "title": title, "language": (body.get("language") or "hi"),
-        "genres": body.get("genres") or [], "synopsis": (body.get("synopsis") or ""),
-        "episode_count": count,
-        "coin_price": int(body.get("coin_price") or catalog.pricing()["episode_coin_price"]),
-        "free_episodes": int(body.get("free_episodes")
-                             if body.get("free_episodes") is not None
-                             else catalog.pricing()["free_episode_count"]),
-        "rating": body.get("rating") or "U/A 13+",
+        "title": d.title, "language": d.language, "genres": d.genres,
+        "synopsis": d.synopsis, "episode_count": d.episode_count,
+        "coin_price": d.coin_price if d.coin_price is not None else prof["episode_coin_price"],
+        "free_episodes": (d.free_episodes if d.free_episodes is not None
+                          else min(prof["free_episode_count"], d.episode_count)),
+        "rating": d.rating,
         "created_by": actor.id, "created_at": now_iso(),
     }
+    title, count = d.title, d.episode_count
     SHARED.kv_set(f"series:{slug}", _json.dumps(draft))
     SHARED.kv_set(f"status:{slug}", "draft")
     SHARED.kv_set(f"touched:{slug}", now_iso())
