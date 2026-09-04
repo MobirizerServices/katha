@@ -30,7 +30,8 @@ backend/**/_generated/
 # --- Swift
 ios/**/.build/
 ios/**/*.xcodeproj/xcuserdata/
-ios/**/*.xcodeproj/project.xcworkspace/   # xcodebuild scratch, not part of the generated project
+# xcodebuild scratch (workspace + per-user UI state), not part of the generated project
+ios/**/*.xcodeproj/project.xcworkspace/
 
 # --- Secrets & env (never commit)
 .env
