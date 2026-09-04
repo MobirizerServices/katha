@@ -1,0 +1,762 @@
+<title>Katha Deep Review</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f3f5f7;
+    --bg-2: #ffffff;
+    --bg-3: #e8ecf0;
+    --ink: #14202b;
+    --ink-2: #46535f;
+    --ink-3: #7a8793;
+    --line: #d5dce2;
+    --accent: #0f6e73;
+    --accent-soft: #d9ecec;
+    --crit: #b3261e; --crit-soft: #f7dedc;
+    --high: #c25b12; --high-soft: #f9e4d6;
+    --med: #8a6d00; --med-soft: #f5ecc7;
+    --low: #4a6b7c; --low-soft: #dfe7ec;
+    --ok: #2b7a4b; --ok-soft: #d9efe1;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --body: "Source Sans 3", "Helvetica Neue", Arial, sans-serif;
+    --display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10161c; --bg-2: #171f27; --bg-3: #1f2932;
+      --ink: #e7ecf0; --ink-2: #b4bec7; --ink-3: #7d8994; --line: #2c3841;
+      --accent: #5cc2c6; --accent-soft: #123a3d;
+      --crit: #ff7b72; --crit-soft: #3d1a19;
+      --high: #f2994a; --high-soft: #3c2412;
+      --med: #e3c24a; --med-soft: #35300f;
+      --low: #9fb8c6; --low-soft: #1f2d36;
+      --ok: #6fcf97; --ok-soft: #14301f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10161c; --bg-2: #171f27; --bg-3: #1f2932;
+    --ink: #e7ecf0; --ink-2: #b4bec7; --ink-3: #7d8994; --line: #2c3841;
+    --accent: #5cc2c6; --accent-soft: #123a3d;
+    --crit: #ff7b72; --crit-soft: #3d1a19;
+    --high: #f2994a; --high-soft: #3c2412;
+    --med: #e3c24a; --med-soft: #35300f;
+    --low: #9fb8c6; --low-soft: #1f2d36;
+    --ok: #6fcf97; --ok-soft: #14301f;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; margin: 0; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 40px 24px 80px; }
+  header.top { border-bottom: 1px solid var(--line); padding-bottom: 28px; margin-bottom: 32px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 10px; }
+  h1 { font-family: var(--display); font-weight: 700; font-size: 44px; line-height: 1.05; letter-spacing: -.01em; margin: 0 0 14px; text-wrap: balance; }
+  .lede { font-size: 18px; color: var(--ink-2); max-width: 66ch; margin: 0; }
+  h2 { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.15; margin: 48px 0 6px; letter-spacing: -.005em; text-wrap: balance; }
+  h2 + p.sub { margin: 0 0 18px; color: var(--ink-2); max-width: 70ch; }
+  h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 28px 0 10px; }
+  code, .path { font-family: var(--mono); font-size: 13px; }
+  .path { color: var(--ink-2); word-break: break-all; }
+
+  /* verification strip */
+  .verify { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 24px; }
+  .vcard { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: grid; gap: 4px; }
+  .vcard .k { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .vcard .v { font-family: var(--display); font-weight: 600; font-size: 18px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .vcard .n { font-size: 13px; color: var(--ink-2); }
+  .vcard.bad .v { color: var(--crit); }
+  .vcard.ok .v { color: var(--ok); }
+
+  /* totals + filter */
+  .totals { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 18px 0 8px; }
+  .totals button { font: inherit; font-size: 14px; font-weight: 600; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink); border-radius: 999px; padding: 6px 14px; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+  .totals button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .totals button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .totals .num { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.crit { background: var(--crit); } .dot.high { background: var(--high); } .dot.med { background: var(--med); } .dot.low { background: var(--low); }
+  .totals .hint { font-size: 13px; color: var(--ink-3); margin-left: auto; }
+
+  /* findings */
+  .register { display: grid; gap: 10px; }
+  .f { display: grid; grid-template-columns: 6px 1fr; background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .f[hidden] { display: none; }
+  .f .stripe { background: var(--low); }
+  .f.crit .stripe { background: var(--crit); } .f.high .stripe { background: var(--high); } .f.med .stripe { background: var(--med); }
+  .f .body { padding: 12px 16px 14px; display: grid; gap: 6px; }
+  .f .head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; }
+  .chip { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+  .chip.crit { background: var(--crit-soft); color: var(--crit); } .chip.high { background: var(--high-soft); color: var(--high); }
+  .chip.med { background: var(--med-soft); color: var(--med); } .chip.low { background: var(--low-soft); color: var(--low); }
+  .chip.conf { background: var(--bg-3); color: var(--ink-2); }
+  .id { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .f .title { font-weight: 600; font-size: 17px; line-height: 1.3; }
+  .f p { margin: 0; color: var(--ink-2); max-width: 78ch; }
+  .f p b { color: var(--ink); font-weight: 600; }
+  .f .fix { border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 2px; }
+
+  /* fix-first list */
+  ol.first { padding-left: 0; margin: 0; list-style: none; counter-reset: fx; display: grid; gap: 8px; }
+  ol.first li { counter-increment: fx; display: grid; grid-template-columns: 34px 1fr; gap: 10px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; align-items: start; }
+  ol.first li::before { content: counter(fx); font-family: var(--display); font-weight: 700; font-size: 20px; color: var(--accent); line-height: 1.2; }
+  ol.first li .t { font-weight: 600; }
+  ol.first li .d { color: var(--ink-2); font-size: 15px; }
+
+  /* plain lists */
+  ul.plain { margin: 8px 0 0; padding-left: 20px; max-width: 78ch; }
+  ul.plain li { margin: 4px 0; color: var(--ink-2); }
+  ul.plain li b { color: var(--ink); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  .tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-2); }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ok-t { color: var(--ok); font-weight: 600; } .bad-t { color: var(--crit); font-weight: 600; }
+  footer { margin-top: 56px; color: var(--ink-3); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+  @media (max-width: 640px) { h1 { font-size: 34px; } .wrap { padding: 28px 16px 60px; } }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <p class="eyebrow">Code review · 3 September 2026 · commit 378e93d</p>
+  <h1>Katha Deep Review</h1>
+  <p class="lede">A full read of the five built surfaces and the deploy layer: the coin ledger and its persistence, core-api, admin-api, the Next.js site, the React back office, the iOS app, and compose/nginx/CI/tools. Every finding below was traced through the code; those marked <em>reproduced</em> were triggered against a test client, a scratch database, or real threads.</p>
+
+  <div class="verify">
+    <div class="vcard ok"><span class="k">backend pytest</span><span class="v">245 pass · 99.2%</span><span class="n">README claims 100%; gate is 98</span></div>
+    <div class="vcard bad"><span class="k">web/site vitest</span><span class="v">77 pass · 1 fail</span><span class="n">Player.test.tsx:85 is stale; coverage gate is red</span></div>
+    <div class="vcard ok"><span class="k">web/admin vitest + tsc</span><span class="v">222 pass · clean</span><span class="n">CI never runs tsc or build</span></div>
+    <div class="vcard ok"><span class="k">KathaKit swift test</span><span class="v">83 pass</span><span class="n">app target has no unit tests</span></div>
+    <div class="vcard bad"><span class="k">core-api contract</span><span class="v">drifted</span><span class="n">WebOrderRequest.order_ref missing from committed spec</span></div>
+    <div class="vcard bad"><span class="k">admin-api pytest alone</span><span class="v">1 fail</span><span class="n">app/ shim shadows core-api's app package; full run is green</span></div>
+  </div>
+</header>
+
+<h2>Fix first</h2>
+<p class="sub">The eight items that make the current build unsafe to put money behind, in the order I would take them. Each is a real, reachable defect, not a hardening wish.</p>
+<ol class="first">
+  <li><div><div class="t">Close the free-coins endpoint (C1)</div><div class="d">POST /v1/web/orders credits any authenticated caller with no payment proof and no production guard. One line makes it fail closed like IAP already does.</div></div></li>
+  <li><div><div class="t">Make debits atomic in the database (B1, B2)</div><div class="d">Balance checks run against a per-worker snapshot; two concurrent unlocks both succeed and the wallet goes negative. A failed flush then wedges that worker's ledger for every user.</div></div></li>
+  <li><div><div class="t">Namespace idempotency keys by user and reject mismatched replays (B4)</div><div class="d">A client-chosen unlock key can pre-empt another user's check-in or web purchase key, silently zeroing their credit.</div></div></li>
+  <li><div><div class="t">Require a real OTP provider and real Apple verification in managed envs (B3)</div><div class="d">A deployment that passes the production guard still logs anyone into any phone number with any four digits.</div></div></li>
+  <li><div><div class="t">Validate drafts and refuse non-positive prices at the ledger (A1, A4)</div><div class="d">A content-role draft with coin_price −100 pays users to unlock; a draft with the wrong shape 500s the public catalog with no way to delete it.</div></div></li>
+  <li><div><div class="t">Make the admin guard require OIDC config and put the admin vhost behind an allowlist (D1, A2, A6)</div><div class="d">With the shipped QA compose and a blank issuer, the one-click dev identity provider is live on public 443.</div></div></li>
+  <li><div><div class="t">Move the web site's access and price decisions to the server (S1, S2, S4)</div><div class="d">The site decides "free" and "unlocked" from a constant and localStorage, contradicting the repo's core convention.</div></div></li>
+  <li><div><div class="t">Ship StoreKit 2 and Keychain storage in the iOS app (I1, I2)</div><div class="d">The app sends a fabricated receipt, so purchases cannot work against a real backend, and the 30-day bearer sits in plaintext UserDefaults.</div></div></li>
+</ol>
+
+<h2>Findings register</h2>
+<p class="sub">Grouped by surface. IDs are stable so they can be referenced in tickets. "Reproduced" means the reviewer triggered the failure; "Traced" means it was confirmed by reading the code end to end.</p>
+<div class="totals" id="totals">
+  <button type="button" data-sev="all" aria-pressed="true">All <span class="num" id="n-all"></span></button>
+  <button type="button" data-sev="crit" aria-pressed="false"><span class="dot crit"></span>Critical <span class="num" id="n-crit"></span></button>
+  <button type="button" data-sev="high" aria-pressed="false"><span class="dot high"></span>High <span class="num" id="n-high"></span></button>
+  <button type="button" data-sev="med" aria-pressed="false"><span class="dot med"></span>Medium <span class="num" id="n-med"></span></button>
+  <button type="button" data-sev="low" aria-pressed="false"><span class="dot low"></span>Low <span class="num" id="n-low"></span></button>
+  <span class="hint">Filter by severity</span>
+</div>
+
+<h3>B · Ledger, persistence and shared infra</h3>
+<div class="register">
+  <div class="f crit"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip crit">Critical</span><span class="chip conf">Reproduced</span><span class="id">B1</span></div>
+    <div class="title">Concurrent unlocks double-spend; wallets go negative</div>
+    <div class="path">backend/packages/infra/katha_infra/persistent_ledger.py:131-141 · db.py · Dockerfile KATHA_WORKERS=4</div>
+    <p>Every mutation is refresh → in-memory rule → flush with no transaction or lock across the three steps, and each gunicorn worker and each service holds its own PersistentLedger. <b>Scenario:</b> a 60-coin wallet receives two 60-coin unlocks on two workers; both refresh, both pass the balance check, both persist. Reproduced with two threads on one SQLite file: 20 of 20 rounds succeeded twice and the wallet row ended at −60. The same window exists between admin adjustments and core-api unlocks.</p>
+    <p class="fix"><b>Fix:</b> make the debit one database transaction with a row lock on the wallet (or a conditional UPDATE … WHERE balance ≥ cost), and treat the in-memory ledger as a cache rather than the arbiter.</p>
+  </div></div>
+
+  <div class="f crit"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip crit">Critical</span><span class="chip conf">Reproduced</span><span class="id">B2</span></div>
+    <div class="title">A failed flush wedges the worker's ledger for every user</div>
+    <div class="path">backend/packages/infra/katha_infra/persistent_ledger.py:43-57</div>
+    <p>On IntegrityError the retry re-mints transaction ids but reuses the same entitlement list, so a (user, episode) collision from two workers fails again and raises. The pending tail is never dropped, so every later flush on that worker hits the same error while the in-memory ledger keeps applying credits it cannot persist. <b>Scenario:</b> double-tap unlock across two workers → one worker's flush raises; a later 10-coin purchase for an unrelated user on that worker raises too, memory says 20, database says 0, and those rows vanish at restart. Reachable from free-episode playback as well as paid unlocks.</p>
+    <p class="fix"><b>Fix:</b> recompute the entitlement set after refresh and drop rows already on disk; on a second failure roll the in-memory state back or crash rather than serve unpersisted money.</p>
+  </div></div>
+
+  <div class="f crit"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip crit">Critical</span><span class="chip conf">Reproduced</span><span class="id">B3</span></div>
+    <div class="title">Production guard does not require an OTP provider or Apple verification</div>
+    <div class="path">backend/packages/infra/katha_infra/prodguard.py:50-56 · core-api/app/routers/auth.py:142,154-166</div>
+    <p>OTP verify only checks the code when KATHA_OTP_PROVIDER is set, and Apple sign-in hashes whatever string the client sends with no verification in any mode. <b>Scenario:</b> KATHA_ENV=prod with all required secrets and Postgres passes the guard; any four digits log into any phone number, and user ids are sha256(phone)[:16] so the victim account is derivable. The Apple path also mints a different user per login in production because Apple's identity token changes each time.</p>
+    <p class="fix"><b>Fix:</b> require KATHA_OTP_PROVIDER (not console) and Redis when workers &gt; 1 in managed envs; verify the Apple identity token against Apple's JWKS and derive the id from its sub claim; fail closed like iap_verify.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">B4</span></div>
+    <div class="title">Idempotency keys share one global namespace and unlock accepts the client's key verbatim</div>
+    <div class="path">backend/packages/ledger/katha_ledger/ledger.py:59-67,137-143 · core-api/app/routers/wallet.py:162,185</div>
+    <p>Keys are not scoped by user or checked against the replayed payload, and the unlock endpoints pass the client key straight through into the same namespace as server-minted keys. <b>Scenario:</b> an attacker unlocks an episode with key checkin:usr_victim:2026-09-03 and web:usr_victim:coins_web_popular_in → the victim's check-in returns already_claimed and their ₹199 web order credits 0 bought coins. Any user replaying another user's key gets a 200 carrying the other user's spent amounts and no entitlement.</p>
+    <p class="fix"><b>Fix:</b> prefix client keys server-side (unlock:{user}:{key}); in the ledger raise a conflict when the existing transaction's user, type or reference differ from the request.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Traced</span><span class="id">B5</span></div>
+    <div class="title">Alembic baseline is create_all from live models, so the first real revision cannot apply</div>
+    <div class="path">backend/migrations/versions/0001_baseline.py:19-29 · .github/workflows/ci.yml:34-37</div>
+    <p>The baseline imports Base and runs create_all, so CI's upgrade head plus alembic check on a fresh database can never detect a model change, and once 0002 exists a fresh environment gets its column from the baseline and 0002 fails with "column already exists". Downgrade drops every table. <b>Scenario:</b> add a column, CI green, QA (stamped at 0001, autocreate off) throws UndefinedColumn at runtime.</p>
+    <p class="fix"><b>Fix:</b> freeze the baseline as explicit op.create_table DDL (autogenerate once and commit it) and never import the models from a migration.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Traced</span><span class="id">B6</span></div>
+    <div class="title">Twilio provider can never verify a code</div>
+    <div class="path">backend/packages/infra/katha_infra/otp.py:70-75,80-104</div>
+    <p>Twilio Verify generates and sends its own code; the send call posts only To and Channel, but verify compares against the locally generated code. No user can log in with the Twilio provider selected.</p>
+    <p class="fix"><b>Fix:</b> call VerificationCheck in verify for Twilio, or send CustomCode (needs account enablement).</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">B7</span></div>
+    <div class="title">Audit chain breaks under concurrent appends and cannot be repaired</div>
+    <div class="path">backend/packages/infra/katha_infra/shared_store.py:346-358 · admin_app/main.py:130-140</div>
+    <p>Append reads the last row then inserts with no serialization; two threadpool handlers take the same prev_hash. Reproduced with 20 concurrent appends and no tampering: chain_ok is False permanently, indistinguishable from an attack. The audit row is also committed in a separate transaction from the money move it records, so a crash in between leaves an unaudited adjustment.</p>
+    <p class="fix"><b>Fix:</b> lock a single chain-head row inside the same transaction as the mutation (or enforce a unique prev_hash and retry).</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">B8</span></div>
+    <div class="title">Audit hash omits actor role, IP and user agent, and deleting the newest rows is undetected</div>
+    <div class="path">backend/packages/infra/katha_infra/shared_store.py:350-352,377-384</div>
+    <p>The hash covers prev|ts|actor|action|target|detail only, joined with a pipe. Rewriting a row's role, IP or user agent and deleting the tail both leave chain_ok True; with no secret an attacker with database write can rewrite any row and recompute the rest.</p>
+    <p class="fix"><b>Fix:</b> hash all columns with unambiguous encoding (JSON), HMAC with a server secret, and anchor the head hash out of band.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">B9</span></div>
+    <div class="title">Ledger accepts a zero or negative unlock cost</div>
+    <div class="path">backend/packages/ledger/katha_ledger/ledger.py:149-172</div>
+    <p>Cost 0 with un-owned episodes raises KeyError (500); a negative cost passes the balance check and min(bonus, cost) turns the debit into a credit. Reproduced: balance 100 → 600 with the episode entitled. This is what A1 exploits from the admin side.</p>
+    <p class="fix"><b>Fix:</b> raise LedgerError when cost ≤ 0 and episodes remain to unlock; validate price_per_episode &gt; 0.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">B10</span></div>
+    <div class="title">Every wallet read, playback and mutation loads the whole transaction and entitlement tables</div>
+    <div class="path">backend/packages/infra/katha_infra/persistent_ledger.py:89-92 · shared_store.py:104,274</div>
+    <p>refresh issues unfiltered SELECTs on both money tables per request per worker, and admin adjust/refund build a fresh PersistentLedger per call, reloading the entire ledger. Cost grows linearly with platform history on the hottest paths.</p>
+    <p class="fix"><b>Fix:</b> fold in rows above a high-water mark id, or drop the process cache in favour of per-request reads once B1 is fixed.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">B11</span></div>
+    <div class="title">OTP is four digits, resends reset the attempt counter, and limits are per-process</div>
+    <div class="path">backend/packages/infra/katha_infra/otp.py:43-49,54,93-104 · core-api/app/routers/auth.py:32-77</div>
+    <p>Defaults allow roughly 150 guesses per phone per 10 minutes. Without Redis the code store and counters are per worker, so with four workers caps multiply by four and verify on a worker that did not mint the code fails about three times in four.</p>
+    <p class="fix"><b>Fix:</b> six digits, attempts carried across resends, resends capped, and Redis required in managed envs.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">B12</span></div>
+    <div class="title">Invoice numbers use the calendar year, not the Indian financial year</div>
+    <div class="path">backend/packages/infra/katha_infra/shared_store.py:770 · comms.py:159</div>
+    <p>A purchase on 10 Feb 2027 is numbered KATHA-INV-2728 although it belongs to FY 2026-27, and the statutory sequence resets on 1 January. The stamp is UTC, so late 31 March UTC is already 1 April IST.</p>
+    <p class="fix"><b>Fix:</b> compute the FY from the IST date with an April boundary.</p>
+  </div></div>
+
+  <div class="f low"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip low">Low</span><span class="chip conf">Reproduced</span><span class="id">B13</span></div>
+    <div class="title">KV value column is String(1024) but stores whole draft series and experiments</div>
+    <div class="path">backend/packages/infra/katha_infra/models.py:79-80 · admin_app/main.py:1220</div>
+    <p>SQLite ignores the length (a 2205-char draft stored fine in dev); Postgres raises on the first long synopsis in QA. <b>Fix:</b> use Text, and cap input lengths in the handler.</p>
+  </div></div>
+
+  <div class="f low"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip low">Low</span><span class="chip conf">Traced</span><span class="id">B14</span></div>
+    <div class="title">Unicode digits pass isdigit and crash compare_digest</div>
+    <div class="path">backend/packages/infra/katha_infra/otp.py:100 · core-api/app/routers/auth.py:135</div>
+    <p>Arabic-Indic digits satisfy the format check and then raise TypeError inside the timing-safe compare, a 500 in real-OTP mode. <b>Fix:</b> require isascii() as well.</p>
+  </div></div>
+
+  <div class="f low"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip low">Low</span><span class="chip conf">Traced</span><span class="id">B15</span></div>
+    <div class="title">Retry path re-mints a transaction id the client already received</div>
+    <div class="path">backend/packages/infra/katha_infra/persistent_ledger.py:52-54</div>
+    <p>The router has already returned the original object, so the client holds an id that never exists in the database and refunds by that id 404. <b>Fix:</b> mint ids from the database or return the re-minted transaction.</p>
+  </div></div>
+</div>
+
+<h3>C · core-api (public API)</h3>
+<div class="register">
+  <div class="f crit"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip crit">Critical</span><span class="chip conf">Reproduced</span><span class="id">C1</span></div>
+    <div class="title">POST /v1/web/orders mints coins with no payment verification and no production guard</div>
+    <div class="path">backend/services/core-api/app/routers/wallet.py:110-148</div>
+    <p>iap_verify refuses with 501 outside dev; web_order has no guard at all and credits the pack plus 10% bonus on every call. <b>Scenario:</b> in a managed deployment any authenticated user, including a guest, posts {"sku":"coins_mega_in","order_ref":"a1"}, then a2, a3 … and mints unlimited coins, each order_ref bypassing idempotency. No test asserts this endpoint is refused outside dev, while the symmetric IAP test exists.</p>
+    <p class="fix"><b>Fix:</b> gate behind dev_stubs_enabled() now; credit only from a signature-verified Razorpay payment.captured webhook keyed on the PSP payment id.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">C2</span></div>
+    <div class="title">Committed OpenAPI contract is stale</div>
+    <div class="path">contracts/openapi/core-api.json</div>
+    <p>WebOrderRequest gained order_ref, the field that keys web-order idempotency, and the committed spec does not have it; two descriptions also drifted. The drift gate is a CI shell step, not a pytest test, so local runs stay green.</p>
+    <p class="fix"><b>Fix:</b> run make openapi and commit; add a pytest that compares app.openapi() to the committed file.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">C3</span></div>
+    <div class="title">Unlocking a free episode charges full price</div>
+    <div class="path">backend/services/core-api/app/routers/wallet.py:151-167</div>
+    <p>unlock_episode checks the number is within the series but never against free_episode_count, and a free episode is only entitled once played. Unlocking episode 1 before playing debits 30 coins.</p>
+    <p class="fix"><b>Fix:</b> grant free and return a zero-charge response when number ≤ free_episode_count.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">C4</span></div>
+    <div class="title">Raw-bearer fallback in /v1/home and guest merge ignores the dev-stubs switch</div>
+    <div class="path">backend/services/core-api/app/routers/catalog.py:42-48 · routers/auth.py:104-112</div>
+    <p>current_user rejects a non-JWT bearer once stubs are off, but the home rail helper returns the raw token as the user id unconditionally. <b>Scenario:</b> in production, Bearer &lt;victim id&gt; on /v1/home returns the victim's "Because you watched" rail. The merge source in login has the same fallback.</p>
+    <p class="fix"><b>Fix:</b> fall back to the raw token only when dev_stubs_enabled(), as /v1/config already does.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">C5</span></div>
+    <div class="title">A missing Authorization header maps every anonymous caller to one shared "guest-dev" account</div>
+    <div class="path">backend/services/core-api/app/auth.py:97-98 · store.py:200</div>
+    <p>There is no production check: unauthenticated requests in any environment share one wallet, one entitlement set and one watch history, and merge_guest accepts guest-dev as a source. The load test exercises exactly this path.</p>
+    <p class="fix"><b>Fix:</b> outside dev stubs, return 401 without a valid bearer; clients already call /v1/auth/guest for a real gst_ identity.</p>
+  </div></div>
+
+  <div class="f low"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip low">Low</span><span class="chip conf">Traced</span><span class="id">C6</span></div>
+    <div class="title">Guest merge only checks the source prefix</div>
+    <div class="path">backend/services/core-api/app/store.py:195-232</div>
+    <p>Anyone holding a victim's guest bearer can pass it on their own login and sweep that guest's coins. Bounded by needing the token. <b>Fix:</b> bind guest tokens to a device or attestation before honouring a merge.</p>
+  </div></div>
+
+  <div class="f low"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip low">Low</span><span class="chip conf">Traced</span><span class="id">C7</span></div>
+    <div class="title">CDN fallback playback URL is unsigned</div>
+    <div class="path">backend/services/core-api/app/routers/playback.py:29</div>
+    <p>When the local HLS master is missing the endpoint returns a cdn.katha.dev URL with a plain exp query and no HMAC. <b>Fix:</b> sign this branch or fail closed.</p>
+  </div></div>
+
+  <div class="f low"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip low">Low</span><span class="chip conf">Traced</span><span class="id">C8</span></div>
+    <div class="title">Progress and My List writes ignore serve status; stub services are dead scaffolding</div>
+    <div class="path">backend/services/core-api/app/routers/engagement.py:33-38,68-73 · services/ai-service · services/workers/tasks.py</div>
+    <p>Engagement resolves series through the seed catalog rather than the override layer, so archived series still accept writes. ai-service is a health-only stub imported nowhere, workers/tasks.py is an unused Celery list, and the arq worker's push task is a no-op.</p>
+  </div></div>
+</div>
+
+<h3>A · admin-api (back office)</h3>
+<div class="register">
+  <div class="f crit"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip crit">Critical</span><span class="chip conf">Reproduced</span><span class="id">A1</span></div>
+    <div class="title">Content role can mint coins through an unbounded draft price</div>
+    <div class="path">backend/services/admin-api/admin_app/main.py:1213-1216,756-778 · core-api/app/routers/wallet.py:160</div>
+    <p>create_series accepts any integer for coin_price and free_episodes, unlike the finance-only pricing endpoint which bounds them. Content can then flip the draft live. <b>Scenario:</b> a draft with coin_price −100 goes live; any user unlocking an episode goes from 0 to +100 bonus coins, repeatable per episode per user.</p>
+    <p class="fix"><b>Fix:</b> validate drafts with the same bounds as pricing (coin_price ≥ 1) and have the ledger refuse non-positive costs (B9).</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">A2</span></div>
+    <div class="title">Dev identity provider is reachable in a managed deployment with a hardcoded bootstrap admin</div>
+    <div class="path">prodguard.py:57-60 · admin_app/oidc.py:67,133,448-478 · docker-compose.qa.yml:60</div>
+    <p>The guard never requires an OIDC issuer, client credentials, cookie-secure or admin CORS. An unset or empty issuer selects the dev IdP, and the compose file passes an empty variable through. <b>Scenario:</b> KATHA_ENV=prod with secret and Postgres passes; GET /admin/v1/devidp/authorize renders a one-click "ops@katha.dev · admin" button. See D1 for the network exposure.</p>
+    <p class="fix"><b>Fix:</b> require issuer, client id/secret, redirect URL and cookie-secure in the guard; 404 the dev IdP routes in managed envs; no default bootstrap email.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Traced</span><span class="id">A3</span></div>
+    <div class="title">The dual-approval queue lives in process memory across four workers</div>
+    <div class="path">backend/services/admin-api/admin_app/store.py:54 · main.py:52,143,568,1303 · deploy/backend-entrypoint.sh:16</div>
+    <p>Approvals, rate buckets and metrics are per-process dicts with no table behind them. <b>Scenario:</b> support requests +900 on worker A, finance approves on worker B and gets 404 three times in four; a restart drops every pending request while the requester's daily cap has already been charged.</p>
+    <p class="fix"><b>Fix:</b> persist approvals in the shared database and transition status with a conditional UPDATE … WHERE status='pending'.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">A4</span></div>
+    <div class="title">One malformed draft takes down the public catalog permanently</div>
+    <div class="path">backend/services/admin-api/admin_app/main.py:1209-1220 · core-api/app/overrides.py:66</div>
+    <p>genres, language and rating are stored untyped; the override layer builds a pydantic model from them and raises. <b>Scenario:</b> {"genres":"notalist"} returns 200; thereafter /v1/series, /v1/home and the admin catalog all return 500 for everyone. Archiving does not help and there is no delete endpoint.</p>
+    <p class="fix"><b>Fix:</b> validate drafts with a pydantic model and make the override reader skip unparsable rows.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Traced</span><span class="id">A5</span></div>
+    <div class="title">GST invoice register and CSV silently stop at 200 rows</div>
+    <div class="path">backend/services/admin-api/admin_app/main.py:1362,1417 · shared_store.py:799</div>
+    <p>Both call invoices_all with its default limit. From the 201st web sale the totals and the filing CSV omit the oldest invoices with no indication.</p>
+    <p class="fix"><b>Fix:</b> paginate by financial year and compute totals in SQL.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">A6</span></div>
+    <div class="title">Any KATHA_ADMIN_AUTH value other than the literal "oidc" falls open to client-named roles</div>
+    <div class="path">backend/services/admin-api/admin_app/oidc.py:62-64 · rbac.py:57-68</div>
+    <p>A typo such as oidc-google or OIDC2 selects header identity. Reproduced: X-Role: admin on /admin/v1/overview returns 200. Only the managed-env guard catches it.</p>
+    <p class="fix"><b>Fix:</b> treat only the literal "headers" as opt-in; everything else is OIDC.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">A7</span></div>
+    <div class="title">Audit annotate and user timeline only see the newest 500 rows</div>
+    <div class="path">backend/services/admin-api/admin_app/main.py:630-635,1329-1331</div>
+    <p>Both scan audit_list(limit=500) in Python. After 505 rows, annotating row 1 returns 404 and a user's timeline shows none of their older admin events. <b>Fix:</b> look up by id and filter by target in SQL.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">A8</span></div>
+    <div class="title">/admin/v1/metrics is unauthenticated and keyed by raw path</div>
+    <div class="path">backend/services/admin-api/admin_app/main.py:965-970</div>
+    <p>No role dependency; keys are literal paths such as /admin/v1/users/&lt;id&gt;/export, so user ids and operator activity leak and the dict grows per distinct path. <b>Fix:</b> gate with a role and key by route template.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">A9</span></div>
+    <div class="title">DPDP erase leaves grievance and outbox PII and does not kill the user's tokens; export is incomplete</div>
+    <div class="path">backend/services/admin-api/admin_app/main.py:640-661 · shared_store.py:470-486</div>
+    <p>Erase scrubs profile, devices and push tokens only: grievance contact and body and outbox rows (recipient email, invoice HTML) survive, and token_version is not bumped so the erased user's JWT keeps working. Export omits grievances, devices and events.</p>
+    <p class="fix"><b>Fix:</b> scrub grievance contact and outbox recipients, bump the token version, and export every personal-data table.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">A10</span></div>
+    <div class="title">Adjustments under the approval threshold have no idempotency; the daily cap is read-modify-write</div>
+    <div class="path">backend/services/admin-api/admin_app/main.py:196-209,580-585</div>
+    <p>Each call mints adjust:&lt;uuid&gt;, so a retried or double-clicked request grants twice (the web client has no key either, W6). The cap check races. <b>Fix:</b> accept a client idempotency key and use an atomic increment for the cap.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">A11</span></div>
+    <div class="title">Session hardening gaps: cookie Secure is opt-in, step-up is a silent SSO re-login, logout skips CSRF, JWKS never evicts keys</div>
+    <div class="path">backend/services/admin-api/admin_app/oidc.py:80,247-255,314-321 · main.py:180-193</div>
+    <p>KATHA_ADMIN_COOKIE_SECURE is absent from the QA compose; the step-up flow sends no prompt=login or max_age and never checks auth_time, so an unattended browser passes it; /auth/logout accepts a cross-site POST. <b>Fix:</b> guard cookie-secure, send max_age=0 and verify auth_time on step-up, require the CSRF header on logout, rebuild the JWKS map on refetch.</p>
+  </div></div>
+
+  <div class="f low"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip low">Low</span><span class="chip conf">Reproduced</span><span class="id">A12</span></div>
+    <div class="title">Role-matrix drift, refund re-audit, and PII breadth</div>
+    <div class="path">admin_app/main.py:682-686,1245,1351,1370-1380 · rbac.py:101-108 · oidc.py:149</div>
+    <p>Content can PUT experiments although the matrix says admin only; the "own" audit view for content/qc/support is unimplemented (403); a second refund of the same transaction reports "refunded" and audits 600 coins again although the ledger deduped; outbox bodies and recipient emails are visible to read-only and analyst roles; the grievance email interpolates the user's subject unescaped; directory_role full-scans the KV table on every authenticated request.</p>
+  </div></div>
+</div>
+
+<h3>S · web/site (Next.js public site and web player)</h3>
+<div class="register">
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">S1</span></div>
+    <div class="title">Episode access is decided on the client from a constant and localStorage</div>
+    <div class="path">web/site/components/Player.tsx:28-31 · lib/catalog.ts:117-119 · components/WalletProvider.tsx:170-177</div>
+    <p>isFreeEpisode is n ≤ 10 at build time and "unlocked" is a localStorage map; /playback is only called after the client has decided the episode is watchable. <b>Scenario:</b> admin reprices a series to 8 free episodes → the site still shows E9 and E10 as free, playback answers locked, and the user sees "Stream unavailable" instead of a paywall. A user who unlocked on iPhone sees the paywall on the web and is asked to pay again.</p>
+    <p class="fix"><b>Fix:</b> call /playback first and render the paywall from its locked payload, which already carries price, balance and the bundle offer; drop the local map as the source of truth.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">S2</span></div>
+    <div class="title">A failed unlock restores the balance but leaves the episode marked unlocked forever</div>
+    <div class="path">web/site/components/WalletProvider.tsx:186-218</div>
+    <p>On 402 or a timeout the optimistic unlocked entry is never removed and is persisted. The player then treats the episode as accessible, playback returns locked, and the user is stuck with no way to pay.</p>
+    <p class="fix"><b>Fix:</b> roll the entry back in the catch, or fix S1 so access is server-derived.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">S3</span></div>
+    <div class="title">Sign-in sends a hard-coded OTP and reports success on any failure</div>
+    <div class="path">web/site/components/WalletProvider.tsx:131-156 · lib/api.ts:45</div>
+    <p>The typed digits are discarded and "1234" is sent; on any error the provider still sets signed:true with the name "Meera". With a real OTP provider the UI says "Signed in as +91…" while the bearer is still the guest token, so purchases credit an anonymous browser-local account. A test pins this as expected.</p>
+    <p class="fix"><b>Fix:</b> send the entered code, treat failure as failure, and derive signed state from the token and profile.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">S4</span></div>
+    <div class="title">Prices, bundle cost, affordability, web bonus and a "2× first pack" offer are all computed client-side</div>
+    <div class="path">web/site/app/coins/page.tsx:20,44-47 · components/Player.tsx:33-35 · app/series/[slug]/page.tsx:52-53</div>
+    <p>The server has per-series prices, charges bundles only for un-owned episodes, and has no first-pack doubling at all. <b>Scenario:</b> the Starter pack advertises 1,320 coins and optimistically credits them; the server credits 660 and the balance visibly drops on reconcile. A repriced series advertises 30, the server charges 45, and the user gets a generic failure toast.</p>
+    <p class="fix"><b>Fix:</b> render prices from the server (playback locked payload or a pricing endpoint) and delete the client-side doubling.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">S5</span></div>
+    <div class="title">Purchase credits coins and emails an invoice before any payment, with a client-fabricated payment id</div>
+    <div class="path">web/site/components/WalletProvider.tsx:221-236 · app/coins/page.tsx:118-121</div>
+    <p>order_ref is crypto.randomUUID(), which the server treats as the PSP payment id. This client contract cannot be made safe: the webhook must be the credit trigger and the client should poll order status. randomUUID is also undefined on non-secure origins (the LAN-IP device testing setup), which throws after the optimistic credit and leaves a phantom balance.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">S6</span></div>
+    <div class="title">Bearer token in localStorage and no Content-Security-Policy</div>
+    <div class="path">web/site/lib/api.ts:3-14 · next.config.js</div>
+    <p>Any XSS drains the wallet. Today the only inline-script sink (JSON-LD) is correctly escaped, so this is defence in depth. <b>Fix:</b> httpOnly cookie session, or at minimum a CSP via next.config headers().</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">S7</span></div>
+    <div class="title">API base URLs are baked into the image at build time</div>
+    <div class="path">web/site/Dockerfile:8-9 · lib/catalog.ts:140</div>
+    <p>Defaults to http://localhost:8799 in the bundle. <b>Fix:</b> use relative paths behind the edge proxy and the server's coverUrl.</p>
+  </div></div>
+
+  <div class="f low"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip low">Low</span><span class="chip conf">Reproduced</span><span class="id">S8</span></div>
+    <div class="title">Test suite is red on a clean checkout</div>
+    <div class="path">web/site/test/Player.test.tsx:85</div>
+    <p>"attaches native HLS…" expects a .m3u8 src without stubbing the playback fetch; stale since the "no stand-in stream" change. The coverage gate therefore fails, and the README's green claim is wrong for this surface.</p>
+  </div></div>
+</div>
+
+<h3>W · web/admin (React back office)</h3>
+<div class="register">
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">W1</span></div>
+    <div class="title">Any non-2xx read, including a 401 after session expiry, is shown as sample fixture data</div>
+    <div class="path">web/admin/src/api/client.ts:63-82 · src/store.tsx:74-82</div>
+    <p>Identity is fetched at boot only. <b>Scenario:</b> session expires mid-shift → the Users view shows MOCK_USERS with fake phones and balances under an "Offline" banner, and every mutation toasts "sign in required" with no route back to Login.</p>
+    <p class="fix"><b>Fix:</b> on 401/403 refresh identity and route to Login; substitute fixtures only for network failures.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">W2</span></div>
+    <div class="title">Approvals toast "Approved · change written to the ledger" even when every call failed</div>
+    <div class="path">web/admin/src/views/Approvals.tsx:40-58</div>
+    <p>The success toast fires unconditionally after the loop. <b>Fix:</b> toast only for the items that succeeded.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">W3</span></div>
+    <div class="title">"Send push" has no busy state and the endpoint is not idempotent</div>
+    <div class="path">web/admin/src/views/CatalogDetail.tsx:82-88,364-366 · admin_app/main.py:1435-1452</div>
+    <p>A double-click sends every registered device the drop notification twice. setStatus, applyRating and savePricing share the pattern. <b>Fix:</b> disable while in flight; dedupe server-side.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">W4</span></div>
+    <div class="title">INR formatting rounds to one decimal</div>
+    <div class="path">web/admin/src/ui.tsx:113-115 · views/Config.tsx:188,212</div>
+    <p>A 0.15 rate renders "₹0.2 per coin"; ₹99.99 renders "₹100". A test pins the wrong value. <b>Fix:</b> two fraction digits, or the existing paise helper for minor units.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">W5</span></div>
+    <div class="title">Admin API base is baked in and fetch never sends credentials cross-origin</div>
+    <div class="path">web/admin/Dockerfile:7-8 · src/views/Catalog.tsx:174</div>
+    <p>Any cross-origin VITE_ADMIN_API_BASE silently drops the OIDC cookie (sign-in loop, then fixtures per W1); the catalog view hard-codes a 127.0.0.1 cover URL, which breaks on HTTPS. <b>Fix:</b> default to same-origin /admin/v1 and use the server's cover URL.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">W6</span></div>
+    <div class="title">Coin adjust and refund carry no idempotency key</div>
+    <div class="path">web/admin/src/views/Users.tsx:36-63,209-218</div>
+    <p>If the fetch fails after the server committed, the UI says nothing was written and the operator retries, doubling the credit (pairs with A10).</p>
+  </div></div>
+
+  <div class="f low"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip low">Low</span><span class="chip conf">Traced</span><span class="id">W7</span></div>
+    <div class="title">Users search has no sequence guard; self-approval guard compares against a hard-coded name; audit CSV lacks formula escaping</div>
+    <div class="path">web/admin/src/views/Users.tsx:412-427 · views/Approvals.tsx:42,137 · views/Audit.tsx:21-27</div>
+    <p>A slow response for "me" can overwrite "meera"; the client self-approval check compares requestedBy to "riya" and never fires in OIDC mode (the server enforces it); operator-typed notes starting with =, +, − or @ are exported unescaped.</p>
+  </div></div>
+</div>
+
+<h3>I · iOS (KathaApp and KathaKit)</h3>
+<div class="register">
+  <div class="f crit"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip crit">Critical</span><span class="chip conf">Reproduced</span><span class="id">I1</span></div>
+    <div class="title">No StoreKit at all; the app ships a fabricated receipt and "Restore" only refreshes the wallet</div>
+    <div class="path">ios/KathaApp/PaywallView.swift:153-158,217 · WalletView.swift:192</div>
+    <p>The buy path sends jws: "dev-jws-&lt;sku&gt;-&lt;uuid&gt;" to /v1/iap/verify; there is no StoreKit import anywhere under ios/. Against a production backend every purchase fails; against any deployment with dev stubs on, each tap mints a pack for free. Restore never calls AppStore.sync or reads current entitlements, an App Review 3.1.1 blocker.</p>
+    <p class="fix"><b>Fix:</b> StoreKit 2 Product.purchase → send jwsRepresentation → finish the transaction only after the server 200s, re-sending Transaction.unfinished on launch; implement real restore.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">I2</span></div>
+    <div class="title">30-day session token stored in plaintext UserDefaults</div>
+    <div class="path">ios/KathaApp/KathaApp.swift:134-137 · PrivacyInfo.xcprivacy:70-71</div>
+    <p>Any unencrypted backup or file-sharing extraction yields a bearer that authorizes unlocks, purchases and account deletion. The privacy manifest documents it as a preference. <b>Fix:</b> Keychain with kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">I3</span></div>
+    <div class="title">App Transport Security disabled globally and a LAN IP committed as the API base</div>
+    <div class="path">ios/KathaApp/Info.plist:23-33 · generate_xcodeproj.rb:55</div>
+    <p>NSAllowsArbitraryLoads is true and KathaAPIBase is http://192.168.1.12:8799 in the single plist used for every configuration, so a Release build sends the bearer in cleartext. <b>Fix:</b> per-configuration plist; Release removes arbitrary loads and rejects non-https bases.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">I4</span></div>
+    <div class="title">Parental PIN is plaintext, unthrottled, and removable without entering it</div>
+    <div class="path">ios/KathaApp/KathaApp.swift:128-133 · ProfileViews.swift:194-201,280-283</div>
+    <p>"Remove parental lock" is one tap with no PIN prompt; the compare is a plain == with no attempt limit, so 10,000 combos brute-force with no backoff. The IT Rules gate is cosmetic. <b>Fix:</b> require the current PIN to change or remove, store a salted hash in Keychain, lock out after five failures.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Reproduced</span><span class="id">I5</span></div>
+    <div class="title">Player race: concurrent loadPlayback calls are never cancelled and can debit two episodes</div>
+    <div class="path">ios/KathaApp/PlayerView.swift:395-407,414-422,449-489</div>
+    <p>Two quick swipes during a slow request start two unstructured Tasks; whichever returns last loads the engine, so E4 can play while the chrome, progress reports and drawer say E5. With auto-unlock on, both in-flight calls run their own unlock and the user is charged for an episode they never watch.</p>
+    <p class="fix"><b>Fix:</b> keep a single load Task, cancel it on advance and disappear, pass the target episode in and discard results when it no longer matches current; check cancellation before the unlock.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">I6</span></div>
+    <div class="title">Capture shield can be driven while "blocked" and only reacts to isCaptured</div>
+    <div class="path">ios/KathaApp/PlayerView.swift:171-172,197,211-214</div>
+    <p>While captured the layer is removed and the engine paused, but the swipe gesture stays attached: a swipe calls advance → load → play, so audio plays into the recording and auto-unlock debits happen behind the shield. No screenshot handling; the HLS is cleartext with a 6-hour token, so a proxy defeats the shield entirely. <b>Fix:</b> guard advance and tap on captured, stop rather than pause; FairPlay for real protection.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">I7</span></div>
+    <div class="title">No AVAudioSession category and no scene-phase handling in the player</div>
+    <div class="path">ios/KathaApp/PlayerView.swift · KathaApp.swift:43-49</div>
+    <p>Default soloAmbient respects the mute switch, so episodes play silently with the ringer off. On background the system pauses the player but isPlaying stays true, so the first tap on return pauses an already-paused player. <b>Fix:</b> set .playback at player start, pause on background, observe timeControlStatus.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">I8</span></div>
+    <div class="title">A 401 after launch is never handled</div>
+    <div class="path">ios/KathaKit/Sources/KathaKit/KathaAPIClient.swift:224-231 · KathaApp.swift:194-206</div>
+    <p>The token is checked once at launch; when it expires or its version is bumped while the app is warm, every call silently fails: feed shows "Can't reach Katha", wallet reads 0, recovery only by force-quit. <b>Fix:</b> map 401 to an unauthorized error and clear the token and restart as guest (or prompt sign-in).</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">I9</span></div>
+    <div class="title">Client fallbacks embed business numbers and the paywall derives its own bundle maths</div>
+    <div class="path">ios/KathaApp/KathaApp.swift:179-182 · PlayerView.swift:335 · ProfileViews.swift:493 · KathaKit/CoinMath.swift:30 · PaywallView.swift:26,96</div>
+    <p>If /v1/config fails the app shows a made-up 30 coins / ₹4.5 price and "2× on your first pack" regardless of the flag; the bundle row counts already-owned episodes as remaining, overstating savings versus what the server charges. <b>Fix:</b> render a skeleton until config arrives; take remaining-locked and gross from the playback payload.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">I10</span></div>
+    <div class="title">Progress reports are fire-and-forget and unordered; the server is last-write-wins</div>
+    <div class="path">ios/KathaApp/PlayerView.swift:491-499 · core-api/app/store.py:104-110</div>
+    <p>A 30 s report landing after a 35 s report regresses the resume position; the throttle also fires on every seek. <b>Fix:</b> serialize through one actor with coalescing; server ignores a smaller position unless a rewind flag is set.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Reproduced</span><span class="id">I11</span></div>
+    <div class="title">Dev auth stubs baked into the app UI</div>
+    <div class="path">ios/KathaApp/KathaApp.swift:293 · AuthViews.swift:116</div>
+    <p>Sign in with Apple sends identityToken "dev-apple-token" with no AuthenticationServices, so every Apple sign-in maps to the same server user; the OTP screen tells users "Dev build: any 4 digits work". <b>Fix:</b> ASAuthorizationController with the real identity token; dev copy behind #if DEBUG.</p>
+  </div></div>
+
+  <div class="f low"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip low">Low</span><span class="chip conf">Reproduced</span><span class="id">I12</span></div>
+    <div class="title">Check-in card reappears every launch; Swift 6 strictness never enforced on the app target; entitlements development-only</div>
+    <div class="path">ios/KathaApp/KathaApp.swift:86-90,143-147,359-365 · generate_xcodeproj.rb:59,95 · KathaApp.entitlements</div>
+    <p>lastCheckinDay is written but never read (server dedupes, so cosmetic). SWIFT_VERSION is 5.0, so the nonisolated(unsafe) statics and the non-isolated observable player engine touched from AVFoundation callbacks are never checked. aps-environment has no Release variant; the app README describes files that do not exist.</p>
+  </div></div>
+</div>
+
+<h3>D · Deploy, CI and tools</h3>
+<div class="register">
+  <div class="f crit"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip crit">Critical</span><span class="chip conf">Traced</span><span class="id">D1</span></div>
+    <div class="title">Following the QA runbook as written exposes one-click admin sign-in on public 443</div>
+    <div class="path">docker-compose.qa.yml:60 · deploy/.env.qa.example:16 · deploy/nginx/nginx.conf:92-116</div>
+    <p>The env template ships a blank issuer, the guard does not require one (A2), the admin vhost has no allow/deny, and KATHA_ADMIN_IP_ALLOWLIST is not set in compose, contradicting the security posture doc's "never exposed to the public internet". <b>Scenario:</b> any visitor to /admin/v1/auth/login clicks "ops@katha.dev · admin" and gets a full admin session with money actions.</p>
+    <p class="fix"><b>Fix:</b> guard requires issuer, client credentials, redirect URL, cookie-secure and a non-empty allowlist; add allow &lt;vpn-cidr&gt;; deny all; to the admin server block.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Traced</span><span class="id">D2</span></div>
+    <div class="title">Real OIDC cannot work in QA and session cookies are not Secure</div>
+    <div class="path">docker-compose.qa.yml:53-62 · admin_app/oidc.py:76-81</div>
+    <p>KATHA_OIDC_REDIRECT_URL and KATHA_ADMIN_COOKIE_SECURE are set nowhere, so redirect_uri defaults to localhost:5174 and cookies go over HTTPS without Secure. The IdP rejects the login, the operator blanks the issuer, and D1 follows.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Traced</span><span class="id">D3</span></div>
+    <div class="title">Both services see nginx's IP as the client</div>
+    <div class="path">deploy/backend-entrypoint.sh:13-21 · core-api/app/auth.py:101 · admin_app/main.py:61,90,132</div>
+    <p>gunicorn's default forwarded_allow_ips is 127.0.0.1, so X-Forwarded-For from the nginx container is ignored. <b>Scenario:</b> 100 testers share one OTP per-IP bucket and lock each other out; the admin IP allowlist is all-or-nothing; audit and device rows record the proxy. <b>Fix:</b> --forwarded-allow-ips for the compose subnet and X-Forwarded-For set to $remote_addr so clients cannot prepend hops.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Traced</span><span class="id">D4</span></div>
+    <div class="title">Internet Archive rights gate admits non-commercial, no-derivative and mis-tagged items</div>
+    <div class="path">tools/fetch_archive.py:38-59,116</div>
+    <p>Any creativecommons.org URL passes (BY-NC-ND forbids commercial use and derivatives; ingest crops and re-encodes); "public domain" is a substring match that accepts "not public domain"; --i-verified-rights skips the gate; the largest file is downloaded with no size cap. This is the one place the repo's no-third-party-video rule is enforced in code, and it is porous.</p>
+    <p class="fix"><b>Fix:</b> allow-list exact license URLs (CC0, PDM, CC BY, CC BY-SA), exact-match the copyright status, write provenance beside the episode, enforce a byte cap.</p>
+  </div></div>
+
+  <div class="f high"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip high">High</span><span class="chip conf">Traced</span><span class="id">D5</span></div>
+    <div class="title">backend/.dockerignore is not applied; the venv, coverage data and any dev SQLite DB are baked into the image</div>
+    <div class="path">backend/Dockerfile:17 · docker-compose.qa.yml:43 · .github/workflows/ci.yml:63</div>
+    <p>The build context is the repo root and there is no root .dockerignore, so COPY backend/ ships backend/.venv, .coverage and backend/*.db (real dev ledger rows and phone numbers when present). <b>Fix:</b> a root .dockerignore, or a Dockerfile-adjacent one under BuildKit.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">D6</span></div>
+    <div class="title">The prod guard is opt-in and silently skipped on ImportError</div>
+    <div class="path">prodguard.py:28-29 · core-api/app/main.py:47-53 · admin_app/main.py:1466-1471</div>
+    <p>Checks run only when the deployer remembers KATHA_ENV, and the call sits inside except ImportError: pass. An image run with KATHA_ENV unset serves dev secrets, raw-bearer auth and stubbed IAP on a reachable host. <b>Fix:</b> treat unset as managed (explicit dev/test disables), let ImportError propagate.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">D7</span></div>
+    <div class="title">CI does not run every gate the README claims</div>
+    <div class="path">.github/workflows/ci.yml · README.md:14,28,57</div>
+    <p>No Playwright e2e job; web/admin never runs tsc or build (vitest does not type-check); web/site uses npm install while the Dockerfile uses npm ci; the security job is continue-on-error; actions are on floating tags; no permissions block; push plus pull_request double-runs; XCUITest is not in CI.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">D8</span></div>
+    <div class="title">Slug path traversal in the media tools</div>
+    <div class="path">tools/ingest_media.py:104,170-173 · fetch_archive.py:114 · fetch_stock.py:94</div>
+    <p>A plan or map JSON with "slug": "../../../Users/x/.ssh/y" makes mkdir, ffmpeg output and downloads land outside media/. ffmpeg itself is invoked safely as argv. <b>Fix:</b> validate slugs with the same ^[a-z0-9-]+$ regex used for --source-dir and assert the output resolves under media/.</p>
+  </div></div>
+
+  <div class="f med"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip med">Medium</span><span class="chip conf">Traced</span><span class="id">D9</span></div>
+    <div class="title">Runbook template is gitignored; no restart policies; media volume never populated; worker permanently unhealthy</div>
+    <div class="path">.gitignore:36 · docker-compose.qa.yml · tools/ingest_media.py:41-42 · backend/services/worker/settings.py:28</div>
+    <p>.env.* matches deploy/.env.qa.example so a fresh clone cannot copy it; no service has restart:; ingest writes to the repo's media/ rather than the mounted volume so every playback 404s via X-Accel; the worker inherits the HTTP healthcheck while running arq and builds a new database engine per task.</p>
+  </div></div>
+
+  <div class="f low"><div class="stripe"></div><div class="body">
+    <div class="head"><span class="chip low">Low</span><span class="chip conf">Traced</span><span class="id">D10</span></div>
+    <div class="title">nginx hardening gaps and a load test that never touches auth or money</div>
+    <div class="path">deploy/nginx/nginx.conf:22-29,58-62,81-104 · deploy/loadtest/katha.js:53-56</div>
+    <p>/__media/ redefines add_header so HSTS and nosniff drop on every segment; keepalive is inert without Connection ""; no session cache, cipher list or OCSP; the 5 r/m auth zone will trip CGNAT cohorts once D3 is fixed. The load test does anonymous GETs and a playback as guest-dev, so it says nothing about JWT validation, purchase or unlock contention.</p>
+  </div></div>
+</div>
+
+<h2>What is solid</h2>
+<p class="sub">The review is fair only if it says where the design holds. These are the parts I would keep exactly as they are.</p>
+<ul class="plain">
+  <li><b>The pure ledger.</b> Side-effect free, append-only log as the source of truth, bonus-first spend, negative-balance block, reconcile-from-log, and tests that assert real invariants. The defects are in the persistence adapter and callers, not the rules.</li>
+  <li><b>Stream token signing.</b> HMAC over prefix, user and expiry with a normalised path scope check that closes traversal and prefix-walk; the public media route refuses video outright.</li>
+  <li><b>OIDC core.</b> PKCE S256, state and nonce in a signed short-lived cookie, RS256 via JWKS, issuer/audience/expiry required, email_verified and hosted-domain checks, role always from the server directory, fixed callback redirect, CSRF header on mutations.</li>
+  <li><b>Money-desk guardrails.</b> Approvals are idempotent by id, self-approval is blocked server-side, refunds are IDOR-safe and bounded, typed confirms guard pricing and flags, last-admin and tombstone guards prevent lockout and resurrection.</li>
+  <li><b>Client discipline in the admin panel and iOS app.</b> Both render server state for balances and lock state, carry idempotency keys on unlocks, and never optimistically debit; the admin contract drift test genuinely parses the client against the generated inventory.</li>
+  <li><b>Containers and repo hygiene.</b> Non-root users in every image, TLS 1.2/1.3 only, HSTS and frame denial on both vhosts, no secrets, databases or media tracked in git.</li>
+</ul>
+
+<h2>Test quality</h2>
+<p class="sub">Coverage numbers are high and mostly honest; the gaps are exactly where the serious findings sit.</p>
+<div class="tbl"><table>
+  <tr><th>Surface</th><th>Result</th><th>What the gate does not cover</th></tr>
+  <tr><td>backend</td><td class="num"><span class="ok-t">245 pass</span> · 99.2%</td><td>No concurrency test at all (B1, B2, B7). No test unlocks a free episode (C3), asserts web_order is refused outside dev (C1), or replays another user's idempotency key (B4). Most money tests run on the raw-bearer impersonation path rather than a signed JWT.</td></tr>
+  <tr><td>admin-api</td><td class="num"><span class="bad-t">1 fail</span> standalone</td><td>Running services/admin-api/tests alone puts its app/ deploy shim ahead of core-api's app package. All money tests use header identity; nothing exercises OIDC session plus CSRF plus step-up, multi-worker approvals, draft validation, invoice caps, or the metrics endpoint. Contract test compares path sets only; every body is a bare dict so payload drift is invisible.</td></tr>
+  <tr><td>web/site</td><td class="num"><span class="bad-t">77 pass · 1 fail</span></td><td>Player tests mock the wallet wholesale, so the access decision (S1, S2) is never exercised; one test pins the fake sign-in (S3) as expected behaviour.</td></tr>
+  <tr><td>web/admin</td><td class="num"><span class="ok-t">222 pass</span> · tsc clean</td><td>Fetch is stubbed rather than modules mocked, which is good; but most assertions target offline fixtures (six catalog slugs no longer exist in the seed) and the gate is met by click-through sweep files with low assertion density. One test pins the INR rounding bug (W4).</td></tr>
+  <tr><td>iOS</td><td class="num"><span class="ok-t">83 pass</span> KathaKit</td><td>The package suite proves transport and decoding, and part of its 98% is dead PaywallViewModel code the app never calls. The app target has no unit tests, so auto-unlock, the player state machine, the PIN gate and token lifecycle have zero automated coverage. UI tests need dev stubs and would pass against any backend returning 200; the screenshot tour cannot fail by design.</td></tr>
+</table></div>
+
+<footer>Reviewed at commit 378e93d on the main branch, 3 September 2026. Nothing in the repository was modified. Findings were produced by six parallel reviewers, one per surface, and cross-checked against each other; the top backend items were independently re-read.</footer>
+</div>
+
+<script>
+(function () {
+  var rows = Array.prototype.slice.call(document.querySelectorAll('.f'));
+  var counts = { all: rows.length, crit: 0, high: 0, med: 0, low: 0 };
+  rows.forEach(function (r) { ['crit','high','med','low'].forEach(function (s) { if (r.classList.contains(s)) counts[s]++; }); });
+  Object.keys(counts).forEach(function (k) { var el = document.getElementById('n-' + k); if (el) el.textContent = counts[k]; });
+  var buttons = document.querySelectorAll('#totals button');
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var sev = b.getAttribute('data-sev');
+      buttons.forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      rows.forEach(function (r) { r.hidden = sev !== 'all' && !r.classList.contains(sev); });
+      document.querySelectorAll('h3').forEach(function (h) {
+        var reg = h.nextElementSibling; if (!reg || !reg.classList.contains('register')) return;
+        var any = Array.prototype.some.call(reg.querySelectorAll('.f'), function (r) { return !r.hidden; });
+        h.hidden = !any; reg.hidden = !any;
+      });
+    });
+  });
+})();
+</script>
