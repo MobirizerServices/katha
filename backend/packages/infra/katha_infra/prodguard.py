@@ -2,7 +2,8 @@
 
 In any non-dev environment (`KATHA_ENV` = qa | staging | prod | production) the
 services must refuse to boot when a security-critical secret is missing or still
-the committed dev default, or when a dev auth mode is left on. This is what turns
+the committed dev default, when a dev auth mode is left on, or when login would
+run on a stub (no OTP provider, no Apple audience, no shared Redis). This is what turns
 the review's hardening from "warns" into "cannot run insecurely" — the dev
 fallbacks (raw-bearer auth, the IAP stub) key off these same secrets, so once
 they are real, the stubs are off.
@@ -54,6 +55,23 @@ def enforce(service: str) -> None:
             problems.append("KATHA_DEV_STUBS is enabled (raw-bearer auth + IAP stub) in a managed env")
         if not os.environ.get("KATHA_CORS_ORIGINS"):
             problems.append("KATHA_CORS_ORIGINS is not pinned (defaults are permissive dev origins)")
+        # Login must be real: without a provider, OTP verify accepts ANY 4-digit
+        # code for ANY phone (account takeover by phone number), and the console
+        # provider just logs the code.
+        provider = os.environ.get("KATHA_OTP_PROVIDER", "").strip().lower()
+        if not provider:
+            problems.append("KATHA_OTP_PROVIDER is not set (OTP verify would accept any code)")
+        elif provider == "console":
+            problems.append("KATHA_OTP_PROVIDER=console logs codes instead of sending them")
+        if not os.environ.get("KATHA_APPLE_BUNDLE_ID"):
+            problems.append("KATHA_APPLE_BUNDLE_ID is not set (Apple identity tokens cannot be verified)")
+        # OTP codes/attempts and the abuse limiter live in Redis; per-process
+        # memory splits them across gunicorn workers (caps multiply, codes
+        # minted on one worker fail to verify on another).
+        workers = os.environ.get("KATHA_WORKERS", "").strip()
+        if not os.environ.get("KATHA_REDIS_URL") and workers != "1":
+            problems.append("KATHA_REDIS_URL is required with more than one worker "
+                            "(OTP store + rate limits must be shared)")
     elif service == "admin-api":
         _require_secret("KATHA_ADMIN_SESSION_SECRET", dev_default=None, problems=problems)
         if os.environ.get("KATHA_ADMIN_AUTH", "oidc").strip().lower() != "oidc":

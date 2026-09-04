@@ -13,6 +13,9 @@ def _managed_core(monkeypatch):
     monkeypatch.setenv("KATHA_CORS_ORIGINS", "https://app.katha.example")
     monkeypatch.setenv("KATHA_PERSIST", "1")
     monkeypatch.setenv("KATHA_DB_URL", PG)
+    monkeypatch.setenv("KATHA_OTP_PROVIDER", "msg91")
+    monkeypatch.setenv("KATHA_APPLE_BUNDLE_ID", "dev.katha.app")
+    monkeypatch.setenv("KATHA_REDIS_URL", "redis://redis:6379/0")
 
 
 def test_dev_env_is_a_noop(monkeypatch):
@@ -80,3 +83,35 @@ def test_unknown_service_raises(monkeypatch):
     monkeypatch.setenv("KATHA_ENV", "prod")
     with pytest.raises(ValueError):
         enforce("nope")
+
+
+# --- B3: login must be real in a managed env -------------------------------
+
+def test_managed_core_requires_an_otp_provider(monkeypatch):
+    _managed_core(monkeypatch)
+    monkeypatch.delenv("KATHA_OTP_PROVIDER")
+    with pytest.raises(InsecureConfigError) as e:
+        enforce("core-api")
+    assert "KATHA_OTP_PROVIDER" in str(e.value) and "any code" in str(e.value)
+    monkeypatch.setenv("KATHA_OTP_PROVIDER", "console")
+    with pytest.raises(InsecureConfigError) as e:
+        enforce("core-api")
+    assert "console" in str(e.value)
+
+
+def test_managed_core_requires_apple_audience(monkeypatch):
+    _managed_core(monkeypatch)
+    monkeypatch.delenv("KATHA_APPLE_BUNDLE_ID")
+    with pytest.raises(InsecureConfigError) as e:
+        enforce("core-api")
+    assert "KATHA_APPLE_BUNDLE_ID" in str(e.value)
+
+
+def test_managed_core_requires_redis_unless_single_worker(monkeypatch):
+    _managed_core(monkeypatch)
+    monkeypatch.delenv("KATHA_REDIS_URL")
+    with pytest.raises(InsecureConfigError) as e:
+        enforce("core-api")
+    assert "KATHA_REDIS_URL" in str(e.value)
+    monkeypatch.setenv("KATHA_WORKERS", "1")
+    enforce("core-api")          # a single worker may keep OTP state in memory

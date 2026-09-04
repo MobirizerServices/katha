@@ -1,6 +1,8 @@
-"""Auth + profile endpoints (PDD §12.5). OTP and Apple sign-in are stubbed for
-the dev slice: any 4-digit OTP verifies, any Apple identity token is accepted.
-Both mint a real signed Katha JWT that the rest of the API verifies."""
+"""Auth + profile endpoints (PDD §12.5). In dev/test, OTP and Apple sign-in
+are stubbed: any 4-digit OTP verifies, any Apple identity token is accepted.
+A configured deployment (dev stubs off — see `prodguard`) checks the OTP
+against the provider and verifies Apple tokens against Apple's JWKS. Both
+mint a real signed Katha JWT that the rest of the API verifies."""
 from __future__ import annotations
 
 import json
@@ -156,8 +158,20 @@ def apple_auth(body: AppleAuthBody,
                authorization: str | None = Header(default=None)) -> AuthToken:
     if not body.identity_token.strip():
         raise HTTPException(status_code=400, detail="identity_token required")
-    # Dev stub: derive a stable id from the token; prod verifies with Apple's keys.
-    user_id = user_id_for_apple(body.identity_token)
+    from ..auth import dev_stubs_enabled
+    if dev_stubs_enabled():
+        # Dev stub: a stable id from the token string itself.
+        user_id = user_id_for_apple(body.identity_token)
+    else:
+        # Configured deployment: the token must verify against Apple's JWKS,
+        # and the user is the stable `sub` — the token string changes per login.
+        from .. import apple
+        try:
+            claims = apple.verify_identity_token(body.identity_token.strip())
+        except apple.AppleTokenInvalid as e:
+            raise HTTPException(status_code=401,
+                                detail=f"apple identity token rejected: {e}")
+        user_id = user_id_for_apple(claims["sub"])
     u = store.get_or_create_user(user_id, kind="apple")
     u.kind = "apple"
     if body.full_name and not u.display_name:
