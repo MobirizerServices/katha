@@ -69,6 +69,8 @@ coverage/
 ios/build/
 ios/build-device/
 ios/build-sim/
+# Per-developer Debug overrides (LAN IP for a real device) — template is committed
+ios/KathaApp/Config/Local.xcconfig
 
 # Device screen-review captures (session artifacts, regenerable)
 review/

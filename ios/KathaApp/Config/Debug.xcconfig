@@ -1,0 +1,10 @@
+// Debug builds: talk to a dev core-api over plain HTTP on the local network.
+// Set KATHA_API_BASE to the dev Mac's LAN IP for a real-device build
+// (127.0.0.1 would be the phone itself); the simulator default is fine as is.
+// Never "localhost": core-api binds IPv4 and the simulator resolves ::1 first.
+KATHA_API_BASE = http:/$()/127.0.0.1:8799
+
+// ATS lives in Info-Debug.plist: local networking only, never arbitrary loads.
+
+// Optional developer overrides (gitignored): LAN IP, team id, etc.
+#include? "Local.xcconfig"

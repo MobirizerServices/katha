@@ -24,6 +24,13 @@
 	<string>$(KATHA_API_BASE)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Debug only: plain HTTP to the dev Mac on the local network.
+		     Not NSAllowsArbitraryLoads — that key ships in no configuration. -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

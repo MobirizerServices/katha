@@ -52,12 +52,24 @@ build_file = project.new(Xcodeproj::Project::Object::PBXBuildFile)
 build_file.product_ref = dep
 target.frameworks_build_phase.files << build_file
 
+# Per-configuration settings: the API base comes from Config/{Debug,Release}
+# .xcconfig (Info.plist reads $(KATHA_API_BASE)), and each configuration has
+# its own plist — Info-Debug.plist allows local networking for the dev Mac,
+# Info.plist (Release) carries no ATS exception at all.
+config_group = group.new_group('Config', 'Config')
+xcconfigs = {}
+%w[Debug Release].each do |name|
+  xcconfigs[name] = config_group.new_reference("#{name}.xcconfig")
+end
+config_group.new_reference('Local.xcconfig.example')
+
 # Build settings for a simulator-runnable, unsigned app.
 target.build_configurations.each do |cfg|
   s = cfg.build_settings
+  cfg.base_configuration_reference = xcconfigs[cfg.name] if xcconfigs[cfg.name]
   s['PRODUCT_BUNDLE_IDENTIFIER'] = 'dev.katha.app'
   s['PRODUCT_NAME'] = '$(TARGET_NAME)'
-  s['INFOPLIST_FILE'] = 'KathaApp/Info.plist'
+  s['INFOPLIST_FILE'] = cfg.name == 'Debug' ? 'KathaApp/Info-Debug.plist' : 'KathaApp/Info.plist'
   s['GENERATE_INFOPLIST_FILE'] = 'NO'
   s['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
   s['TARGETED_DEVICE_FAMILY'] = '1'

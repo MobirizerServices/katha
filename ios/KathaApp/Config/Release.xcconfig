@@ -1,0 +1,3 @@
+// Release builds: HTTPS only. Info.plist carries no ATS exception of any kind,
+// and AppModel refuses a non-https base at launch, so a stray dev URL cannot ship.
+KATHA_API_BASE = https:/$()/api.katha.example

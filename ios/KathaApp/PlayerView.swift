@@ -155,6 +155,10 @@ struct PlayerView: View {
     @State private var lastReported = 0.0
     @State private var nextReady: (number: Int, pb: PlaybackResponse)?
     @State private var preloadingFor: Int?
+    /// The one in-flight playback load. A swipe cancels it before starting the
+    /// next, so two quick swipes can never race: only the load for the episode
+    /// on screen may touch the engine or debit an auto-unlock.
+    @State private var loadTask: Task<Void, Never>?
 
     private var episodeTitle: String {
         detail?.episodes.first { $0.number == current }?.title ?? "Episode \(current)"
@@ -202,9 +206,10 @@ struct PlayerView: View {
             guard current == 0 else { return }
             current = number
             await loadDetail()
-            await loadPlayback()
+            startLoad(for: number)
         }
         .onDisappear {
+            loadTask?.cancel()
             reportProgress(force: true)
             engine.stop()
         }
@@ -229,7 +234,7 @@ struct PlayerView: View {
                     episodeTitle: episodeTitle,
                     playback: pb,
                     detail: d,
-                    onUnlocked: { await loadPlayback() }
+                    onUnlocked: { startLoad(for: current) }
                 )
             }
         }
@@ -237,7 +242,7 @@ struct PlayerView: View {
             if let d = detail {
                 EpisodeDrawer(detail: d, current: current) { n in
                     showDrawer = false
-                    Task { await advance(to: n) }
+                    advance(to: n)
                 }
             }
         }
@@ -345,7 +350,7 @@ struct PlayerView: View {
             Text("Connection lost").font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
             Button("Retry") {
                 loadFailed = false
-                Task { await loadPlayback() }
+                reload()
             }
             .font(.system(size: 15, weight: .semibold))
             .foregroundStyle(Katha.Color.accent)
@@ -369,7 +374,7 @@ struct PlayerView: View {
                 Text("Up next: E\(current + 1)")
                     .font(.system(size: 18, weight: .bold)).foregroundStyle(.white)
                 KathaPrimaryButton(title: "Play next episode") {
-                    Task { await advance(to: current + 1) }
+                    advance(to: current + 1)
                 }
                 .padding(.horizontal, 60)
             }
@@ -396,29 +401,42 @@ struct PlayerView: View {
         DragGesture(minimumDistance: 60)
             .onEnded { g in
                 guard abs(g.translation.height) > abs(g.translation.width) else { return }
+                guard !captured else { return }     // the shield must not be swiped through
                 if g.translation.height < -60 {
                     Haptics.tap()
-                    Task { await advance(to: current + 1) }
+                    advance(to: current + 1)
                 } else if g.translation.height > 60, current > 1 {
                     Haptics.tap()
-                    Task { await advance(to: current - 1) }
+                    advance(to: current - 1)
                 }
             }
     }
 
     private func engineTapPlayPause() {
-        guard playback?.isEntitled == true, !engine.ended else { return }
+        guard playback?.isEntitled == true, !engine.ended, !captured else { return }
         engine.toggle()
     }
 
-    private func advance(to n: Int) async {
+    private func advance(to n: Int) {
         guard let d = detail, (1...d.episodeCount).contains(n) else { return }
         reportProgress(force: true)
         lastReported = 0        // the throttle window belongs to ONE episode
         current = n
         showPaywall = false
         engine.stop()
-        await loadPlayback()
+        startLoad(for: n)
+    }
+
+    /// Cancel whatever is loading and load episode `n`. Everything the load
+    /// does after an await re-checks that `n` is still the episode on screen.
+    private func startLoad(for n: Int) {
+        loadTask?.cancel()
+        loadTask = Task { await loadPlayback(for: n) }
+    }
+
+    /// Retry from the connection-lost state.
+    private func reload() {
+        startLoad(for: current)
     }
 
     // MARK: loading
@@ -446,8 +464,11 @@ struct PlayerView: View {
         }
     }
 
-    private func loadPlayback() async {
-        if let ready = nextReady, ready.number == current, ready.pb.isEntitled {
+    private func loadPlayback(for n: Int) async {
+        /// True while this load still belongs to the episode on screen.
+        var live: Bool { !Task.isCancelled && current == n }
+
+        if let ready = nextReady, ready.number == n, ready.pb.isEntitled {
             nextReady = nil
             playback = ready.pb
             loadFailed = false
@@ -458,18 +479,22 @@ struct PlayerView: View {
             }
         }
         do {
-            var pb = try await model.api.playback(slug: slug, number: current)
+            var pb = try await model.api.playback(slug: slug, number: n)
+            guard live else { return }
 
             // Auto-unlock (§8.4): debit only as the episode starts, one-tap off in
-            // the drawer; a toast confirms each auto-debit.
-            if pb.locked, model.autoUnlock,
+            // the drawer; a toast confirms each auto-debit. Never behind the
+            // capture shield, and never for an episode the viewer swiped past.
+            if pb.locked, model.autoUnlock, !captured,
                let price = pb.priceCoins, model.wallet.total >= price {
                 if let res = try? await model.api.unlockEpisode(
-                    slug: slug, number: current, idempotencyKey: UUID().uuidString) {
+                    slug: slug, number: n, idempotencyKey: UUID().uuidString) {
                     model.wallet.reconcile(with: res.wallet)
-                    toast = "−\(price) coins · E\(current) unlocked"
+                    guard live else { return }        // charged, but no longer on screen
+                    toast = "−\(price) coins · E\(n) unlocked"
                     Haptics.success()
-                    pb = try await model.api.playback(slug: slug, number: current)
+                    pb = try await model.api.playback(slug: slug, number: n)
+                    guard live else { return }
                 }
             }
 
@@ -477,14 +502,14 @@ struct PlayerView: View {
             loadFailed = false
             if pb.isEntitled, let urlStr = pb.hlsMasterUrl, let url = URL(string: urlStr) {
                 showPaywall = false
-                engine.load(url: url, resumeMs: pb.resumePositionMs ?? 0)
+                if !captured { engine.load(url: url, resumeMs: pb.resumePositionMs ?? 0) }
             } else {
                 engine.stop()
                 Haptics.warning()
                 showPaywall = true
             }
         } catch {
-            loadFailed = true
+            if live { loadFailed = true }
         }
     }
 

@@ -160,7 +160,7 @@ struct ProfileView: View {
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
-    @State private var showPinSetup = false
+    @State private var pinSheetMode: PinSheetMode?
     @State private var showDelete = false
 
     var body: some View {
@@ -191,16 +191,17 @@ struct SettingsView: View {
                 Text("One alert when your next episode drops. Never between 11 pm and 8 am, at most two a day.")
             }
             Section {
-                Button(model.parentalPin == nil ? "Set parental lock" : "Change parental lock") {
-                    showPinSetup = true
+                Button(model.parentalLockSet ? "Change parental lock" : "Set parental lock") {
+                    pinSheetMode = .set
                 }
-                if model.parentalPin != nil {
+                if model.parentalLockSet {
                     Button("Remove parental lock", role: .destructive) {
-                        model.parentalPin = nil
+                        pinSheetMode = .remove
                     }
                 }
             } header: { Text("Parental lock") } footer: {
-                Text("A PIN is asked before playing U/A 16+ and A-rated titles (IT Rules 2021).")
+                Text("A PIN is asked before playing U/A 16+ and A-rated titles (IT Rules 2021). "
+                     + "Changing or removing the lock asks for the current PIN.")
             }
             Section("About") {
                 NavigationLink("Help & grievance") { HelpView() }
@@ -211,8 +212,8 @@ struct SettingsView: View {
         .scrollContentBackground(.hidden)
         .background(Katha.Color.bg)
         .navigationTitle("Settings")
-        .sheet(isPresented: $showPinSetup) {
-            PinSetupSheet()
+        .sheet(item: $pinSheetMode) { mode in
+            PinSetupSheet(mode: mode)
         }
         .sheet(isPresented: $showDelete) {
             DeleteAccountSheet()
@@ -222,34 +223,129 @@ struct SettingsView: View {
 
 // MARK: - 4.3 Parental lock
 
+enum PinSheetMode: String, Identifiable {
+    case set, remove
+    var id: String { rawValue }
+}
+
+/// Set / change / remove the PIN. An existing lock is verified first — the
+/// current PIN is the only credential that can change or drop it.
 struct PinSetupSheet: View {
+    let mode: PinSheetMode
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+
+    private enum Step { case current, new, confirm }
+    @State private var step: Step
     @State private var pin = ""
+    @State private var current: String?
+    @State private var firstNew = ""
+    @State private var message: String?
+    @State private var lockedFor = 0
+
+    init(mode: PinSheetMode) {
+        self.mode = mode
+        // Existing lock → the current PIN comes first for change AND remove.
+        _step = State(initialValue: .new)
+    }
+
+    private var title: String {
+        switch (mode, step) {
+        case (.remove, _): return "Remove parental lock"
+        case (.set, .current): return "Enter your current PIN"
+        case (.set, .new): return model.parentalLockSet ? "Choose a new PIN" : "Set a parental PIN"
+        case (.set, .confirm): return "Confirm the new PIN"
+        }
+    }
+    private var subtitle: String {
+        if let message { return message }
+        switch step {
+        case .current: return "Asked before the lock can change."
+        case .new: return "Asked before U/A 16+ and A-rated titles play."
+        case .confirm: return "Enter the same 4 digits again."
+        }
+    }
 
     var body: some View {
         VStack(spacing: Katha.Spacing.lg) {
-            Text("Set a parental PIN")
+            Text(title)
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(Katha.Color.text)
-            Text("Asked before U/A 16+ and A-rated titles play.")
+            Text(subtitle)
                 .font(.system(size: 13))
-                .foregroundStyle(Katha.Color.text2)
+                .foregroundStyle(message == nil ? Katha.Color.text2 : Katha.Color.danger)
+                .multilineTextAlignment(.center)
             PinDots(filled: pin.count)
             PinPad { digit in
+                guard lockedFor == 0 else { return }
                 if digit == -1 { if !pin.isEmpty { pin.removeLast() } }
                 else if pin.count < 4 {
                     pin.append(String(digit))
-                    if pin.count == 4 {
-                        model.parentalPin = pin
-                        dismiss()
-                    }
+                    if pin.count == 4 { submit() }
                 }
             }
+            .disabled(lockedFor > 0)
+            .opacity(lockedFor > 0 ? 0.4 : 1)
         }
         .padding(Katha.Spacing.xl)
         .presentationDetents([.large])
         .presentationBackground(Katha.Color.surface)
+        .onAppear {
+            if model.parentalLockSet { step = .current }
+            lockedFor = model.parentalLock.lockoutRemaining
+            if lockedFor > 0 { message = "Too many wrong PINs. Try again in \(lockedFor)s." }
+        }
+        .task(id: lockedFor) {
+            guard lockedFor > 0 else { return }
+            try? await Task.sleep(for: .seconds(1))
+            lockedFor = model.parentalLock.lockoutRemaining
+            if lockedFor == 0 { message = nil } else { message = "Too many wrong PINs. Try again in \(lockedFor)s." }
+        }
+    }
+
+    private func submit() {
+        let entered = pin
+        pin = ""
+        switch step {
+        case .current:
+            switch model.parentalLock.verify(entered) {
+            case .ok:
+                current = entered
+                message = nil
+                if mode == .remove {
+                    model.removeParentalPin(current: entered)
+                    Haptics.success()
+                    dismiss()
+                } else {
+                    step = .new
+                }
+            case .wrong(let left):
+                Haptics.warning()
+                message = "Wrong PIN. \(left) attempt\(left == 1 ? "" : "s") left."
+            case .lockedOut(let seconds):
+                Haptics.warning()
+                lockedFor = seconds
+                message = "Too many wrong PINs. Try again in \(seconds)s."
+            }
+        case .new:
+            firstNew = entered
+            message = nil
+            step = .confirm
+        case .confirm:
+            guard entered == firstNew else {
+                Haptics.warning()
+                message = "The PINs didn't match. Start again."
+                step = .new
+                return
+            }
+            if model.setParentalPin(entered, current: current) {
+                Haptics.success()
+                dismiss()
+            } else {
+                message = "Couldn't change the lock. Enter the current PIN again."
+                step = .current
+            }
+        }
     }
 }
 
@@ -259,7 +355,8 @@ struct PinGateView: View {
     let onCancel: () -> Void
     @Environment(AppModel.self) private var model
     @State private var pin = ""
-    @State private var wrong = false
+    @State private var message: String?
+    @State private var lockedFor = 0
 
     var body: some View {
         VStack(spacing: Katha.Spacing.lg) {
@@ -269,25 +366,50 @@ struct PinGateView: View {
             Text("Parental lock")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(Katha.Color.text)
-            Text(wrong ? "Wrong PIN — try again." : "This title is rated for older viewers.")
+            Text(message ?? "This title is rated for older viewers.")
                 .font(.system(size: 13))
-                .foregroundStyle(wrong ? Katha.Color.danger : Katha.Color.text2)
+                .foregroundStyle(message == nil ? Katha.Color.text2 : Katha.Color.danger)
+                .multilineTextAlignment(.center)
             PinDots(filled: pin.count)
             PinPad { digit in
+                guard lockedFor == 0 else { return }
                 if digit == -1 { if !pin.isEmpty { pin.removeLast() } }
                 else if pin.count < 4 {
                     pin.append(String(digit))
                     if pin.count == 4 {
-                        if pin == model.parentalPin { onSuccess() }
-                        else { pin = ""; wrong = true }
+                        let entered = pin
+                        pin = ""
+                        switch model.parentalLock.verify(entered) {
+                        case .ok:
+                            onSuccess()
+                        case .wrong(let left):
+                            Haptics.warning()
+                            message = "Wrong PIN — \(left) attempt\(left == 1 ? "" : "s") left."
+                        case .lockedOut(let seconds):
+                            Haptics.warning()
+                            lockedFor = seconds
+                            message = "Too many wrong PINs. Try again in \(seconds)s."
+                        }
                     }
                 }
             }
+            .disabled(lockedFor > 0)
+            .opacity(lockedFor > 0 ? 0.4 : 1)
             Button("Go back") { onCancel() }
                 .font(.system(size: 14))
                 .foregroundStyle(Katha.Color.text2)
         }
         .padding(Katha.Spacing.xl)
+        .onAppear {
+            lockedFor = model.parentalLock.lockoutRemaining
+            if lockedFor > 0 { message = "Too many wrong PINs. Try again in \(lockedFor)s." }
+        }
+        .task(id: lockedFor) {
+            guard lockedFor > 0 else { return }
+            try? await Task.sleep(for: .seconds(1))
+            lockedFor = model.parentalLock.lockoutRemaining
+            if lockedFor == 0 { message = nil } else { message = "Too many wrong PINs. Try again in \(lockedFor)s." }
+        }
     }
 }
 

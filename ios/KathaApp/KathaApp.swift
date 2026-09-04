@@ -124,13 +124,11 @@ final class AppModel {
     /// Bumped to replay the coach-mark tour on demand (from Profile → Replay
     /// tips). Transient — not persisted; the host observes the change.
     var coachReplayToken = 0
-    /// Dev-slice parental PIN (production hashes with Argon2 server-side, PDD §12.9).
-    var parentalPin: String? {
-        didSet {
-            if let parentalPin { defaults.set(parentalPin, forKey: "katha.pin") }
-            else { defaults.removeObject(forKey: "katha.pin") }
-        }
-    }
+    /// Parental lock: salted hash in the Keychain, attempt lockout, current PIN
+    /// required to change or remove (see ParentalLock).
+    let parentalLock = ParentalLock()
+    /// Observed mirror of `parentalLock.isSet` so views refresh when it changes.
+    var parentalLockSet = false
     /// The session bearer lives in the Keychain (see KeychainStore) — it
     /// authorises money for 30 days and must not ride along in a backup.
     private static let tokenKey = "session.token"
@@ -152,7 +150,12 @@ final class AppModel {
                 UserDefaults.standard.removeObject(forKey: key)
             }
             KeychainStore.delete(Self.tokenKey)
+            parentalLock.clearUnconditionally()
         }
+        // Builds before the hashed lock kept the PIN in UserDefaults: scrub it.
+        // (Re-setting the lock is a one-time ask; a plaintext PIN must not live on.)
+        UserDefaults.standard.removeObject(forKey: "katha.pin")
+        parentalLockSet = parentalLock.isSet
         // One-time migration: builds before the Keychain move kept the bearer
         // in UserDefaults. Move it, then scrub the old copy.
         if let legacy = UserDefaults.standard.string(forKey: "katha.token") {
@@ -165,10 +168,19 @@ final class AppModel {
         // "localhost" (the simulator resolves ::1 first and gets refused).
         let plistBase = (Bundle.main.object(forInfoDictionaryKey: "KathaAPIBase") as? String)
             .flatMap(URL.init(string:))
+        #if DEBUG
         let base = baseURL
             ?? env["KATHA_API_BASE"].flatMap(URL.init(string:))
             ?? plistBase
             ?? URL(string: "http://127.0.0.1:8799")!
+        #else
+        // Release: the base comes from Config/Release.xcconfig only, and it must
+        // be HTTPS — the bearer and every money call ride on it. A misbuilt
+        // binary fails here, on first launch, instead of shipping cleartext.
+        guard let base = baseURL ?? plistBase, base.scheme == "https" else {
+            fatalError("KathaAPIBase must be an https URL in Release builds")
+        }
+        #endif
         self.api = KathaAPIClient(baseURL: base)
 
         // Load persisted preferences into the observed stored properties.
@@ -180,7 +192,6 @@ final class AppModel {
         autoUnlock = d.bool(forKey: "katha.autounlock")
         dataSaver = d.bool(forKey: "katha.datasaver")
         episodeAlerts = d.object(forKey: "katha.alerts") == nil ? true : d.bool(forKey: "katha.alerts")
-        parentalPin = d.string(forKey: "katha.pin")
         hasSeenCoachMarks = d.bool(forKey: "katha.coachmarks.seen")
     }
 
@@ -411,8 +422,24 @@ final class AppModel {
     // MARK: Parental lock
 
     func ratingNeedsPin(_ rating: String) -> Bool {
-        guard parentalPin != nil else { return false }
+        guard parentalLockSet else { return false }
         return rating.contains("16+") || rating == "A"
+    }
+
+    /// Set (or, with `current`, change) the PIN. False when the current PIN is wrong.
+    @discardableResult
+    func setParentalPin(_ pin: String, current: String? = nil) -> Bool {
+        let ok = parentalLock.set(pin, current: current)
+        parentalLockSet = parentalLock.isSet
+        return ok
+    }
+
+    /// Remove the lock; the current PIN is required.
+    @discardableResult
+    func removeParentalPin(current: String) -> Bool {
+        let ok = parentalLock.clear(current: current)
+        parentalLockSet = parentalLock.isSet
+        return ok
     }
 }
 
