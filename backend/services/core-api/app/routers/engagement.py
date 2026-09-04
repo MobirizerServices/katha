@@ -29,8 +29,9 @@ def _wallet(user: str) -> WalletResponse:
 @router.put("/progress", response_model=ContinueResponse)
 def put_progress(body: ProgressBatchBody, user: str = Depends(current_user)) -> ContinueResponse:
     """Batch upload of watch progress (the client flushes periodically)."""
+    from ..overrides import get_series, is_served
     for it in body.items:
-        series = catalog.get_series(it.slug)
+        series = get_series(it.slug) if is_served(it.slug) else None
         if series is None or not (1 <= it.number <= series.episode_count):
             raise HTTPException(status_code=404, detail=f"episode not found: {it.slug} e{it.number}")
         eid = catalog.episode_id(it.slug, it.number)
@@ -68,7 +69,8 @@ def get_list(user: str = Depends(current_user)) -> MyListResponse:
 
 @router.put("/me/list/{slug}", response_model=MyListResponse)
 def add_list(slug: str, user: str = Depends(current_user)) -> MyListResponse:
-    if catalog.get_series(slug) is None:
+    from ..overrides import get_series, is_served
+    if not is_served(slug) or get_series(slug) is None:
         raise HTTPException(status_code=404, detail="series not found")
     store.add_to_list(user, slug)
     return _list_response(user)

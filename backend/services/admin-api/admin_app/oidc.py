@@ -184,7 +184,19 @@ def directory_delete(email: str) -> None:
 
 
 def directory_role(email: str) -> str | None:
-    entry = directory_all().get(email.lower())
+    """One keyed read per request (the old path scanned the whole KV table);
+    the full-directory walk only runs to seed the bootstrap operators."""
+    shared = _shared()
+    entry = None
+    if shared is not None:
+        raw = shared.kv_get(f"{DIR_PREFIX}{email.lower()}")
+        if raw:
+            try:
+                entry = json.loads(raw)
+            except ValueError:
+                entry = None
+    if entry is None:
+        entry = directory_all().get(email.lower())
     role = (entry or {}).get("role") or None
     return role if role in {r.value for r in Role} else None
 

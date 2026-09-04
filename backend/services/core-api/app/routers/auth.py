@@ -145,7 +145,9 @@ def otp_request(body: OtpRequestBody, request: Request) -> OtpRequestResponse:
 def otp_verify(body: OtpVerifyBody, request: Request,
                authorization: str | None = Header(default=None)) -> AuthToken:
     code = body.code.strip()
-    if not (code.isdigit() and len(code) == 4):
+    # isascii(): Unicode digits pass isdigit() and then crash the constant-time
+    # compare in real-OTP mode.
+    if not (code.isascii() and code.isdigit() and len(code) == 4):
         raise HTTPException(status_code=400, detail="invalid code (dev: any 4 digits)")
     _otp_guard(request, body.phone.strip(), kind="verify")
     # With a real provider, the code must match the one we sent; dev/test accept

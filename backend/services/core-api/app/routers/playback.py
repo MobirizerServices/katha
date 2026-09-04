@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from katha_domain import catalog
 from ..deps import current_user
-from ..media import media_dir
 from katha_domain.timeutil import iso_plus
 
 from ..store import store
@@ -23,10 +22,11 @@ def _signed_url(episode_id: str, user: str) -> str:
     from ..signing import make_token
     slug, _, tail = episode_id.partition(":e")
     epdir = f"{slug}/e{int(tail):03d}/hls/"
-    if (media_dir() / epdir / "master.m3u8").is_file():
-        token = make_token(epdir, user)
-        return f"{catalog.media_base()}/media/t/{token}/{epdir}master.m3u8"
-    return f"https://cdn.katha.dev/hls/{episode_id}/master.m3u8?exp={iso_plus(6)}"
+    # Always the tokened route, whether or not the media is on this box: a
+    # missing tree is a 404 behind the same signature, never an unsigned URL
+    # handed to the client.
+    token = make_token(epdir, user)
+    return f"{catalog.media_base()}/media/t/{token}/{epdir}master.m3u8"
 
 
 def _resume_ms(user: str, eid: str) -> int:

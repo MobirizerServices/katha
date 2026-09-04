@@ -194,6 +194,18 @@ final class AppModel {
         dataSaver = d.bool(forKey: "katha.datasaver")
         episodeAlerts = d.object(forKey: "katha.alerts") == nil ? true : d.bool(forKey: "katha.alerts")
         hasSeenCoachMarks = d.bool(forKey: "katha.coachmarks.seen")
+        // The check-in card reappeared every launch even when today's reward
+        // was already claimed (the server deduped, but the card still asked).
+        checkinClaimedToday = (d.string(forKey: "katha.checkin.day") ?? "") == Self.istToday()
+    }
+
+    /// Today's date in IST — the check-in day boundary, as the server counts it.
+    static func istToday() -> String {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = TimeZone(identifier: "Asia/Kolkata")
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
     }
 
     // MARK: Session lifecycle

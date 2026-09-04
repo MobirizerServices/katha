@@ -83,7 +83,10 @@ target.build_configurations.each do |cfg|
     s['CODE_SIGN_IDENTITY'] = 'Apple Development'
     # Push capability: signed device builds carry the APNs entitlement so
     # registerForRemoteNotifications yields a real token.
-    s['CODE_SIGN_ENTITLEMENTS'] = 'KathaApp/KathaApp.entitlements'
+    # Debug talks to the APNs sandbox; Release must carry the production
+    # aps-environment or pushes never arrive on TestFlight/App Store builds.
+    s['CODE_SIGN_ENTITLEMENTS'] = cfg.name == 'Release' ? 'KathaApp/KathaApp-Release.entitlements'
+                                                        : 'KathaApp/KathaApp.entitlements'
   else
     s['CODE_SIGNING_ALLOWED'] = 'NO'
     s['CODE_SIGNING_REQUIRED'] = 'NO'

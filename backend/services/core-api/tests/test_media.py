@@ -120,7 +120,13 @@ def test_playback_resumes_where_the_viewer_left_off(monkeypatch, tmp_path):
     assert r.json()["resume_position_ms"] == 0
 
 
-def test_playback_falls_back_to_cdn_stub(monkeypatch, tmp_path):
+def test_playback_url_is_signed_even_without_media_on_disk(monkeypatch, tmp_path):
+    """C7: never an unsigned CDN URL — the tokened route 404s a missing tree
+    behind the same signature."""
     monkeypatch.setenv("KATHA_MEDIA_DIR", str(tmp_path))  # no media on disk
     r = client.post("/v1/series/kaanch-ka-mahal/episodes/1/playback", headers=AUTH)
-    assert "cdn.katha.dev" in r.json()["hls_master_url"]
+    url = r.json()["hls_master_url"]
+    assert "/media/t/" in url and "cdn.katha.dev" not in url
+    path = url.split("/media/t/", 1)[1]
+    token, rest = path.split("/", 1)
+    assert client.get(f"/media/t/{token}/{rest}").status_code == 404

@@ -6,6 +6,7 @@ writes an audit row.
 """
 from __future__ import annotations
 
+import html as _html
 import json as _json
 import os
 import time
@@ -751,8 +752,13 @@ def wallet_refund(request: Request, body: dict = Body(...),
     if tx["type"] != "purchase":
         raise HTTPException(status_code=409, detail="only purchases are refundable")
     coins = tx["amount_bought"] + tx["amount_bonus"]
+    ref_key = f"refund:{tx['id']}"
+    if any(t.idempotency_key == ref_key for t in SHARED.transactions(user_id)):
+        # The ledger would dedupe silently; say so instead of auditing a
+        # second "refunded N coins" that moved nothing.
+        raise HTTPException(status_code=409, detail="this purchase was already refunded")
     wallet = SHARED.refund(user_id, coins=coins, reference_id=tx["id"],
-                           ref_key=f"refund:{tx['id']}", created_at=now_iso())
+                           ref_key=ref_key, created_at=now_iso())
     audit(actor, "wallet.refund", user_id,
           {"tx": tx_id, "coins": coins, "sku": tx["reference_id"]}, request)
     return {"status": "refunded", "coins": coins, "wallet": wallet}
@@ -1321,7 +1327,7 @@ def experiments(actor: Actor = Depends(require(Role.CONTENT, Role.FINANCE,
 
 @router.put("/experiments/{key}", tags=["config"])
 def set_experiment(key: str, request: Request = None, body: dict = Body(...),
-                   actor: Actor = Depends(require(Role.CONTENT))):
+                   actor: Actor = Depends(require())):          # admin-only, as the matrix says
     """Thin experiment registry (#061): variants with % splits, assigned by a
     stable user hash and served to clients in /v1/config.experiments."""
     import re as _re
@@ -1356,8 +1362,7 @@ def set_experiment(key: str, request: Request = None, body: dict = Body(...),
 # ---- devices + sign-out-everywhere (#021) -----------------------------------
 @router.get("/users/{user_id}/devices", tags=["users"])
 def user_devices(user_id: str,
-                 actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,
-                                                Role.ANALYST))):
+                 actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE))):
     if SHARED is None:
         return {"user_id": user_id, "devices": []}
     return {"user_id": user_id, "devices": SHARED.devices(user_id)}
@@ -1426,8 +1431,8 @@ def _grievance_email(gid: str, verdict: str, message: str) -> None:
     comms.send_email(
         SHARED, to=g["contact"],
         subject=f"Your Katha grievance {gid} — {verdict}",
-        body_html=(f"<p>Grievance <b>{gid}</b> ({g['subject']}) has been "
-                   f"<b>{verdict}</b>.</p><p>{message}</p>"
+        body_html=(f"<p>Grievance <b>{_html.escape(gid)}</b> ({_html.escape(g['subject'])}) has been "
+                   f"<b>{_html.escape(verdict)}</b>.</p><p>{_html.escape(message)}</p>"
                    "<p>— Katha grievance desk</p>"),
         now=now_iso())
 
@@ -1444,8 +1449,9 @@ def invoices(actor: Actor = Depends(require(Role.FINANCE, Role.ANALYST, Role.RO)
 
 @router.get("/outbox", tags=["ops"])
 def outbox(kind: str = "", limit: int = 100,
-           actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,
-                                          Role.ANALYST, Role.RO))):
+           actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE))):
+    # Recipients and full bodies are personal data: the desks that act on
+    # them, not read-only/analyst roles.
     """Every email and push the system produced — queued (dev, no transport
     configured), sent, or failed with the reason. The truth about comms."""
     if SHARED is None:

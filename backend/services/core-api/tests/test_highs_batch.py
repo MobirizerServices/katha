@@ -26,6 +26,8 @@ def shared(tmp_path, monkeypatch):
     db = Database(f"sqlite+aiosqlite:///{tmp_path/'highs.db'}")
     sh = SharedStore(db)
     monkeypatch.setattr(admin_main, "SHARED", sh)
+    from app.store import store as core_store
+    monkeypatch.setattr(core_store, "shared", sh, raising=False)   # core-api reads the same KV
     monkeypatch.setenv("KATHA_ADMIN_AUTH", "headers")
     admin_store.ledger = Ledger()
     admin_store.audit.clear()
@@ -392,3 +394,56 @@ def test_progress_does_not_regress_unless_rewound():
     put(5000, rewind=True)                       # the viewer scrubbed back
     resume = c.post("/v1/series/kaanch-ka-mahal/episodes/1/playback", headers=h).json()
     assert resume["resume_position_ms"] == 5000
+
+
+# ===================== Lows =====================
+
+def test_low_batch_core(monkeypatch):
+    """B14 unicode digits are a 400 not a 500; C7 the stream URL is signed even
+    when the media is not on this box; C8 archived series take no engagement."""
+    from app.main import app as core_app
+    c = TestClient(core_app)
+    r = c.post("/v1/auth/otp/verify", json={"phone": "+919444444444", "code": "\u0661\u0662\u0663\u0664"})
+    assert r.status_code == 400
+    h = {"Authorization": "Bearer low-user"}
+    pb = c.post("/v1/series/kaanch-ka-mahal/episodes/1/playback", headers=h).json()
+    assert "/media/t/" in pb["hls_master_url"] and "cdn.katha.dev" not in pb["hls_master_url"]
+
+
+def test_low_batch_engagement_respects_serve_gate(shared):
+    from app.main import app as core_app
+    c = TestClient(core_app)
+    h = {"Authorization": "Bearer low-user2"}
+    shared.kv_set("status:kaanch-ka-mahal", "archived")
+    assert c.put("/v1/me/list/kaanch-ka-mahal", headers=h).status_code == 404
+    assert c.put("/v1/progress", headers=h, json={"items": [
+        {"slug": "kaanch-ka-mahal", "number": 1, "position_ms": 1000, "duration_ms": 60000}]}).status_code == 404
+    shared.kv_set("status:kaanch-ka-mahal", "live")
+    assert c.put("/v1/me/list/kaanch-ka-mahal", headers=h).status_code == 200
+
+
+def test_low_batch_admin(shared):
+    """A12: a second refund is a 409 (no phantom audit), experiments are
+    admin-only, outbox/devices are not for read-only or analyst roles, and the
+    grievance email escapes the subject."""
+    a = TestClient(admin_main.app)
+    from katha_ledger import TxType
+    tx = shared.ledger.credit("refund-twice", TxType.PURCHASE, coins=1300, reference_type="web_order",
+                              reference_id="coins_popular_in", idempotency_key="web:refund-twice:p1",
+                              created_at=TS)
+    body = {"user_id": "refund-twice", "tx_id": tx.id}
+    assert a.post("/admin/v1/wallet/refund", headers=FIN_A, json=body).status_code == 200
+    assert a.post("/admin/v1/wallet/refund", headers=FIN_A, json=body).status_code == 409
+    content = {"X-Actor-Id": "cee", "X-Role": "content"}
+    assert a.put("/admin/v1/experiments/x", headers=content,
+                 json={"hypothesis": "h", "variants": [{"name": "a", "pct": 100}]}).status_code == 403
+    ro = {"X-Actor-Id": "ro", "X-Role": "ro"}
+    analyst = {"X-Actor-Id": "an", "X-Role": "analyst"}
+    assert a.get("/admin/v1/outbox", headers=ro).status_code == 403
+    assert a.get("/admin/v1/users/u/devices", headers=analyst).status_code == 403
+    assert a.get("/admin/v1/outbox", headers=SUPPORT).status_code == 200
+    shared.grievance_create(gid="G-X", user_id="u", contact="c@x", channel="app",
+                            subject="<img src=x onerror=alert(1)>", body="b", created_at=TS)
+    a.post("/admin/v1/grievances/G-X/ack", headers=SUPPORT)
+    mail = [o for o in shared.outbox_list() if "G-X" in (o.get("subject") or "")]
+    assert mail and "<img" not in mail[-1]["body"] and "&lt;img" in mail[-1]["body"]
