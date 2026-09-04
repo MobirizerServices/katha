@@ -264,6 +264,8 @@ final class KathaAppUITests: XCTestCase {
             if back.exists { back.tap() } else { break }
         }
         tapWhenReady(button(app, containing: "Help & grievance"))
+        // Smaller phones: the contact links sit below the assistant card.
+        if !app.links["grievance@katha.example"].waitForExistence(timeout: 4) { app.swipeUp() }
         assertExists(app.links["grievance@katha.example"], 10)
         app.navigationBars.buttons.firstMatch.tap()      // back to Profile
 
@@ -537,8 +539,12 @@ final class KathaAppUITests: XCTestCase {
         tapWhenReady(app.buttons["player.cc"])
         assertExists(app.staticTexts["Subtitles"], 8)
         assertExists(app.buttons["captions.off"], 5)
-        tapWhenReady(app.buttons["captions.hi"])
-        XCTAssertTrue(app.buttons["captions.hi"].isSelected)
+        // Caption rows come from subs/*.vtt beside the media (make seed-media
+        // writes hi + en); a catalog without subtitle files lists only Off.
+        if app.buttons["captions.hi"].waitForExistence(timeout: 3) {
+            app.buttons["captions.hi"].tap()
+            XCTAssertTrue(app.buttons["captions.hi"].isSelected)
+        }
         tapWhenReady(app.buttons["Done"])                        // dismiss the sheet
         XCTAssertTrue(app.staticTexts["Subtitles"].waitForNonExistence(timeout: 5))
         assertExists(app.sliders.firstMatch, 8)

@@ -8,6 +8,7 @@ Output layout (mirrors the SAD §6.5 media layout, locally):
   media/{series_slug}/e{NNN}/source.mp4          mezzanine, 1080x1920
   media/{series_slug}/e{NNN}/hls/master.m3u8     4-rendition ladder, 2s segments
   media/{series_slug}/e{NNN}/hls/{1080p,720p,540p,360p}/...
+  media/{series_slug}/e{NNN}/subs/{hi,en}.vtt              placeholder caption tracks
   media/manifest.json                            paths + durations for seeding the API
 
 Idempotent: episodes whose master.m3u8 already exists are skipped, so an
@@ -58,9 +59,37 @@ def episode_duration(ep: dict) -> int:
     return EPISODE_SECONDS + (ep["number"] % 7) + (6 if ep.get("is_cliff") else 0)
 
 
+
+def write_subs(out, title, ep, duration):
+    """Placeholder subtitle tracks (hi + en) beside the episode. The playback
+    endpoint lists every subs/*.vtt under the same stream token, so the CC
+    picker in the apps has real rows to show. Idempotent."""
+    subs = out / "subs"
+    subs.mkdir(parents=True, exist_ok=True)
+    ep_title = ep.get("title") or f"Episode {ep['number']}"
+    lines = {
+        "hi": [f"{title} · एपिसोड {ep['number']}", "यह प्लेसहोल्डर सबटाइटल है।", "असली संवाद स्टूडियो डिलीवरी के साथ आएंगे।"],
+        "en": [f"{title} · Episode {ep['number']}: {ep_title}", "These are placeholder subtitles.", "Real dialogue lands with the studio delivery."],
+    }
+    step = max(2, duration // 4)
+    ts = lambda sec: f"00:{sec // 60:02d}:{sec % 60:02d}.000"  # noqa: E731
+    for lang, cues in lines.items():
+        f = subs / f"{lang}.vtt"
+        if f.exists():
+            continue
+        body = ["WEBVTT", ""]
+        t = 0
+        for n, text in enumerate(cues, 1):
+            a, b = t, min(duration, t + step)
+            body += [str(n), f"{ts(a)} --> {ts(b)}", text, ""]
+            t += step
+        f.write_text("\n".join(body), encoding="utf-8")
+
+
 def build_episode(color, slug, title, ep):
     n, dur = ep["number"], episode_duration(ep)
     out = MEDIA / slug / f"e{n:03d}"
+    write_subs(out, title, ep, episode_duration(ep))
     if (out / "hls" / "master.m3u8").exists():
         return (slug, n, dur, "skipped")
     out.mkdir(parents=True, exist_ok=True)
