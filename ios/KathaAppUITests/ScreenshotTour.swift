@@ -242,4 +242,258 @@ final class ScreenshotTour: XCTestCase {
         sleep(1)
         snap("4.6b-grievance-form")
     }
+
+    private func text(_ app: XCUIApplication, containing s: String) -> XCUIElement {
+        app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", s)).firstMatch
+    }
+
+    private func openSearch(_ app: XCUIApplication) {
+        let search = app.buttons["Search"].firstMatch
+        _ = search.waitForExistence(timeout: 12)
+        search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        if !app.staticTexts["Trending"].waitForExistence(timeout: 5), search.exists {
+            search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            _ = app.staticTexts["Trending"].waitForExistence(timeout: 8)
+        }
+        _ = app.textFields.firstMatch.waitForExistence(timeout: 8)
+    }
+
+    // Screens added after the v0.3 board: packs sheet, continue-watching list,
+    // people search, app language, forgot-PIN, reminders, help assistant,
+    // player track picker. Same numbering scheme as the board sections.
+    func test08_TourNewScreens() {
+        // --- 4.9 Packs sheet: list, pending, failed ---
+        let packs = launchApp(extra: ["KATHA_FAKE_IAP": "pending"])
+        wait(packs, text: "Daily check-in", 20)
+        packs.tabBars.buttons["Profile"].tap()
+        button(packs, containing: "Wallet").tap()
+        wait(packs, text: "Get coins", 10)
+        snap("3.5a-wallet-empty")
+        button(packs, containing: "All packs").tap()
+        wait(packs, text: "Coin packs", 8)
+        sleep(1)
+        snap("4.9-packs-list")
+        packs.buttons["pack.coins_starter_in"].tap()
+        wait(packs, text: "You haven't been charged yet.", 8)
+        sleep(1)
+        snap("4.9b-packs-pending")
+        packs.buttons["Done"].tap()
+
+        let failed = launchApp(extra: ["KATHA_FAKE_IAP": "failed",
+                                       "KATHA_AUTOPLAY": "kaanch-ka-mahal:11"])
+        wait(failed, text: "Unlock E11", 20)
+        failed.buttons["Get coins"].tap()
+        wait(failed, text: "Coin packs", 8)
+        failed.buttons["pack.coins_popular_in"].tap()
+        _ = text(failed, containing: "Payment didn't go through").waitForExistence(timeout: 8)
+        sleep(1)
+        snap("4.9c-packs-failed")
+
+        // --- 4.5 Continue watching list + 4.4 reminder bell ---
+        let cw = launchApp(extra: ["KATHA_AUTOPLAY": "kaanch-ka-mahal:1"])
+        wait(cw, text: "E1 · One face too many", 20)
+        sleep(3)
+        cw.navigationBars.buttons.firstMatch.tap()
+        wait(cw, text: "Daily check-in", 15)
+        if !cw.buttons["continue.seeAll"].waitForExistence(timeout: 8) {
+            cw.tabBars.buttons["My list"].tap()
+            cw.tabBars.buttons["Home"].tap()
+        }
+        _ = cw.buttons["continue.seeAll"].waitForExistence(timeout: 8)
+        snap("2.1c-home-continue-row")
+        cw.buttons["continue.seeAll"].tap()
+        _ = cw.navigationBars["Continue watching"].waitForExistence(timeout: 10)
+        sleep(1)
+        snap("4.5-continue-watching-list")
+        cw.navigationBars.buttons.firstMatch.tap()
+        _ = button(cw, containing: "Kaanch Ka Mahal").waitForExistence(timeout: 10)
+        button(cw, containing: "Kaanch Ka Mahal").tap()
+        wait(cw, text: "U/A 13+", 12)
+        cw.buttons["Save to My list"].tap()
+        cw.buttons["Remind me"].tap()
+        _ = cw.buttons["Reminder on"].waitForExistence(timeout: 6)
+        snap("2.4b-series-reminder-on")
+        cw.swipeUp()
+        sleep(1)
+        snap("2.4c-series-episodes-scrolled")
+        cw.tabBars.buttons["My list"].tap()
+        wait(cw, text: "Reminder on", 10)
+        sleep(1)
+        snap("4.4b-my-list-reminder-on")
+
+        // --- 2.3 Search: People section + person page ---
+        let s = launchApp(extra: ["KATHA_STUB_SEARCH": "1"])
+        wait(s, text: "Daily check-in", 20)
+        openSearch(s)
+        let field = s.textFields.firstMatch
+        field.tap()
+        field.typeText("aditi")
+        wait(s, text: "People", 12)
+        sleep(1)
+        snap("2.3c-search-people")
+        button(s, containing: "Aditi Rawal").tap()
+        _ = s.navigationBars["Aditi Rawal"].waitForExistence(timeout: 10)
+        sleep(1)
+        snap("2.3d-person-page")
+        s.navigationBars.buttons.firstMatch.tap()
+        _ = s.textFields.firstMatch.waitForExistence(timeout: 8)
+        s.buttons["Clear search"].tap()
+        s.textFields.firstMatch.tap()
+        s.textFields.firstMatch.typeText("zzzz")
+        sleep(2)
+        snap("2.3e-search-no-results")
+
+        // --- 4.2 Settings: previews toggle, Hindi, forgot PIN, delete ---
+        let app = launchApp()
+        wait(app, text: "Daily check-in", 20)
+        app.tabBars.buttons["Profile"].tap()
+        _ = app.buttons["Sign in"].waitForExistence(timeout: 10)
+        app.buttons["Sign in"].tap()
+        wait(app, text: "Save your coins and your place", 8)
+        let phone = app.textFields.firstMatch
+        phone.tap()
+        phone.typeText("9876501234")
+        app.buttons["Get OTP"].tap()
+        wait(app, text: "Enter the code", 10)
+        let otp = app.textFields.firstMatch
+        otp.tap()
+        otp.typeText("4321")
+        _ = app.buttons["Sign out"].waitForExistence(timeout: 15)
+        button(app, containing: "Settings").tap()
+        _ = app.switches["Data saver"].waitForExistence(timeout: 10)
+        let previews = app.switches.containing(
+            NSPredicate(format: "label CONTAINS 'Muted previews'")).firstMatch
+        _ = previews.waitForExistence(timeout: 8)
+        let knob = previews.switches.firstMatch.exists ? previews.switches.firstMatch : previews
+        knob.tap()
+        sleep(1)
+        snap("4.2b-settings-previews-off")
+        app.swipeUp()
+        sleep(1)
+        snap("4.2c-settings-bottom")
+        app.swipeDown()
+        app.segmentedControls.buttons["हिन्दी"].tap()
+        _ = app.switches["डेटा सेवर"].waitForExistence(timeout: 8)
+        sleep(1)
+        snap("4.2d-settings-hindi")
+        app.swipeUp()
+        sleep(1)
+        snap("4.2e-settings-hindi-bottom")
+        app.tabBars.buttons["होम"].tap()
+        sleep(2)
+        snap("2.1d-home-hindi")
+        app.tabBars.buttons["प्रोफ़ाइल"].tap()
+        // The Profile tab keeps its Settings stack; pop to the root first.
+        app.navigationBars.buttons.firstMatch.tap()
+        _ = app.buttons["Sign out"].waitForExistence(timeout: 8)
+        sleep(1)
+        snap("4.1c-profile-hindi")
+        // The Profile rows are not localised (hard-coded "Settings"), so match either.
+        app.buttons.containing(NSPredicate(
+            format: "label CONTAINS 'Settings' OR label CONTAINS 'सेटिंग्स'")).firstMatch.tap()
+        _ = app.switches["डेटा सेवर"].waitForExistence(timeout: 8)
+        app.segmentedControls.buttons["English"].tap()
+        _ = app.switches["Data saver"].waitForExistence(timeout: 8)
+
+        app.buttons["Set parental lock"].tap()
+        wait(app, text: "Set a parental PIN", 8)
+        for digit in ["1", "2", "3", "4"] { app.buttons[digit].tap() }
+        wait(app, text: "Confirm the new PIN", 8)
+        snap("4.3f-pin-confirm")
+        for digit in ["1", "2", "3", "4"] { app.buttons[digit].tap() }
+        _ = app.buttons["Change parental lock"].waitForExistence(timeout: 8)
+
+        // PIN persisted → the gate on a 16+ title (test06 never confirms the PIN).
+        let gated = launchApp(reset: false, extra: ["KATHA_AUTOPLAY": "dilli-6-ka-raaz:1"])
+        wait(gated, text: "Parental lock", 20)
+        sleep(1)
+        snap("4.3h-pin-gate")
+        for digit in ["9", "9", "9", "9"] { gated.buttons[digit].tap() }
+        sleep(1)
+        snap("4.3i-pin-gate-wrong")
+
+        let app2 = launchApp(reset: false)
+        wait(app2, text: "Daily check-in", 20)
+        app2.tabBars.buttons["Profile"].tap()
+        button(app2, containing: "Settings").tap()
+        _ = app2.buttons["Change parental lock"].waitForExistence(timeout: 10)
+        app2.buttons["Change parental lock"].tap()
+        wait(app2, text: "Enter your current PIN", 8)
+        snap("4.3g-pin-enter-current")
+        app2.buttons["Forgot PIN?"].tap()
+        wait(app2, text: "Reset the parental lock", 8)
+        sleep(1)
+        snap("4.3c-forgot-pin")
+        app2.buttons["Send code"].tap()
+        wait(app2, text: "Enter the code", 10)
+        sleep(1)
+        snap("4.3d-forgot-pin-code")
+        let code = app2.textFields["pin.reset.code"]
+        _ = code.waitForExistence(timeout: 5)
+        code.tap()
+        code.typeText("2468")
+        wait(app2, text: "Parental lock removed", 10)
+        snap("4.3e-pin-removed-toast")
+
+        app2.swipeUp()
+        _ = app2.buttons["Delete account"].waitForExistence(timeout: 8)
+        app2.buttons["Delete account"].tap()
+        wait(app2, text: "Delete your account?", 8)
+        sleep(1)
+        snap("4.7b-delete-account-sheet")
+
+        // --- 4.6 Help assistant ---
+        let help = launchApp()
+        wait(help, text: "Daily check-in", 20)
+        help.tabBars.buttons["Profile"].tap()
+        button(help, containing: "Help & grievance").tap()
+        _ = button(help, containing: "Chat with us").waitForExistence(timeout: 10)
+        sleep(1)
+        snap("4.6-help-top")
+        button(help, containing: "Chat with us").tap()
+        _ = text(help, containing: "Ask me about coins").waitForExistence(timeout: 10)
+        sleep(1)
+        snap("4.6c-assistant-empty")
+        help.buttons["Refunds and cancellations"].tap()
+        _ = text(help, containing: "reportaproblem.apple.com").waitForExistence(timeout: 8)
+        let input = help.textFields["assistant.input"]
+        _ = input.waitForExistence(timeout: 5)
+        input.tap()
+        input.typeText("paid but coins nahi mile")
+        snap("4.6e-assistant-typing")
+        help.buttons["assistant.send"].tap()
+        _ = text(help, containing: "Restore purchases").waitForExistence(timeout: 8)
+        sleep(1)
+        snap("4.6d-assistant-chat")
+
+        // --- 3.4 Player track picker, captions on, 2× pill ---
+        let p = launchApp(extra: ["KATHA_AUTOPLAY": "kaanch-ka-mahal:1"])
+        wait(p, text: "E1 · One face too many", 20)
+        _ = p.sliders.firstMatch.waitForExistence(timeout: 8)
+        p.buttons["player.cc"].tap()
+        wait(p, text: "Subtitles", 8)
+        sleep(1)
+        snap("3.4-track-picker")
+        if p.buttons["captions.hi"].waitForExistence(timeout: 3) {
+            p.buttons["captions.hi"].tap()
+            sleep(1)
+            snap("3.4b-track-picker-hi-selected")
+        }
+        p.buttons["Done"].tap()
+        sleep(3)
+        snap("3.1c-player-captions-on")
+        // The 2× pill only shows while the finger is down; XCUITest's press
+        // blocks the (main-thread-only) API, so it cannot be captured here.
+        let surface = p.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
+        surface.doubleTap()                                  // like → heart burst
+        _ = p.buttons["Liked"].waitForExistence(timeout: 6)
+        snap("3.1d-player-liked")
+        p.swipeUp()
+        wait(p, text: "E2 · The seventh plate", 15)
+        sleep(2)
+        snap("3.1e-player-E2-after-swipe")
+        // Idle: the controls auto-hide after a few seconds.
+        sleep(6)
+        snap("3.1f-player-controls-hidden")
+    }
 }
