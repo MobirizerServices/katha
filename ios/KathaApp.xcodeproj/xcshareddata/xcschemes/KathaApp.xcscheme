@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "DC5E46B52D273A23AD36133C"
+               BlueprintIdentifier = "E0B1529D0F789999EF83E205"
                BuildableName = "KathaApp.app"
                BlueprintName = "KathaApp"
                ReferencedContainer = "container:KathaApp.xcodeproj">
@@ -30,7 +30,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "DC5E46B52D273A23AD36133C"
+            BlueprintIdentifier = "E0B1529D0F789999EF83E205"
             BuildableName = "KathaApp.app"
             BlueprintName = "KathaApp"
             ReferencedContainer = "container:KathaApp.xcodeproj">
@@ -41,7 +41,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A6D8346844484A9AA380F72C"
+               BlueprintIdentifier = "79C66BF0C00BAA22EE91BCCC"
                BuildableName = "KathaAppUITests.xctest"
                BlueprintName = "KathaAppUITests"
                ReferencedContainer = "container:KathaApp.xcodeproj">
@@ -63,12 +63,15 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "DC5E46B52D273A23AD36133C"
+            BlueprintIdentifier = "E0B1529D0F789999EF83E205"
             BuildableName = "KathaApp.app"
             BlueprintName = "KathaApp"
             ReferencedContainer = "container:KathaApp.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <StoreKitConfigurationFileReference
+         identifier = "../../KathaApp/Katha.storekit">
+      </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -80,7 +83,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "DC5E46B52D273A23AD36133C"
+            BlueprintIdentifier = "E0B1529D0F789999EF83E205"
             BuildableName = "KathaApp.app"
             BlueprintName = "KathaApp"
             ReferencedContainer = "container:KathaApp.xcodeproj">

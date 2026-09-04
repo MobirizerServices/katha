@@ -11,8 +11,8 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3
       - run: cd backend && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements-dev.txt
       - name: backend tests + coverage gate (>=98%)
         run: cd backend && .venv/bin/python -m pytest
@@ -35,8 +35,8 @@ jobs:
     env:
       KATHA_DB_URL: postgresql+asyncpg://katha:katha@localhost:5432/katha
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3
       - run: cd backend && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements.txt
       - name: alembic upgrade head
         run: cd backend && .venv/bin/alembic upgrade head
@@ -49,11 +49,11 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3
       - name: pip-audit (Python deps)
         run: cd backend && uvx pip-audit -r requirements.txt
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22 }
       - name: npm audit (site)
         run: cd web/site && npm audit --audit-level=high
@@ -64,23 +64,23 @@ jobs:
     # Validates the backend image builds (Dockerfile + requirements resolve).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: build backend image
         run: docker build -f backend/Dockerfile -t katha-backend:ci .
 
   ios:
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: iOS KathaKit tests + coverage gate (>=98%)
         run: cd ios/KathaKit && ./coverage.sh
 
   web-site:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22 }
       - run: cd web/site && npm ci && npx tsc --noEmit && npm run build
       - name: web/site tests + coverage gates (98 lines / 95 branches)
@@ -89,8 +89,8 @@ jobs:
   web-admin:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22 }
       - run: cd web/admin && npm ci && npm run build      # tsc -b + vite build: type errors fail here
       - name: web/admin tests + coverage gates (98 lines / 95 branches)
@@ -101,10 +101,10 @@ jobs:
     # throwaway SQLite, driven in the runner's Chrome (no browser download).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3
       - run: cd backend && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requirements-dev.txt
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22 }
       - run: cd web/admin && npm ci
       - name: admin money-path e2e (Playwright)
