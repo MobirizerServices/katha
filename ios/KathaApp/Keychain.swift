@@ -24,9 +24,12 @@ enum KeychainStore {
     }
 
     /// `nil` deletes. Writes replace: a stale value is never left behind.
-    static func set(_ value: String?, for key: String) {
+    /// Returns false when the item could NOT be stored — callers must not
+    /// pretend a secret exists that the next launch will not find.
+    @discardableResult
+    static func set(_ value: String?, for key: String) -> Bool {
         delete(key)
-        guard let value, let data = value.data(using: .utf8) else { return }
+        guard let value, let data = value.data(using: .utf8) else { return true }
         let item: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -34,7 +37,15 @@ enum KeychainStore {
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
-        SecItemAdd(item as CFDictionary, nil)
+        let status = SecItemAdd(item as CFDictionary, nil)
+        if status != errSecSuccess {
+            // -34018 (errSecMissingEntitlement) is what an UNSIGNED build gets:
+            // the keychain needs an application identifier, so simulator builds
+            // must be signed to run locally (see generate_xcodeproj.rb).
+            print("KeychainStore: SecItemAdd(\(key)) failed with \(status)")
+            return false
+        }
+        return true
     }
 
     static func delete(_ key: String) {

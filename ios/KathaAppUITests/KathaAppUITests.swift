@@ -229,10 +229,19 @@ final class KathaAppUITests: XCTestCase {
         assertExists(app.switches["Data saver"], 10)
         assertExists(app.switches["New episode alerts"], 5)
 
-        // set the PIN 1-2-3-4
+        // set the PIN 1-2-3-4 — entered twice (the sheet confirms it)
         tapWhenReady(app.buttons["Set parental lock"])
         assertExists(app.staticTexts["Set a parental PIN"], 8)
         for digit in ["1", "2", "3", "4"] { app.buttons[digit].tap() }
+        assertExists(app.staticTexts["Confirm the new PIN"], 8)
+        for digit in ["1", "2", "3", "4"] { app.buttons[digit].tap() }
+        assertExists(app.buttons["Change parental lock"], 8)
+        // changing or removing the lock asks for the CURRENT pin first
+        tapWhenReady(app.buttons["Remove parental lock"])
+        assertExists(app.staticTexts["Remove parental lock"], 8)
+        for digit in ["9", "9", "9", "9"] { app.buttons[digit].tap() }   // wrong: refused, still locked
+        assertExists(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Wrong PIN'")).firstMatch, 8)
+        app.swipeDown()                                                   // dismiss the sheet
         assertExists(app.buttons["Change parental lock"], 8)
 
         // relaunch KEEPING state into a U/A 16+ title → the gate asks for the PIN

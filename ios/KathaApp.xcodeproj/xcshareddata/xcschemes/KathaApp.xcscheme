@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "83B5A67DE461DA85043704F3"
+               BlueprintIdentifier = "260A57FC26AD2581E85282D7"
                BuildableName = "KathaApp.app"
                BlueprintName = "KathaApp"
                ReferencedContainer = "container:KathaApp.xcodeproj">
@@ -30,7 +30,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "83B5A67DE461DA85043704F3"
+            BlueprintIdentifier = "260A57FC26AD2581E85282D7"
             BuildableName = "KathaApp.app"
             BlueprintName = "KathaApp"
             ReferencedContainer = "container:KathaApp.xcodeproj">
@@ -41,7 +41,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A1E46C61D8319E6853EE9044"
+               BlueprintIdentifier = "CE40D547FCF231D0160B6BF1"
                BuildableName = "KathaAppUITests.xctest"
                BlueprintName = "KathaAppUITests"
                ReferencedContainer = "container:KathaApp.xcodeproj">
@@ -63,7 +63,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "83B5A67DE461DA85043704F3"
+            BlueprintIdentifier = "260A57FC26AD2581E85282D7"
             BuildableName = "KathaApp.app"
             BlueprintName = "KathaApp"
             ReferencedContainer = "container:KathaApp.xcodeproj">
@@ -83,7 +83,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "83B5A67DE461DA85043704F3"
+            BlueprintIdentifier = "260A57FC26AD2581E85282D7"
             BuildableName = "KathaApp.app"
             BlueprintName = "KathaApp"
             ReferencedContainer = "container:KathaApp.xcodeproj">

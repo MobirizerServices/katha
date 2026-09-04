@@ -13,7 +13,9 @@ final class ScreenshotTour: XCTestCase {
     private func launchApp(reset: Bool = true, onboarded: Bool = true,
                            extra: [String: String] = [:]) -> XCUIApplication {
         let app = XCUIApplication()
-        var env: [String: String] = ["KATHA_ALLOW_CAPTURE": "1"]   // device runs are recorded
+        var env: [String: String] = ["KATHA_ALLOW_CAPTURE": "1",   // device runs are recorded
+                                     "KATHA_FAKE_IAP": "1",        // server stub, no App Store sheet (DEBUG-only hooks)
+                                     "KATHA_FAKE_APPLE": "1"]
         if reset { env["KATHA_RESET"] = "1" }
         if onboarded { env["KATHA_ONBOARDED"] = "1" }
         extra.forEach { env[$0] = $1 }
@@ -120,6 +122,7 @@ final class ScreenshotTour: XCTestCase {
         button(app, containing: "600 coins").tap()
         wait(app, text: "You have 600", 12)
         snap("3.3b-paywall-funded")
+        _ = app.buttons["Unlock episode"].waitForExistence(timeout: 8)   // the sheet re-lays out after the buy
         app.buttons["Unlock episode"].tap()
         wait(app, text: "E11 · The signature", 15)
         sleep(2)

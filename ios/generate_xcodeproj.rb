@@ -92,9 +92,14 @@ target.build_configurations.each do |cfg|
     s['CODE_SIGN_ENTITLEMENTS'] = cfg.name == 'Release' ? 'KathaApp/KathaApp-Release.entitlements'
                                                         : 'KathaApp/KathaApp.entitlements'
   else
-    s['CODE_SIGNING_ALLOWED'] = 'NO'
+    # Simulator-only build: "Sign to Run Locally" (ad-hoc, no team). An
+    # UNSIGNED app has no application identifier, so every Keychain write
+    # fails with errSecMissingEntitlement — the session token and the parental
+    # PIN would silently not persist.
+    s['CODE_SIGN_STYLE'] = 'Manual'
+    s['CODE_SIGN_IDENTITY'] = '-'
+    s['CODE_SIGNING_ALLOWED'] = 'YES'
     s['CODE_SIGNING_REQUIRED'] = 'NO'
-    s['CODE_SIGN_IDENTITY'] = ''
   end
   s['ENABLE_PREVIEWS'] = 'YES'
   s['ASSETCATALOG_COMPILER_APPICON_NAME'] = 'AppIcon'

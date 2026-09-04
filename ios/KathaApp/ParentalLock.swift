@@ -47,8 +47,11 @@ final class ParentalLock {
         var saltBytes = [UInt8](repeating: 0, count: 16)
         _ = SecRandomCopyBytes(kSecRandomDefault, saltBytes.count, &saltBytes)
         let salt = Data(saltBytes).base64EncodedString()
-        KeychainStore.set(salt, for: Self.saltKey)
-        KeychainStore.set(Self.digest(pin, salt: salt), for: Self.hashKey)
+        guard KeychainStore.set(salt, for: Self.saltKey),
+              KeychainStore.set(Self.digest(pin, salt: salt), for: Self.hashKey) else {
+            clearUnconditionally()          // never report a lock the next launch won't have
+            return false
+        }
         resetFailures()
         isSet = true
         return true
