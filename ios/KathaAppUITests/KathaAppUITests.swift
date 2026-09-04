@@ -125,9 +125,11 @@ final class KathaAppUITests: XCTestCase {
         // Coordinate tap: the toolbar can re-render mid-tap and break re-resolution.
         let search = app.buttons["Search"].firstMatch
         assertExists(search, 12)
-        search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        if !app.staticTexts["Trending"].waitForExistence(timeout: 5), search.exists {
-            search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        // The toolbar can swallow a tap while the hero/rails re-render on a
+        // real device: retry a few times until SearchView is up.
+        for _ in 0..<4 where !app.staticTexts["Trending"].exists {
+            if search.exists { search.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
+            if app.staticTexts["Trending"].waitForExistence(timeout: 4) { break }
         }
         assertExists(app.staticTexts["Trending"], 10)     // SearchView is up
         let field = app.textFields.firstMatch          // the inline 2.3 search bar
