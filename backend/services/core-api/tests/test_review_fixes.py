@@ -1,7 +1,7 @@
 """Regression tests for the full-repo review fixes: web orders key on the
-payment id, invoice counters are atomic, failed ledger flushes never lose
-money rows, DELETE /me erases shared PII, and non-live series neither stream
-nor charge."""
+payment id, invoice counters are atomic, a failed ledger write leaves neither
+DB nor cache holding money the other lacks, DELETE /me erases shared PII, and
+non-live series neither stream nor charge."""
 import pytest
 from fastapi.testclient import TestClient
 
@@ -69,18 +69,17 @@ def test_kv_incr_is_sequential_and_survives_first_insert(shared):
     assert shared.kv_get("invoiceseq:seeded") == "42"
 
 
-# --- persistent ledger: money rows survive flush failures --------------------
+# --- persistent ledger: every write is one locked transaction ---------------
 
-def test_seq_collision_between_services_remints_and_keeps_both_rows(db):
+def test_second_service_folds_in_the_first_writers_rows_before_minting(db):
     a = PersistentLedger(db)
     b = PersistentLedger(db)                     # both loaded at seq 0
     a.credit("u1", TxType.PURCHASE, coins=500, reference_type="iap",
              reference_id="s", idempotency_key="ka", created_at=TS)
-    # Reproduce the race: b mints the same seq id in memory (its mutation path
-    # normally refreshes first, which only narrows this window), then flushes.
-    b._inner.credit("u2", TxType.PURCHASE, coins=100, reference_type="iap",
-                    reference_id="s", idempotency_key="kb", created_at=TS)
-    b._flush({"u2"})                             # id collision → re-mint + retry
+    # b's write folds a's row under the lock, so it mints seq 2, not a colliding 1.
+    b.credit("u2", TxType.PURCHASE, coins=100, reference_type="iap",
+             reference_id="s", idempotency_key="kb", created_at=TS)
+    assert b.balance("u1").total == 500           # folded, not just avoided
     fresh = PersistentLedger(db)
     assert fresh.balance("u1").total == 500
     assert fresh.balance("u2").total == 100
@@ -88,27 +87,30 @@ def test_seq_collision_between_services_remints_and_keeps_both_rows(db):
     assert len(ids) == 2
 
 
-def test_failed_flush_rows_survive_refresh_and_persist_later(db, monkeypatch):
+def test_failed_write_rolls_back_the_cache_and_raises(db, monkeypatch):
     L = PersistentLedger(db)
-    original = L._repo.persist
+    original = L._write
     calls = {"n": 0}
 
-    def flaky(*args, **kwargs):
+    async def flaky(*args, **kwargs):
         calls["n"] += 1
         if calls["n"] == 1:
             raise RuntimeError("db down")
-        return original(*args, **kwargs)
+        return await original(*args, **kwargs)
 
-    monkeypatch.setattr(L._repo, "persist", flaky)
+    monkeypatch.setattr(L, "_write", flaky)
     with pytest.raises(RuntimeError):
         L.credit("u1", TxType.PURCHASE, coins=500, reference_type="iap",
                  reference_id="s", idempotency_key="k1", created_at=TS)
-    # A refresh in between must NOT mark the orphan as on-disk...
-    L.refresh()
-    # ...so the next mutation's flush persists both rows.
-    L.credit("u1", TxType.BONUS, coins=50, reference_type="promo",
-             reference_id="b", idempotency_key="k2", created_at=TS)
-    assert PersistentLedger(db).balance("u1").total == 550
+    # The cache never holds money the DB does not: nothing applied, key free.
+    assert L.balance("u1").total == 0
+    assert L.transactions("u1") == []
+    assert PersistentLedger(db).balance("u1").total == 0
+    # The same key can be retried and lands exactly once.
+    L.credit("u1", TxType.PURCHASE, coins=500, reference_type="iap",
+             reference_id="s", idempotency_key="k1", created_at=TS)
+    assert L.balance("u1").total == 500
+    assert PersistentLedger(db).balance("u1").total == 500
 
 
 # --- DELETE /me actually erases ---------------------------------------------

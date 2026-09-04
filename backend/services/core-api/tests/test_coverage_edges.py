@@ -229,11 +229,8 @@ def test_true_last_lines(tmp_path):
     assert r.json()["enabled"] is False
     admin_main.store.flag_overrides.pop("rewards.referral_enabled", None)
 
-    # repository.persist with nothing to write is a no-op, not a DB trip
     from katha_infra.db import Database
-    from katha_infra.repository import LedgerRepository
     db = Database(f"sqlite+aiosqlite:///{tmp_path/'noop.db'}")
-    LedgerRepository(db).persist([], [], [])
 
     # a second reader folds entitlements another writer created (refresh)
     from katha_infra import PersistentLedger

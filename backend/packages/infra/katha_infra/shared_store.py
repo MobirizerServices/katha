@@ -20,6 +20,16 @@ from .persistent_ledger import PersistentLedger
 class SharedStore:
     def __init__(self, db: Database | None = None) -> None:
         self.db = db or Database()
+        self._ledger: PersistentLedger | None = None
+
+    @property
+    def ledger(self) -> PersistentLedger:
+        """The admin side's handle on the one shared ledger. Built once: every
+        mutation folds in other writers' rows under the write lock, so it is
+        always current without reloading the whole log per call."""
+        if self._ledger is None:
+            self._ledger = PersistentLedger(self.db)
+        return self._ledger
 
     # ---- profiles (written by core-api) ---------------------------------
     def upsert_profile(self, user_id: str, *, phone: str = "", kind: str = "guest",
@@ -98,11 +108,9 @@ class SharedStore:
     # ---- admin write (goes to the SAME ledger core-api reads) -----------
     def admin_adjust(self, user_id: str, *, coins: int, reason_code: str,
                      ref_id: str, created_at: str) -> dict:
-        # A fresh PersistentLedger rebuilds current state from the DB, applies the
-        # pure admin_adjust rule, and appends the tail — so the write lands in the
-        # one shared ledger and is idempotent by ref_id.
-        pl = PersistentLedger(self.db)
-        pl.admin_adjust(user_id, coins=coins, reference_type=f"admin_adjust:{reason_code}",
+        # The pure admin_adjust rule runs inside the ledger's locked transaction,
+        # so the write lands in the one shared ledger and is idempotent by ref_id.
+        self.ledger.admin_adjust(user_id, coins=coins, reference_type=f"admin_adjust:{reason_code}",
                         reference_id=ref_id, idempotency_key=ref_id, created_at=created_at)
         return self.wallet(user_id)
 
@@ -271,8 +279,7 @@ class SharedStore:
 
     def refund(self, user_id: str, *, coins: int, reference_id: str,
                ref_key: str, created_at: str) -> dict:
-        pl = PersistentLedger(self.db)
-        pl.refund_clawback(user_id, coins=coins, reference_type="gateway_refund",
+        self.ledger.refund_clawback(user_id, coins=coins, reference_type="gateway_refund",
                            reference_id=reference_id, idempotency_key=ref_key,
                            created_at=created_at)
         return self.wallet(user_id)

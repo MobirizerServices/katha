@@ -1,23 +1,57 @@
-"""A drop-in for `katha_ledger.Ledger` that also persists.
+"""A drop-in for `katha_ledger.Ledger` that also persists — atomically.
 
-It owns a pure `Ledger` (rebuilt from the DB on construction) and, after every
-mutating call, flushes the newly-appended tail to the `LedgerRepository`. Reads
-delegate straight through. The routers use exactly the same method surface, so
+It owns a pure `Ledger` (rebuilt from the DB on construction) and treats it as
+a process-local CACHE of the database, never as the arbiter. Every mutation
+runs inside ONE database transaction that:
+
+  1. takes the money-write lock (SQLite: `BEGIN IMMEDIATE`, Postgres: a
+     transaction-scoped advisory lock), so writers in every worker and every
+     service are serialized;
+  2. folds in rows other processes committed since we last looked (an
+     incremental read above our high-water mark, not a table scan);
+  3. applies the pure ledger rule against that now-current state;
+  4. writes the appended tail and the wallet projection, and commits.
+
+If anything fails between 3 and the commit, the in-memory application is
+rolled back and the error propagates: the cache never holds money the
+database does not. A balance check therefore always runs against the latest
+committed state, and two concurrent debits can no longer both pass.
+
+The routers use exactly the same method surface as the pure ledger, so
 swapping `store.ledger` from `Ledger()` to `PersistentLedger(...)` is the only
 wiring change — the money rules stay in the pure ledger.
 """
 from __future__ import annotations
 
-from dataclasses import replace
+import threading
+from typing import Any, Callable
 
-from sqlalchemy import select
+from sqlalchemy import func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from katha_ledger import Entitlement, Ledger, Transaction, TxType, UnlockResult, Wallet
 
 from .db import Database
-from .models import CoinTransactionRow, EntitlementRow
+from .models import CoinTransactionRow, EntitlementRow, WalletRow
 from .repository import LedgerRepository, _seq_of
+
+_TX = CoinTransactionRow.__table__
+_ENT = EntitlementRow.__table__
+_WALLET = WalletRow.__table__
+
+# One advisory key for every money write on Postgres. Global (not per-user)
+# because transaction ids are minted from an in-memory sequence that must be
+# current at mint time; a per-user lock would let two workers mint the same id
+# for different users. Transactions here are a handful of statements, so this
+# still clears hundreds of writes a second — a DB-side sequence for ids is the
+# follow-up that would relax it.
+_PG_LOCK_KEY = 0x4B41544841  # "KATHA"
+
+
+def _tx_id_mark(seq: int) -> str:
+    # ids are "ctx_%012d", so string order == numeric order on both engines.
+    return f"ctx_{seq:012d}"
 
 
 class PersistentLedger:
@@ -25,40 +59,12 @@ class PersistentLedger:
         self._db = db or Database()
         self._repo = LedgerRepository(self._db)
         self._inner = self._repo.load()
-        self._persisted_tx = len(self._inner._log)
-        self._persisted_ents: set[tuple[str, str]] = set(self._inner._entitlements)
+        self._ent_mark = self._db.run(self._max_ent_id())
+        # Serializes in-process callers (sync routers run in a threadpool) so at
+        # most one thread per process holds the DB lock and mutates the cache.
+        self._lock = threading.RLock()
 
-    # ---- flush the append-only tail -------------------------------------
-    def _flush(self, users: set[str]) -> None:
-        inner = self._inner
-        new_tx: list[Transaction] = inner._log[self._persisted_tx:]
-        new_ents: list[Entitlement] = [
-            e for k, e in inner._entitlements.items()
-            if k not in self._persisted_ents
-        ]
-        touched = users | {t.user_id for t in new_tx} | {e.user_id for e in new_ents}
-        try:
-            self._repo.persist(new_tx, new_ents,
-                               [inner._wallet(u) for u in touched])
-        except IntegrityError:
-            # The other service persisted rows with the same seq-minted ids in
-            # the race window between our refresh() and this flush. Fold its
-            # rows in (advancing _seq past them — _refresh keeps our
-            # unpersisted tail pending), re-mint ids for that tail, and retry
-            # once. Money rows must never be silently dropped.
-            self.refresh()
-            start = self._persisted_tx
-            for i in range(start, len(inner._log)):
-                fresh = replace(inner._log[i], id=inner._next_id())
-                inner._log[i] = fresh
-                inner._by_key[fresh.idempotency_key] = fresh
-            new_tx = inner._log[start:]
-            self._repo.persist(new_tx, new_ents,
-                               [inner._wallet(u) for u in touched])
-        self._persisted_tx = len(inner._log)
-        self._persisted_ents = set(inner._entitlements)
-
-    # ---- reads (delegate) -----------------------------------------------
+    # ---- reads (delegate to the cache) -----------------------------------
     def balance(self, user_id: str) -> Wallet:
         return self._inner.balance(user_id)
 
@@ -76,29 +82,38 @@ class PersistentLedger:
 
     # ---- cross-service freshness ----------------------------------------
     def refresh(self) -> int:
-        """Fold in rows another service appended to the same DB.
+        """Fold in rows another process committed since we last looked.
 
-        admin-api writes adjustments through its own PersistentLedger; without
-        this, a long-lived core-api process neither sees them nor advances its
-        id sequence past theirs (risking a primary-key collision on its next
-        write). Idempotency keys are globally unique, so they identify foreign
-        rows. Returns how many rows were folded in.
+        Read path only (no lock held in the DB): wallet/playback reads call
+        this so an admin adjustment is visible without a restart. Mutations
+        fold under the write lock themselves. Returns how many rows came in.
         """
-        return self._db.run(self._refresh())
+        with self._lock:
+            return self._db.run(self._refresh())
 
     async def _refresh(self) -> int:
-        async with self._db.session_factory() as session:
-            tx_rows = (await session.execute(select(CoinTransactionRow))).scalars().all()
-            ent_rows = (await session.execute(select(EntitlementRow))).scalars().all()
+        async with self._db.engine.connect() as conn:
+            return await self._fold(conn)
+
+    async def _max_ent_id(self) -> int:
+        async with self._db.engine.connect() as conn:
+            return (await conn.scalar(select(func.max(_ENT.c.id)))) or 0
+
+    async def _fold(self, conn: AsyncConnection) -> int:
+        """Apply rows above our high-water marks to the cache. Idempotency keys
+        are globally unique, so a key we already hold is never re-applied even
+        if a mark is somehow behind."""
         inner = self._inner
-        # Local rows a failed flush left unpersisted stay PENDING: marking them
-        # on-disk here would silently vanish them on the next restart.
-        pending_tx = inner._log[self._persisted_tx:]
-        pending_ents = {k for k in inner._entitlements
-                        if k not in self._persisted_ents}
-        fresh = [r for r in tx_rows if r.idempotency_key not in inner._by_key]
-        fresh.sort(key=lambda r: _seq_of(r.id))
-        for r in fresh:
+        tx_rows = (await conn.execute(
+            select(_TX).where(_TX.c.id > _tx_id_mark(inner._seq)).order_by(_TX.c.id)
+        )).all()
+        ent_rows = (await conn.execute(
+            select(_ENT).where(_ENT.c.id > self._ent_mark).order_by(_ENT.c.id)
+        )).all()
+        folded = 0
+        for r in tx_rows:
+            if r.idempotency_key in inner._by_key:
+                continue
             tx = Transaction(
                 id=r.id, user_id=r.user_id, type=TxType(r.type),
                 amount_bought=r.amount_bought, amount_bonus=r.amount_bonus,
@@ -108,7 +123,9 @@ class PersistentLedger:
             inner._log.append(tx)
             inner._by_key[tx.idempotency_key] = tx
             inner._wallet(tx.user_id).apply(tx)
-        inner._seq = max(inner._seq, max((_seq_of(r.id) for r in tx_rows), default=0))
+            folded += 1
+        if tx_rows:
+            inner._seq = max(inner._seq, max(_seq_of(r.id) for r in tx_rows))
         for e in ent_rows:
             key = (e.user_id, e.episode_id)
             if key not in inner._entitlements:
@@ -116,44 +133,98 @@ class PersistentLedger:
                     user_id=e.user_id, episode_id=e.episode_id,
                     source=e.source, created_at=e.created_at,
                 )
-        # Watermark bookkeeping: keep [persisted prefix][folded foreign rows]
-        # then the still-pending local tail at the end, so _flush retries
-        # exactly the pending rows and nothing else.
-        if pending_tx:
-            base = self._persisted_tx
-            folded = inner._log[base + len(pending_tx):]
-            inner._log[base:] = folded + pending_tx
-        self._persisted_tx = len(inner._log) - len(pending_tx)
-        self._persisted_ents = set(inner._entitlements) - pending_ents
-        return len(fresh)
+            self._ent_mark = max(self._ent_mark, e.id)
+        return folded
 
-    # ---- mutations (delegate, then flush) -------------------------------
+    # ---- the atomic mutation --------------------------------------------
+    def _mutate(self, user_id: str, op: Callable[[Ledger], Any]) -> Any:
+        with self._lock:
+            try:
+                return self._db.run(self._mutate_async(user_id, op))
+            except IntegrityError:
+                # A row committed by another process between our last fold and
+                # this write collided on id or idempotency key. The failed
+                # attempt was rolled back (DB and cache); fold again and retry
+                # exactly once — under the lock the second attempt cannot race.
+                return self._db.run(self._mutate_async(user_id, op))
+
+    async def _begin_exclusive(self, conn: AsyncConnection) -> None:
+        if self._db.url.startswith("sqlite"):
+            # Reserve the write lock up front so concurrent writers (other
+            # workers/services on the same file) queue here instead of failing
+            # at commit; reads inside see the latest committed state.
+            await conn.exec_driver_sql("BEGIN IMMEDIATE")
+        else:
+            await conn.execute(text("SELECT pg_advisory_xact_lock(:k)"),
+                               {"k": _PG_LOCK_KEY})
+
+    async def _mutate_async(self, user_id: str, op: Callable[[Ledger], Any]) -> Any:
+        inner = self._inner
+        async with self._db.engine.connect() as conn:
+            await self._begin_exclusive(conn)
+            await self._fold(conn)
+            # Snapshot enough to undo the in-memory application. Every ledger
+            # op touches exactly one user's wallet.
+            log_mark, seq_mark = len(inner._log), inner._seq
+            ents_before = set(inner._entitlements)
+            wallet = inner._wallet(user_id)
+            wallet_before = (wallet.balance_bought, wallet.balance_bonus)
+            try:
+                result = op(inner)
+                new_tx = inner._log[log_mark:]
+                new_ents = [e for k, e in inner._entitlements.items() if k not in ents_before]
+                touched = {user_id} | {t.user_id for t in new_tx} | {e.user_id for e in new_ents}
+                await self._write(conn, new_tx, new_ents, [inner._wallet(u) for u in touched])
+                ent_mark = (await conn.scalar(select(func.max(_ENT.c.id)))) or 0
+                await conn.commit()
+            except BaseException:
+                await conn.rollback()
+                for tx in inner._log[log_mark:]:
+                    inner._by_key.pop(tx.idempotency_key, None)
+                del inner._log[log_mark:]
+                inner._seq = seq_mark
+                for k in [k for k in inner._entitlements if k not in ents_before]:
+                    del inner._entitlements[k]
+                wallet.balance_bought, wallet.balance_bonus = wallet_before
+                raise
+        self._ent_mark = max(self._ent_mark, ent_mark)
+        return result
+
+    async def _write(self, conn: AsyncConnection, transactions: list[Transaction],
+                     entitlements: list[Entitlement], wallets: list[Wallet]) -> None:
+        if transactions:
+            await conn.execute(insert(_TX), [
+                dict(id=t.id, user_id=t.user_id, type=t.type.value,
+                     amount_bought=t.amount_bought, amount_bonus=t.amount_bonus,
+                     reference_type=t.reference_type, reference_id=t.reference_id,
+                     idempotency_key=t.idempotency_key, created_at=t.created_at)
+                for t in transactions])
+        if entitlements:
+            await conn.execute(insert(_ENT), [
+                dict(user_id=e.user_id, episode_id=e.episode_id,
+                     source=e.source, created_at=e.created_at)
+                for e in entitlements])
+        for w in wallets:
+            res = await conn.execute(
+                update(_WALLET).where(_WALLET.c.user_id == w.user_id)
+                .values(balance_bought=w.balance_bought, balance_bonus=w.balance_bonus))
+            if res.rowcount == 0:
+                await conn.execute(insert(_WALLET).values(
+                    user_id=w.user_id, balance_bought=w.balance_bought,
+                    balance_bonus=w.balance_bonus))
+
+    # ---- mutations (same surface as the pure ledger) --------------------
     def credit(self, user_id: str, *args, **kwargs) -> Transaction:
-        self.refresh()
-        tx = self._inner.credit(user_id, *args, **kwargs)
-        self._flush({user_id})
-        return tx
+        return self._mutate(user_id, lambda l: l.credit(user_id, *args, **kwargs))
 
     def unlock(self, user_id: str, *args, **kwargs) -> UnlockResult:
-        self.refresh()
-        res = self._inner.unlock(user_id, *args, **kwargs)
-        self._flush({user_id})
-        return res
+        return self._mutate(user_id, lambda l: l.unlock(user_id, *args, **kwargs))
 
     def grant_free(self, user_id: str, *args, **kwargs) -> Entitlement:
-        self.refresh()
-        ent = self._inner.grant_free(user_id, *args, **kwargs)
-        self._flush({user_id})
-        return ent
+        return self._mutate(user_id, lambda l: l.grant_free(user_id, *args, **kwargs))
 
     def refund_clawback(self, user_id: str, *args, **kwargs) -> Transaction:
-        self.refresh()
-        tx = self._inner.refund_clawback(user_id, *args, **kwargs)
-        self._flush({user_id})
-        return tx
+        return self._mutate(user_id, lambda l: l.refund_clawback(user_id, *args, **kwargs))
 
     def admin_adjust(self, user_id: str, *args, **kwargs) -> Transaction:
-        self.refresh()
-        tx = self._inner.admin_adjust(user_id, *args, **kwargs)
-        self._flush({user_id})
-        return tx
+        return self._mutate(user_id, lambda l: l.admin_adjust(user_id, *args, **kwargs))
