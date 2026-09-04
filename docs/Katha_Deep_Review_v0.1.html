@@ -118,7 +118,7 @@
 
 <div class="wrap">
 <header class="top">
-  <p class="eyebrow">Code review · 3 September 2026 · commit 378e93d</p>
+  <p class="eyebrow">Code review · 3 September 2026 · commit 378e93d · fix pass 4 September 2026</p>
   <h1>Katha Deep Review</h1>
   <p class="lede">A full read of the five built surfaces and the deploy layer: the coin ledger and its persistence, core-api, admin-api, the Next.js site, the React back office, the iOS app, and compose/nginx/CI/tools. Every finding below was traced through the code; those marked <em>reproduced</em> were triggered against a test client, a scratch database, or real threads.</p>
 
@@ -131,6 +131,16 @@
     <div class="vcard bad"><span class="k">admin-api pytest alone</span><span class="v">1 fail</span><span class="n">app/ shim shadows core-api's app package; full run is green</span></div>
   </div>
 </header>
+
+
+<h2>Status after the fix pass</h2>
+<p class="sub">Every finding above was worked through in the commits after this review (C1 → the Lows), each with regression tests. What is not fixed is listed explicitly.</p>
+<ul class="plain">
+  <li><b>Fixed (60 of 64).</b> All 7 Critical, all 21 High, all 26 Medium, and 6 of 10 Low findings. Backend 310 tests, web/admin 232, web/site 89, KathaKit 83; both web coverage gates green; the app builds in Debug and Release; both OpenAPI contracts regenerated.</li>
+  <li><b>Deferred, by design.</b> C6 guest-merge device binding (needs App Attest; the merge still requires holding the guest bearer). I12's Swift 6 strict-concurrency on the app target. The CI security job stays non-blocking and actions stay on major tags until the advisory backlog is triaged. XCUITest is still run on a developer Mac, not in CI.</li>
+  <li><b>Verified by reading, not by running.</b> The Postgres branches of the ledger lock and the audit-chain lock (advisory locks) — no local Postgres was available; the SQLite branches are exercised by the concurrency tests. The StoreKit purchase sheet and the real Sign in with Apple flow need a device.</li>
+  <li><b>Still open as a design choice.</b> The web site keeps its bearer in localStorage behind the new CSP; moving to an httpOnly cookie session needs a core-api cookie mode with CSRF and is a separate piece of work.</li>
+</ul>
 
 <h2>Fix first</h2>
 <p class="sub">The eight items that make the current build unsafe to put money behind, in the order I would take them. Each is a real, reachable defect, not a hardening wish.</p>
