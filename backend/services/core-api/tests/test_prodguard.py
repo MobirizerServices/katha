@@ -66,17 +66,51 @@ def test_managed_core_fully_configured_passes(monkeypatch):
     enforce("core-api")          # no raise
 
 
-def test_managed_admin_requires_oidc_and_session_secret(monkeypatch):
+def _managed_admin(monkeypatch):
     monkeypatch.setenv("KATHA_ENV", "prod")
     monkeypatch.setenv("KATHA_PERSIST", "1")
     monkeypatch.setenv("KATHA_DB_URL", PG)
     monkeypatch.setenv("KATHA_ADMIN_SESSION_SECRET", "a-real-admin-session-secret")
+    monkeypatch.setenv("KATHA_ADMIN_AUTH", "oidc")
+    monkeypatch.setenv("KATHA_OIDC_ISSUER", "https://accounts.google.com")
+    monkeypatch.setenv("KATHA_OIDC_CLIENT_ID", "cid")
+    monkeypatch.setenv("KATHA_OIDC_CLIENT_SECRET", "csecret")
+    monkeypatch.setenv("KATHA_OIDC_REDIRECT_URL", "https://admin.katha.example/admin/v1/auth/callback")
+    monkeypatch.setenv("KATHA_ADMIN_COOKIE_SECURE", "1")
+    monkeypatch.setenv("KATHA_ADMIN_CORS", "https://admin.katha.example")
+    monkeypatch.setenv("KATHA_ADMIN_IP_ALLOWLIST", "10.8.0.0/24")
+    monkeypatch.setenv("KATHA_ADMIN_USERS", "ops@katha.example:admin")
+
+
+def test_managed_admin_requires_oidc_and_session_secret(monkeypatch):
+    _managed_admin(monkeypatch)
     monkeypatch.setenv("KATHA_ADMIN_AUTH", "headers")
     with pytest.raises(InsecureConfigError) as e:
         enforce("admin-api")
     assert "KATHA_ADMIN_AUTH" in str(e.value)
     monkeypatch.setenv("KATHA_ADMIN_AUTH", "oidc")
     enforce("admin-api")         # no raise
+
+
+# --- D1/A2: a blank issuer would select the one-click dev IdP ----------------
+
+@pytest.mark.parametrize("var,bad,needle", [
+    ("KATHA_OIDC_ISSUER", "", "KATHA_OIDC_ISSUER"),
+    ("KATHA_OIDC_CLIENT_ID", "", "KATHA_OIDC_CLIENT_ID"),
+    ("KATHA_OIDC_CLIENT_SECRET", "", "KATHA_OIDC_CLIENT_SECRET"),
+    ("KATHA_OIDC_REDIRECT_URL", "", "KATHA_OIDC_REDIRECT_URL"),
+    ("KATHA_OIDC_REDIRECT_URL", "http://localhost:5174/admin/v1/auth/callback", "https"),
+    ("KATHA_ADMIN_COOKIE_SECURE", "0", "KATHA_ADMIN_COOKIE_SECURE"),
+    ("KATHA_ADMIN_CORS", "", "KATHA_ADMIN_CORS"),
+    ("KATHA_ADMIN_IP_ALLOWLIST", " ", "KATHA_ADMIN_IP_ALLOWLIST"),
+    ("KATHA_ADMIN_USERS", "", "KATHA_ADMIN_USERS"),
+])
+def test_managed_admin_refuses_each_missing_posture_item(monkeypatch, var, bad, needle):
+    _managed_admin(monkeypatch)
+    monkeypatch.setenv(var, bad)
+    with pytest.raises(InsecureConfigError) as e:
+        enforce("admin-api")
+    assert needle in str(e.value)
 
 
 def test_unknown_service_raises(monkeypatch):

@@ -416,3 +416,27 @@ def test_callback_with_burned_code_walks_the_error_path(oidc_mode):
     note = urllib.parse.unquote(client.cookies.get(oidc.NOTE_COOKIE))
     assert note.startswith("error:") and "expired or already used" in note
     assert client.get("/admin/v1/auth/me").json()["authenticated"] is False
+
+
+# --- A6/D1: mode selection and the dev IdP fail closed ------------------------
+
+@pytest.mark.parametrize("raw", ["oidc-google", "off", "OIDC2", "", "Headers "])
+def test_only_the_literal_headers_value_selects_header_identity(monkeypatch, raw):
+    monkeypatch.setenv("KATHA_ADMIN_AUTH", raw)
+    expected = "headers" if raw.strip().lower() == "headers" else "oidc"
+    assert oidc.auth_mode() == expected
+    if expected == "oidc":
+        client = TestClient(app)
+        r = client.get("/admin/v1/overview", headers={"X-Actor-Id": "x", "X-Role": "admin"})
+        assert r.status_code == 401
+
+
+def test_dev_idp_is_unreachable_in_a_managed_env(monkeypatch, oidc_mode):
+    monkeypatch.delenv("KATHA_OIDC_ISSUER", raising=False)
+    client = TestClient(app)
+    assert client.get("/admin/v1/devidp/authorize").status_code == 200   # dev: fine
+    monkeypatch.setenv("KATHA_ENV", "qa")
+    assert not oidc.internal_idp()
+    assert client.get("/admin/v1/devidp/authorize").status_code == 404
+    assert client.post("/admin/v1/devidp/authorize",
+                       content="email=ops%40katha.dev").status_code == 404

@@ -60,12 +60,22 @@ _SESSION_SECRET = (os.environ.get("KATHA_ADMIN_SESSION_SECRET")
 
 
 def auth_mode() -> str:
-    # Fail closed: client-named roles only when explicitly opted in (dev/test).
-    return os.environ.get("KATHA_ADMIN_AUTH", "oidc").strip().lower()
+    """'headers' (client-named roles, dev/test only) needs the literal opt-in;
+    ANY other value — including a typo like "oidc-google" — is OIDC. Falling
+    through to header identity on an unrecognised value would fall open."""
+    raw = os.environ.get("KATHA_ADMIN_AUTH", "oidc").strip().lower()
+    return "headers" if raw == "headers" else "oidc"
 
 
 def internal_idp() -> bool:
-    return not os.environ.get("KATHA_OIDC_ISSUER")
+    """The built-in dev IdP stands in only when no issuer is configured AND
+    this is not a managed environment: its sign-in page is one click to any
+    directory role, so it must never be reachable from QA/prod even if the
+    issuer variable is accidentally blank (prodguard refuses that boot too)."""
+    if os.environ.get("KATHA_OIDC_ISSUER"):
+        return False
+    from katha_infra.prodguard import is_managed_env
+    return not is_managed_env()
 
 
 def _client_id() -> str:

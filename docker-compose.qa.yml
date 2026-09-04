@@ -68,6 +68,11 @@ services:
       KATHA_OIDC_ISSUER: ${KATHA_OIDC_ISSUER}
       KATHA_OIDC_CLIENT_ID: ${KATHA_OIDC_CLIENT_ID}
       KATHA_OIDC_CLIENT_SECRET: ${KATHA_OIDC_CLIENT_SECRET}
+      KATHA_OIDC_REDIRECT_URL: ${KATHA_OIDC_REDIRECT_URL}     # https://admin-.../admin/v1/auth/callback
+      KATHA_ADMIN_COOKIE_SECURE: "1"
+      KATHA_ADMIN_CORS: ${PUBLIC_ADMIN_ORIGIN}                # https://admin-... (the SPA origin)
+      KATHA_ADMIN_IP_ALLOWLIST: ${KATHA_ADMIN_IP_ALLOWLIST}   # VPN/office CIDRs, comma-separated
+      KATHA_ADMIN_USERS: ${KATHA_ADMIN_USERS}                 # bootstrap operators, a@x:admin,b@x:support
     depends_on:
       backend: { condition: service_started }
 
@@ -97,6 +102,7 @@ services:
     ports: ["80:80", "443:443"]
     volumes:
       - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/admin-allow.conf:/etc/nginx/admin-allow.conf:ro
       - ./deploy/certs:/etc/nginx/certs:ro
       - media:/srv/media:ro
       - certbot-www:/var/www/certbot

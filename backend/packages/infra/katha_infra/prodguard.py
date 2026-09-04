@@ -76,6 +76,25 @@ def enforce(service: str) -> None:
         _require_secret("KATHA_ADMIN_SESSION_SECRET", dev_default=None, problems=problems)
         if os.environ.get("KATHA_ADMIN_AUTH", "oidc").strip().lower() != "oidc":
             problems.append("KATHA_ADMIN_AUTH must be 'oidc' in a managed env (header identity is dev-only)")
+        # A blank issuer selects the built-in dev IdP, whose sign-in page is a
+        # one-click "become admin" — so the real relying-party config is
+        # mandatory, not optional.
+        for name in ("KATHA_OIDC_ISSUER", "KATHA_OIDC_CLIENT_ID", "KATHA_OIDC_CLIENT_SECRET"):
+            _require_secret(name, dev_default=None, problems=problems)
+        redirect = os.environ.get("KATHA_OIDC_REDIRECT_URL", "")
+        if not redirect.startswith("https://"):
+            problems.append("KATHA_OIDC_REDIRECT_URL must be set to the https callback "
+                            "(defaults to localhost, which no IdP will accept)")
+        if os.environ.get("KATHA_ADMIN_COOKIE_SECURE") != "1":
+            problems.append("KATHA_ADMIN_COOKIE_SECURE=1 is required (session cookies over TLS only)")
+        if not os.environ.get("KATHA_ADMIN_CORS"):
+            problems.append("KATHA_ADMIN_CORS is not pinned (defaults are localhost dev origins)")
+        if not os.environ.get("KATHA_ADMIN_IP_ALLOWLIST", "").strip():
+            problems.append("KATHA_ADMIN_IP_ALLOWLIST is empty (the back office must sit behind "
+                            "the VPN/office CIDRs — see the security posture doc)")
+        if not os.environ.get("KATHA_ADMIN_USERS", "").strip():
+            problems.append("KATHA_ADMIN_USERS is not set (the default bootstrap admin "
+                            "ops@katha.dev is a dev convenience)")
     else:
         raise ValueError(f"unknown service: {service}")
 
