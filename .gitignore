@@ -61,8 +61,9 @@ coverage/
 .coverage
 *.tsbuildinfo
 
-# Generated Xcode app project (regenerate: cd ios && ruby generate_xcodeproj.rb) + build output
-ios/KathaApp.xcodeproj/
+# Xcode app project is committed so a fresh clone can open and run the app.
+# Regenerate it after adding/removing Swift files: cd ios && ruby generate_xcodeproj.rb
+# Build output stays ignored.
 ios/build/
 ios/build-device/
 ios/build-sim/
