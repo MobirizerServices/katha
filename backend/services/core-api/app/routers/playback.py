@@ -8,6 +8,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from katha_domain import catalog
+from katha_domain.schemas import AudioTrack
 from ..deps import current_user
 from katha_domain.timeutil import iso_plus
 
@@ -16,17 +17,36 @@ from ..store import store
 router = APIRouter(prefix="/v1", tags=["playback"])
 
 
-def _signed_url(episode_id: str, user: str) -> str:
-    """Tokened stream URL (ADR-012): one HMAC token covers the episode's whole
-    HLS tree for this user, expiring with the playback grant."""
+def _token_root(episode_id: str, user: str) -> tuple[str, str]:
+    """(url root, episode dir) for the tokened route (ADR-012): one HMAC token
+    covers the episode's whole directory — hls/ tree AND subs/ — for this
+    user, expiring with the playback grant. Always the tokened route, whether
+    or not the media is on this box: a missing tree is a 404 behind the same
+    signature, never an unsigned URL handed to the client."""
     from ..signing import make_token
     slug, _, tail = episode_id.partition(":e")
-    epdir = f"{slug}/e{int(tail):03d}/hls/"
-    # Always the tokened route, whether or not the media is on this box: a
-    # missing tree is a 404 behind the same signature, never an unsigned URL
-    # handed to the client.
+    epdir = f"{slug}/e{int(tail):03d}/"
     token = make_token(epdir, user)
-    return f"{catalog.media_base()}/media/t/{token}/{epdir}master.m3u8"
+    return f"{catalog.media_base()}/media/t/{token}/{epdir}", epdir
+
+
+def _signed_url(episode_id: str, user: str) -> str:
+    root, _ = _token_root(episode_id, user)
+    return f"{root}hls/master.m3u8"
+
+
+def _captions(episode_id: str, user: str) -> list[dict]:
+    """Every media/{slug}/e{NNN}/subs/{lang}.vtt on disk, served under the
+    same stream token as the HLS tree."""
+    from ..media import media_dir
+    from katha_domain.schemas import CaptionTrack
+    root, epdir = _token_root(episode_id, user)
+    subs = media_dir() / epdir / "subs"
+    out = []
+    for f in sorted(subs.glob("*.vtt")) if subs.is_dir() else []:
+        out.append(CaptionTrack(lang=f.stem, label=catalog.language_name(f.stem),
+                                url=f"{root}subs/{f.name}").model_dump())
+    return out
 
 
 def _resume_ms(user: str, eid: str) -> int:
@@ -63,7 +83,10 @@ def playback(slug: str, number: int, response: Response, user: str = Depends(cur
             "hls_master_url": _signed_url(eid, user),
             "expires_at": iso_plus(6),
             "resume_position_ms": _resume_ms(user, eid),
-            "captions": [{"lang": series.primary_language, "url": f".../{eid}/subs.vtt"}],
+            "captions": _captions(eid, user),
+            "audio": [AudioTrack(lang=series.primary_language,
+                                 label=catalog.language_name(series.primary_language),
+                                 kind="original").model_dump()],
         }
 
     store.emit(user, "paywall_view", ref=eid, value=series.episode_coin_price)

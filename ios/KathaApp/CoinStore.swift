@@ -30,11 +30,16 @@ final class CoinStore {
     /// StoreKit configuration, so it asks for the server's dev stub instead of
     /// the App Store sheet. Compiled out of Release — a shipping build can only
     /// buy through StoreKit.
-    static var harnessStub: Bool {
+    static var harnessStub: Bool { harnessMode != nil }
+
+    /// KATHA_FAKE_IAP=1 → the server's dev stub credits; "pending" → Ask to
+    /// Buy (deferred); "cancelled" / "failed" → those outcomes. Lets the UI
+    /// suite walk every 3.3/3.4 state without an App Store sheet.
+    private static var harnessMode: String? {
         #if DEBUG
-        return ProcessInfo.processInfo.environment["KATHA_FAKE_IAP"] == "1"
+        return ProcessInfo.processInfo.environment["KATHA_FAKE_IAP"]
         #else
-        return false
+        return nil
         #endif
     }
 
@@ -122,6 +127,12 @@ final class CoinStore {
     // MARK: Dev stub (DEBUG + harness only)
 
     private func stubBuy(sku: String, api: KathaAPIClient) async -> PurchaseOutcome {
+        switch Self.harnessMode {
+        case "pending": return .pending
+        case "cancelled": return .cancelled
+        case "failed": return .failed("Payment didn't go through. You weren't charged.")
+        default: break
+        }
         do {
             let w = try await api.verifyIAP(jws: "dev-jws-\(sku)-\(UUID().uuidString)", sku: sku)
             return .credited(w)

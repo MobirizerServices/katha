@@ -13,9 +13,11 @@ export default function SiteHeader() {
           Katha<small>कथा</small>
         </Link>
         <nav className="links" aria-label="Primary">
-          <Link href="/#series">Series</Link>
+          <Link href="/browse">Browse</Link>
+          <Link href="/search">Search</Link>
+          {w.signed && <Link href="/mylist">My list</Link>}
           <Link href="/#how">How coins work</Link>
-          <Link href="/#faq">Help</Link>
+          <Link href="/#business">For studios &amp; brands</Link>
           <Link href="/coins">Coins</Link>
         </nav>
         <div className="right">
@@ -24,9 +26,9 @@ export default function SiteHeader() {
             {w.ready ? fmt(w.balance) : "0"}
           </Link>
           {w.signed ? (
-            <span className="avatar" aria-label="Profile">
+            <Link className="avatar" href="/profile" aria-label="Profile">
               {w.name.charAt(0) || "M"}
-            </span>
+            </Link>
           ) : (
             <button className="signin" onClick={() => w.openSignIn()}>
               Sign in

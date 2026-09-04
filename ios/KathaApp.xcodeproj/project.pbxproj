@@ -7,195 +7,207 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0FCDDA535CDE96B4B51D3A5E /* SeriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC8ECD6998C9D0FF1AD28D52 /* SeriesView.swift */; };
-		10987114D1E125AE240FBFD2 /* CoinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00215AA57147CD4122DEDE8E /* CoinStore.swift */; };
-		1CC58DC316519D7CE5E42F65 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 625F6344F5D9F03ED53E81AA /* Foundation.framework */; };
-		1EFFA5B7CB3D69F1DF062036 /* ScreenshotTour.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8CF73D683F70AB707B28915 /* ScreenshotTour.swift */; };
-		256E7916E1F51EC02FB9087A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 298A4B262655D32C79F5E5AC /* PrivacyInfo.xcprivacy */; };
-		2750C17F7023F03D114B4493 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FF203B47C3282291D783BD /* PaywallView.swift */; };
-		386B122483CE2E1237D23F50 /* Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26669BC39EB318E8D5D0BDE9 /* Notifications.swift */; };
-		39672506C1B2D44E2519A59D /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4767F1DF6CF4587CF6285C08 /* PlayerView.swift */; };
-		4600710554548053581B0466 /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = FF2EB666360BA2072850BF68 /* Fonts */; };
-		4F4C16CB5882C97BB9EA28CA /* CoachMarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EB5ECD73D612F0F4BBA963E /* CoachMarks.swift */; };
-		5B0155495B9BB628C80363EC /* AuthViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87ECC08D1C17351F665A7B68 /* AuthViews.swift */; };
-		5C98F231AFA0BC579F5C0CEC /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE1944B7A70AEB375482259 /* Keychain.swift */; };
-		60F70260AD01513E2FA1D914 /* ProfileViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4458F975BAAA561781727F9 /* ProfileViews.swift */; };
-		65A7B52B0A200B7604A5E317 /* KathaKit in Frameworks */ = {isa = PBXBuildFile; productRef = D2532E5F58FB4AE6DF021E3D /* KathaKit */; };
-		7F9DF9A85743BEF174286CE9 /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C265703B4A6FDD66CD026B1C /* FeedView.swift */; };
-		8095A3D011EAAE239E252557 /* KathaAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886F140A5C267EDD5C30F747 /* KathaAppUITests.swift */; };
-		867AC0F415A1509CBE2EE39C /* KathaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF3476DB42E700D3F5CCE004 /* KathaApp.swift */; };
-		8857B3E4C6469D82F21990B0 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF75A1929ABD47D51DC46880 /* WalletView.swift */; };
-		962F41A0305CF4FF57E7A315 /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D89265B6C0ECC8FB2F68F51 /* AppleSignIn.swift */; };
-		A06987974D0F2952F636437C /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 625F6344F5D9F03ED53E81AA /* Foundation.framework */; };
-		BAED63BB516D795E2F4D384B /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4592823887BB1765BC0AB414 /* DesignSystem.swift */; };
-		C026131EB829844452E5E3DF /* ParentalLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC85390B0929E74E0378F653 /* ParentalLock.swift */; };
-		D00A9537C42C3953A5B1C3AF /* OnboardingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D80A0F8054B6B1B79B9397F /* OnboardingViews.swift */; };
-		DA70C34615C421BF5877B5A0 /* ProgressReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80E8FEB3E053DF54A2B15E1D /* ProgressReporter.swift */; };
-		E6A88957452FF7B948E4DE57 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 05F5A699D524A73ED0F121D7 /* Assets.xcassets */; };
-		EDEFD5546B31F321D3AFDB71 /* DiscoverViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 008FCF5F05849B26141444C7 /* DiscoverViews.swift */; };
+		03028E5FD5872BBF0ADE397D /* ScreenshotTour.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A9628EE6FB37C6DC5084B31 /* ScreenshotTour.swift */; };
+		1104A8FBFB932B9F73547E26 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C06B8686FFFC881061040B /* PaywallView.swift */; };
+		1A4BFA925FF26EA48F968C10 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FEC81CD8EDB5F22724E57298 /* PrivacyInfo.xcprivacy */; };
+		1C0CD90FEEF12B246145F875 /* DiscoverViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA802D56FA08660EC6A21F9C /* DiscoverViews.swift */; };
+		1CE20B92AADD98611E5366E7 /* CoinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3596DBED3E86906D2293D361 /* CoinStore.swift */; };
+		1F48B57A6340B24C029DEEBD /* KathaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CB70D8453AA5F039093EADD /* KathaApp.swift */; };
+		247DB1713760AE7871F7E206 /* CoachMarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58690F90CB2A8D535E65AC4D /* CoachMarks.swift */; };
+		37459F9BBC4935FC7C1478EE /* ParentalLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66246DDF3DD33758A95FA927 /* ParentalLock.swift */; };
+		3BFDBEA6BD2481138DB1DEB9 /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = A9E93BA2DEA64B69526AF7C3 /* Fonts */; };
+		41DB616262A4994FCF6D2979 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200FD0EFC87E57EDEF35B38E /* Keychain.swift */; };
+		4262016C1021124C7C3F5BFF /* ContinueWatchingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51EECEA095F951AA90B73203 /* ContinueWatchingView.swift */; };
+		4C0035A0FB6531D2679C94B7 /* OnboardingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BEB1F50F111B2C97E65EE8B /* OnboardingViews.swift */; };
+		4C7E4ADF35A7059A418B3CEC /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3D4ED2840E4496B2D06E15 /* DesignSystem.swift */; };
+		4D39BC5CB76BDCAC077E9E08 /* Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = C99C0142BB25B21BC73BC926 /* Notifications.swift */; };
+		5BDD8821C4017066EC01C819 /* SeriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B39537F60C28DCC9E1474AEA /* SeriesView.swift */; };
+		5CE1557ED0FDBF69328E1102 /* PacksSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D1451784936A3AE2A748260 /* PacksSheet.swift */; };
+		6A2820AAE50C3BF92F7AAB88 /* AuthViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1522491F3F6C6D74D24CB3F2 /* AuthViews.swift */; };
+		719934D0ACE0B17021122F46 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5D2DE805A6590B3D200360D2 /* Assets.xcassets */; };
+		77288DD61BCCE54B8A31F81C /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0CB01B66934B69A14486115 /* Foundation.framework */; };
+		78C5C2AD03530E5D49415E62 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0CB01B66934B69A14486115 /* Foundation.framework */; };
+		95F276FCFEE6B71FB7A8B31F /* HelpAssistantView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F4DE0D40AFD1F2E458F0CA3 /* HelpAssistantView.swift */; };
+		97C81F272AC4B517E85CF641 /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C858EE272AD6804D16C8310D /* FeedView.swift */; };
+		9F70CBA8464D54B1E5BA0380 /* KathaAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93782C0F1E4B5859EB1EFA4B /* KathaAppUITests.swift */; };
+		B19EC10AA69D4D772348934D /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB09317B122EC2501D6799B8 /* AppleSignIn.swift */; };
+		B57287BFC55CC410A628C477 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6535A3DE5D77C896703C952 /* PlayerView.swift */; };
+		BC0527288D592DCE330B6810 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFB8775D3940286798AADCD /* WalletView.swift */; };
+		C10F15358DED88906E4E0AA3 /* ProfileViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C50361E1C78E676AB7ECCFF /* ProfileViews.swift */; };
+		ED4107B1F4919DB788136BD7 /* ProgressReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C13EB572183D726217AD24E /* ProgressReporter.swift */; };
+		F64BFFF49207B80A94C4E0A0 /* Strings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CA1D1A451AAC78DE4DE9A2 /* Strings.swift */; };
+		F8A59084F453F79DFC28F4BB /* KathaKit in Frameworks */ = {isa = PBXBuildFile; productRef = E4EEEBCFD234B523CD1B50AF /* KathaKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		636C99FDAB554A14F2A131B5 /* PBXContainerItemProxy */ = {
+		B66D721D9CE3AC5B86164E7B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = B3DDD5ECE36E00CCB0FC3482 /* Project object */;
+			containerPortal = 6062AB573E0C9DC96B06BC39 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 260A57FC26AD2581E85282D7;
+			remoteGlobalIDString = 86FAF5AA9AE12E1BB1A0EE91;
 			remoteInfo = KathaApp;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		00215AA57147CD4122DEDE8E /* CoinStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoinStore.swift; sourceTree = "<group>"; };
-		008FCF5F05849B26141444C7 /* DiscoverViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiscoverViews.swift; sourceTree = "<group>"; };
-		05F5A699D524A73ED0F121D7 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		08B205025B0E33E3579438E7 /* Local.xcconfig.example */ = {isa = PBXFileReference; includeInIndex = 1; path = Local.xcconfig.example; sourceTree = "<group>"; };
-		22B2FFB6CB4617CA99EF16C8 /* Katha.storekit */ = {isa = PBXFileReference; includeInIndex = 1; path = Katha.storekit; sourceTree = "<group>"; };
-		26669BC39EB318E8D5D0BDE9 /* Notifications.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Notifications.swift; sourceTree = "<group>"; };
-		298A4B262655D32C79F5E5AC /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		2D89265B6C0ECC8FB2F68F51 /* AppleSignIn.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
-		2EB5ECD73D612F0F4BBA963E /* CoachMarks.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoachMarks.swift; sourceTree = "<group>"; };
-		4592823887BB1765BC0AB414 /* DesignSystem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
-		4767F1DF6CF4587CF6285C08 /* PlayerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
-		5DDFF268EFD6A96578615467 /* Release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
-		605873D223F0E03AC96683BC /* Debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
-		625F6344F5D9F03ED53E81AA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		6D80A0F8054B6B1B79B9397F /* OnboardingViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingViews.swift; sourceTree = "<group>"; };
-		7491AC8B23CC76642114AD77 /* KathaApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KathaApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		80E8FEB3E053DF54A2B15E1D /* ProgressReporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProgressReporter.swift; sourceTree = "<group>"; };
-		87ECC08D1C17351F665A7B68 /* AuthViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthViews.swift; sourceTree = "<group>"; };
-		886F140A5C267EDD5C30F747 /* KathaAppUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KathaAppUITests.swift; sourceTree = "<group>"; };
-		8CE1944B7A70AEB375482259 /* Keychain.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
-		990CEBC0830AEC8901F087E6 /* KathaAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KathaAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A4458F975BAAA561781727F9 /* ProfileViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileViews.swift; sourceTree = "<group>"; };
-		AF3476DB42E700D3F5CCE004 /* KathaApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KathaApp.swift; sourceTree = "<group>"; };
-		B8CF73D683F70AB707B28915 /* ScreenshotTour.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenshotTour.swift; sourceTree = "<group>"; };
-		C265703B4A6FDD66CD026B1C /* FeedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
-		C4FF203B47C3282291D783BD /* PaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
-		DC85390B0929E74E0378F653 /* ParentalLock.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ParentalLock.swift; sourceTree = "<group>"; };
-		EC8ECD6998C9D0FF1AD28D52 /* SeriesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeriesView.swift; sourceTree = "<group>"; };
-		FF2EB666360BA2072850BF68 /* Fonts */ = {isa = PBXFileReference; includeInIndex = 1; path = Fonts; sourceTree = "<group>"; };
-		FF75A1929ABD47D51DC46880 /* WalletView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
+		1522491F3F6C6D74D24CB3F2 /* AuthViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthViews.swift; sourceTree = "<group>"; };
+		1BEB1F50F111B2C97E65EE8B /* OnboardingViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingViews.swift; sourceTree = "<group>"; };
+		200FD0EFC87E57EDEF35B38E /* Keychain.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
+		21CA1D1A451AAC78DE4DE9A2 /* Strings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
+		32A33BF218F1D6730EF27C1D /* Local.xcconfig.example */ = {isa = PBXFileReference; includeInIndex = 1; path = Local.xcconfig.example; sourceTree = "<group>"; };
+		3596DBED3E86906D2293D361 /* CoinStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoinStore.swift; sourceTree = "<group>"; };
+		3A9628EE6FB37C6DC5084B31 /* ScreenshotTour.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenshotTour.swift; sourceTree = "<group>"; };
+		4D3D4ED2840E4496B2D06E15 /* DesignSystem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		4F4DE0D40AFD1F2E458F0CA3 /* HelpAssistantView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HelpAssistantView.swift; sourceTree = "<group>"; };
+		51EECEA095F951AA90B73203 /* ContinueWatchingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContinueWatchingView.swift; sourceTree = "<group>"; };
+		58690F90CB2A8D535E65AC4D /* CoachMarks.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoachMarks.swift; sourceTree = "<group>"; };
+		5D2DE805A6590B3D200360D2 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		66246DDF3DD33758A95FA927 /* ParentalLock.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ParentalLock.swift; sourceTree = "<group>"; };
+		6CB70D8453AA5F039093EADD /* KathaApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KathaApp.swift; sourceTree = "<group>"; };
+		6D1451784936A3AE2A748260 /* PacksSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PacksSheet.swift; sourceTree = "<group>"; };
+		6E4C46200CF556DD726C3648 /* Katha.storekit */ = {isa = PBXFileReference; includeInIndex = 1; path = Katha.storekit; sourceTree = "<group>"; };
+		93782C0F1E4B5859EB1EFA4B /* KathaAppUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KathaAppUITests.swift; sourceTree = "<group>"; };
+		99C06B8686FFFC881061040B /* PaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		9C13EB572183D726217AD24E /* ProgressReporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProgressReporter.swift; sourceTree = "<group>"; };
+		9C50361E1C78E676AB7ECCFF /* ProfileViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileViews.swift; sourceTree = "<group>"; };
+		9FF2EEEABC34A30614A1429A /* Release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		A9E93BA2DEA64B69526AF7C3 /* Fonts */ = {isa = PBXFileReference; includeInIndex = 1; path = Fonts; sourceTree = "<group>"; };
+		AF7AE57D6F9F6DE472FBB984 /* KathaApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KathaApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B39537F60C28DCC9E1474AEA /* SeriesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeriesView.swift; sourceTree = "<group>"; };
+		C858EE272AD6804D16C8310D /* FeedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
+		C99C0142BB25B21BC73BC926 /* Notifications.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Notifications.swift; sourceTree = "<group>"; };
+		CB09317B122EC2501D6799B8 /* AppleSignIn.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
+		D0CB01B66934B69A14486115 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		E6535A3DE5D77C896703C952 /* PlayerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
+		F4D0D788519A54C3E5EFF11C /* Debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		FA802D56FA08660EC6A21F9C /* DiscoverViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiscoverViews.swift; sourceTree = "<group>"; };
+		FE3E198F48775ADEFB9FB38D /* KathaAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KathaAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FEC81CD8EDB5F22724E57298 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		FFFB8775D3940286798AADCD /* WalletView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		C0A6E0A020A9A140328206F6 /* Frameworks */ = {
+		DBF3D1C5F34DEF0BCA9C5F3D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1CC58DC316519D7CE5E42F65 /* Foundation.framework in Frameworks */,
-				65A7B52B0A200B7604A5E317 /* KathaKit in Frameworks */,
+				77288DD61BCCE54B8A31F81C /* Foundation.framework in Frameworks */,
+				F8A59084F453F79DFC28F4BB /* KathaKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		D1A06364594F09FB5D3F884F /* Frameworks */ = {
+		E8D6EC957EF0F3154F6FD876 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A06987974D0F2952F636437C /* Foundation.framework in Frameworks */,
+				78C5C2AD03530E5D49415E62 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		8344537578C20E74481E8E81 /* KathaApp */ = {
+		01967360A71FDDC6FF65465E /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				2D89265B6C0ECC8FB2F68F51 /* AppleSignIn.swift */,
-				87ECC08D1C17351F665A7B68 /* AuthViews.swift */,
-				2EB5ECD73D612F0F4BBA963E /* CoachMarks.swift */,
-				00215AA57147CD4122DEDE8E /* CoinStore.swift */,
-				4592823887BB1765BC0AB414 /* DesignSystem.swift */,
-				008FCF5F05849B26141444C7 /* DiscoverViews.swift */,
-				C265703B4A6FDD66CD026B1C /* FeedView.swift */,
-				AF3476DB42E700D3F5CCE004 /* KathaApp.swift */,
-				8CE1944B7A70AEB375482259 /* Keychain.swift */,
-				26669BC39EB318E8D5D0BDE9 /* Notifications.swift */,
-				6D80A0F8054B6B1B79B9397F /* OnboardingViews.swift */,
-				DC85390B0929E74E0378F653 /* ParentalLock.swift */,
-				C4FF203B47C3282291D783BD /* PaywallView.swift */,
-				4767F1DF6CF4587CF6285C08 /* PlayerView.swift */,
-				A4458F975BAAA561781727F9 /* ProfileViews.swift */,
-				80E8FEB3E053DF54A2B15E1D /* ProgressReporter.swift */,
-				EC8ECD6998C9D0FF1AD28D52 /* SeriesView.swift */,
-				FF75A1929ABD47D51DC46880 /* WalletView.swift */,
-				05F5A699D524A73ED0F121D7 /* Assets.xcassets */,
-				298A4B262655D32C79F5E5AC /* PrivacyInfo.xcprivacy */,
-				22B2FFB6CB4617CA99EF16C8 /* Katha.storekit */,
-				FF2EB666360BA2072850BF68 /* Fonts */,
-				ADA9D9BE8AED8B6F69093FC9 /* Config */,
+				AF7AE57D6F9F6DE472FBB984 /* KathaApp.app */,
+				FE3E198F48775ADEFB9FB38D /* KathaAppUITests.xctest */,
 			);
-			name = KathaApp;
-			path = KathaApp;
+			name = Products;
 			sourceTree = "<group>";
 		};
-		84E1DE37234A7BA7020BBBB9 /* KathaAppUITests */ = {
+		23DEC950ADA518BE25844CB9 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				886F140A5C267EDD5C30F747 /* KathaAppUITests.swift */,
-				B8CF73D683F70AB707B28915 /* ScreenshotTour.swift */,
+				B36E1685AFC28409BB3D3C5D /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		45C4E1AC4A61251B5ED9E1D6 /* KathaAppUITests */ = {
+			isa = PBXGroup;
+			children = (
+				93782C0F1E4B5859EB1EFA4B /* KathaAppUITests.swift */,
+				3A9628EE6FB37C6DC5084B31 /* ScreenshotTour.swift */,
 			);
 			name = KathaAppUITests;
 			path = KathaAppUITests;
 			sourceTree = "<group>";
 		};
-		87DF4E5B0AB349585184892D /* iOS */ = {
+		853E4A2D40AE81A9D96D4F7D = {
 			isa = PBXGroup;
 			children = (
-				625F6344F5D9F03ED53E81AA /* Foundation.framework */,
+				01967360A71FDDC6FF65465E /* Products */,
+				23DEC950ADA518BE25844CB9 /* Frameworks */,
+				C16BDEDBFFB0165FEC5476D7 /* KathaApp */,
+				45C4E1AC4A61251B5ED9E1D6 /* KathaAppUITests */,
 			);
-			name = iOS;
 			sourceTree = "<group>";
 		};
-		9D409A790A88F57077426B11 /* Products */ = {
+		94EF46175E31ED5E6CDE0609 /* Config */ = {
 			isa = PBXGroup;
 			children = (
-				7491AC8B23CC76642114AD77 /* KathaApp.app */,
-				990CEBC0830AEC8901F087E6 /* KathaAppUITests.xctest */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		ADA9D9BE8AED8B6F69093FC9 /* Config */ = {
-			isa = PBXGroup;
-			children = (
-				605873D223F0E03AC96683BC /* Debug.xcconfig */,
-				5DDFF268EFD6A96578615467 /* Release.xcconfig */,
-				08B205025B0E33E3579438E7 /* Local.xcconfig.example */,
+				F4D0D788519A54C3E5EFF11C /* Debug.xcconfig */,
+				9FF2EEEABC34A30614A1429A /* Release.xcconfig */,
+				32A33BF218F1D6730EF27C1D /* Local.xcconfig.example */,
 			);
 			name = Config;
 			path = Config;
 			sourceTree = "<group>";
 		};
-		B606703DE133EE0620844E9A = {
+		B36E1685AFC28409BB3D3C5D /* iOS */ = {
 			isa = PBXGroup;
 			children = (
-				9D409A790A88F57077426B11 /* Products */,
-				EEF9BDCB506722C42197250A /* Frameworks */,
-				8344537578C20E74481E8E81 /* KathaApp */,
-				84E1DE37234A7BA7020BBBB9 /* KathaAppUITests */,
+				D0CB01B66934B69A14486115 /* Foundation.framework */,
 			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
-		EEF9BDCB506722C42197250A /* Frameworks */ = {
+		C16BDEDBFFB0165FEC5476D7 /* KathaApp */ = {
 			isa = PBXGroup;
 			children = (
-				87DF4E5B0AB349585184892D /* iOS */,
+				CB09317B122EC2501D6799B8 /* AppleSignIn.swift */,
+				1522491F3F6C6D74D24CB3F2 /* AuthViews.swift */,
+				58690F90CB2A8D535E65AC4D /* CoachMarks.swift */,
+				3596DBED3E86906D2293D361 /* CoinStore.swift */,
+				51EECEA095F951AA90B73203 /* ContinueWatchingView.swift */,
+				4D3D4ED2840E4496B2D06E15 /* DesignSystem.swift */,
+				FA802D56FA08660EC6A21F9C /* DiscoverViews.swift */,
+				C858EE272AD6804D16C8310D /* FeedView.swift */,
+				4F4DE0D40AFD1F2E458F0CA3 /* HelpAssistantView.swift */,
+				6CB70D8453AA5F039093EADD /* KathaApp.swift */,
+				200FD0EFC87E57EDEF35B38E /* Keychain.swift */,
+				C99C0142BB25B21BC73BC926 /* Notifications.swift */,
+				1BEB1F50F111B2C97E65EE8B /* OnboardingViews.swift */,
+				6D1451784936A3AE2A748260 /* PacksSheet.swift */,
+				66246DDF3DD33758A95FA927 /* ParentalLock.swift */,
+				99C06B8686FFFC881061040B /* PaywallView.swift */,
+				E6535A3DE5D77C896703C952 /* PlayerView.swift */,
+				9C50361E1C78E676AB7ECCFF /* ProfileViews.swift */,
+				9C13EB572183D726217AD24E /* ProgressReporter.swift */,
+				B39537F60C28DCC9E1474AEA /* SeriesView.swift */,
+				21CA1D1A451AAC78DE4DE9A2 /* Strings.swift */,
+				FFFB8775D3940286798AADCD /* WalletView.swift */,
+				5D2DE805A6590B3D200360D2 /* Assets.xcassets */,
+				FEC81CD8EDB5F22724E57298 /* PrivacyInfo.xcprivacy */,
+				6E4C46200CF556DD726C3648 /* Katha.storekit */,
+				A9E93BA2DEA64B69526AF7C3 /* Fonts */,
+				94EF46175E31ED5E6CDE0609 /* Config */,
 			);
-			name = Frameworks;
+			name = KathaApp;
+			path = KathaApp;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		260A57FC26AD2581E85282D7 /* KathaApp */ = {
+		86FAF5AA9AE12E1BB1A0EE91 /* KathaApp */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = D37D34E8CA36CE3F80DC826F /* Build configuration list for PBXNativeTarget "KathaApp" */;
+			buildConfigurationList = CAE26970A9C7156897687432 /* Build configuration list for PBXNativeTarget "KathaApp" */;
 			buildPhases = (
-				411610EDF3475C172C4FB3E7 /* Sources */,
-				C0A6E0A020A9A140328206F6 /* Frameworks */,
-				292C4827CF2373FC5215C380 /* Resources */,
+				60ABDF9536E946ABDBE44A18 /* Sources */,
+				DBF3D1C5F34DEF0BCA9C5F3D /* Frameworks */,
+				D18AA87FCABC259AD7895E68 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -203,40 +215,40 @@
 			);
 			name = KathaApp;
 			packageProductDependencies = (
-				D2532E5F58FB4AE6DF021E3D /* KathaKit */,
+				E4EEEBCFD234B523CD1B50AF /* KathaKit */,
 			);
 			productName = KathaApp;
-			productReference = 7491AC8B23CC76642114AD77 /* KathaApp.app */;
+			productReference = AF7AE57D6F9F6DE472FBB984 /* KathaApp.app */;
 			productType = "com.apple.product-type.application";
 		};
-		CE40D547FCF231D0160B6BF1 /* KathaAppUITests */ = {
+		A62FEB5E72195B7A587807CD /* KathaAppUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = EB03079B4836D3676A3E1044 /* Build configuration list for PBXNativeTarget "KathaAppUITests" */;
+			buildConfigurationList = F57DBA203441A6125B45E4A1 /* Build configuration list for PBXNativeTarget "KathaAppUITests" */;
 			buildPhases = (
-				8DA76B5AABEA55DE675A2098 /* Sources */,
-				D1A06364594F09FB5D3F884F /* Frameworks */,
-				17DB36E13FA4F4C8C75E0AAD /* Resources */,
+				2FA3C68AAF786A7ED512BE58 /* Sources */,
+				E8D6EC957EF0F3154F6FD876 /* Frameworks */,
+				A7E191D24BCB2CB2698126F8 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				1B8834ED80466FAB773FD8AD /* PBXTargetDependency */,
+				E250E254D377E21DCF23CE6E /* PBXTargetDependency */,
 			);
 			name = KathaAppUITests;
 			productName = KathaAppUITests;
-			productReference = 990CEBC0830AEC8901F087E6 /* KathaAppUITests.xctest */;
+			productReference = FE3E198F48775ADEFB9FB38D /* KathaAppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		B3DDD5ECE36E00CCB0FC3482 /* Project object */ = {
+		6062AB573E0C9DC96B06BC39 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 			};
-			buildConfigurationList = 26AE46C4CA3E86753BF74FF0 /* Build configuration list for PBXProject "KathaApp" */;
+			buildConfigurationList = 4901CB51DC46E6CB1756FC0B /* Build configuration list for PBXProject "KathaApp" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -244,101 +256,122 @@
 				en,
 				Base,
 			);
-			mainGroup = B606703DE133EE0620844E9A;
+			mainGroup = 853E4A2D40AE81A9D96D4F7D;
 			minimizedProjectReferenceProxies = 0;
 			packageReferences = (
-				427B90AE16788234C39176E7 /* XCLocalSwiftPackageReference "KathaKit" */,
+				2C5AF3A083B19479EB89B822 /* XCLocalSwiftPackageReference "KathaKit" */,
 			);
 			preferredProjectObjectVersion = 100;
-			productRefGroup = 9D409A790A88F57077426B11 /* Products */;
+			productRefGroup = 01967360A71FDDC6FF65465E /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				260A57FC26AD2581E85282D7 /* KathaApp */,
-				CE40D547FCF231D0160B6BF1 /* KathaAppUITests */,
+				86FAF5AA9AE12E1BB1A0EE91 /* KathaApp */,
+				A62FEB5E72195B7A587807CD /* KathaAppUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		17DB36E13FA4F4C8C75E0AAD /* Resources */ = {
+		A7E191D24BCB2CB2698126F8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		292C4827CF2373FC5215C380 /* Resources */ = {
+		D18AA87FCABC259AD7895E68 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E6A88957452FF7B948E4DE57 /* Assets.xcassets in Resources */,
-				256E7916E1F51EC02FB9087A /* PrivacyInfo.xcprivacy in Resources */,
-				4600710554548053581B0466 /* Fonts in Resources */,
+				719934D0ACE0B17021122F46 /* Assets.xcassets in Resources */,
+				1A4BFA925FF26EA48F968C10 /* PrivacyInfo.xcprivacy in Resources */,
+				3BFDBEA6BD2481138DB1DEB9 /* Fonts in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		411610EDF3475C172C4FB3E7 /* Sources */ = {
+		2FA3C68AAF786A7ED512BE58 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				962F41A0305CF4FF57E7A315 /* AppleSignIn.swift in Sources */,
-				5B0155495B9BB628C80363EC /* AuthViews.swift in Sources */,
-				4F4C16CB5882C97BB9EA28CA /* CoachMarks.swift in Sources */,
-				10987114D1E125AE240FBFD2 /* CoinStore.swift in Sources */,
-				BAED63BB516D795E2F4D384B /* DesignSystem.swift in Sources */,
-				EDEFD5546B31F321D3AFDB71 /* DiscoverViews.swift in Sources */,
-				7F9DF9A85743BEF174286CE9 /* FeedView.swift in Sources */,
-				867AC0F415A1509CBE2EE39C /* KathaApp.swift in Sources */,
-				5C98F231AFA0BC579F5C0CEC /* Keychain.swift in Sources */,
-				386B122483CE2E1237D23F50 /* Notifications.swift in Sources */,
-				D00A9537C42C3953A5B1C3AF /* OnboardingViews.swift in Sources */,
-				C026131EB829844452E5E3DF /* ParentalLock.swift in Sources */,
-				2750C17F7023F03D114B4493 /* PaywallView.swift in Sources */,
-				39672506C1B2D44E2519A59D /* PlayerView.swift in Sources */,
-				60F70260AD01513E2FA1D914 /* ProfileViews.swift in Sources */,
-				DA70C34615C421BF5877B5A0 /* ProgressReporter.swift in Sources */,
-				0FCDDA535CDE96B4B51D3A5E /* SeriesView.swift in Sources */,
-				8857B3E4C6469D82F21990B0 /* WalletView.swift in Sources */,
+				9F70CBA8464D54B1E5BA0380 /* KathaAppUITests.swift in Sources */,
+				03028E5FD5872BBF0ADE397D /* ScreenshotTour.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8DA76B5AABEA55DE675A2098 /* Sources */ = {
+		60ABDF9536E946ABDBE44A18 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8095A3D011EAAE239E252557 /* KathaAppUITests.swift in Sources */,
-				1EFFA5B7CB3D69F1DF062036 /* ScreenshotTour.swift in Sources */,
+				B19EC10AA69D4D772348934D /* AppleSignIn.swift in Sources */,
+				6A2820AAE50C3BF92F7AAB88 /* AuthViews.swift in Sources */,
+				247DB1713760AE7871F7E206 /* CoachMarks.swift in Sources */,
+				1CE20B92AADD98611E5366E7 /* CoinStore.swift in Sources */,
+				4262016C1021124C7C3F5BFF /* ContinueWatchingView.swift in Sources */,
+				4C7E4ADF35A7059A418B3CEC /* DesignSystem.swift in Sources */,
+				1C0CD90FEEF12B246145F875 /* DiscoverViews.swift in Sources */,
+				97C81F272AC4B517E85CF641 /* FeedView.swift in Sources */,
+				95F276FCFEE6B71FB7A8B31F /* HelpAssistantView.swift in Sources */,
+				1F48B57A6340B24C029DEEBD /* KathaApp.swift in Sources */,
+				41DB616262A4994FCF6D2979 /* Keychain.swift in Sources */,
+				4D39BC5CB76BDCAC077E9E08 /* Notifications.swift in Sources */,
+				4C0035A0FB6531D2679C94B7 /* OnboardingViews.swift in Sources */,
+				5CE1557ED0FDBF69328E1102 /* PacksSheet.swift in Sources */,
+				37459F9BBC4935FC7C1478EE /* ParentalLock.swift in Sources */,
+				1104A8FBFB932B9F73547E26 /* PaywallView.swift in Sources */,
+				B57287BFC55CC410A628C477 /* PlayerView.swift in Sources */,
+				C10F15358DED88906E4E0AA3 /* ProfileViews.swift in Sources */,
+				ED4107B1F4919DB788136BD7 /* ProgressReporter.swift in Sources */,
+				5BDD8821C4017066EC01C819 /* SeriesView.swift in Sources */,
+				F64BFFF49207B80A94C4E0A0 /* Strings.swift in Sources */,
+				BC0527288D592DCE330B6810 /* WalletView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		1B8834ED80466FAB773FD8AD /* PBXTargetDependency */ = {
+		E250E254D377E21DCF23CE6E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = KathaApp;
-			target = 260A57FC26AD2581E85282D7 /* KathaApp */;
-			targetProxy = 636C99FDAB554A14F2A131B5 /* PBXContainerItemProxy */;
+			target = 86FAF5AA9AE12E1BB1A0EE91 /* KathaApp */;
+			targetProxy = B66D721D9CE3AC5B86164E7B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		01F3543C1F80B44DB2D51919 /* Debug */ = {
+		1289B5C870BA94321F40373D /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 605873D223F0E03AC96683BC /* Debug.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 9YG7G7YB2J;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.katha.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = KathaApp;
+			};
+			name = Debug;
+		};
+		22097846687344E21304A544 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F4D0D788519A54C3E5EFF11C /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGNING_ALLOWED = YES;
-				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_ENTITLEMENTS = KathaApp/KathaApp.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9YG7G7YB2J;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "KathaApp/Info-Debug.plist";
@@ -355,24 +388,7 @@
 			};
 			name = Debug;
 		};
-		04486FAE63ABD503F4C93D7D /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_IDENTITY = "";
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.katha.uitests;
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
-				TEST_TARGET_NAME = KathaApp;
-			};
-			name = Debug;
-		};
-		0454826E23466C9F8AF85BB0 /* Release */ = {
+		3EF090E439D7A7C88087D721 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -426,7 +442,54 @@
 			};
 			name = Release;
 		};
-		7FA6760A242FC943B1C6CE37 /* Debug */ = {
+		68FEB12BB1BC94D674A8B4EE /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9FF2EEEABC34A30614A1429A /* Release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = "KathaApp/KathaApp-Release.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9YG7G7YB2J;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = KathaApp/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.katha.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		8B611B57B22CE62FC27F0FF5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 9YG7G7YB2J;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.katha.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = KathaApp;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		C7A076CDF87317E11DE446DE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -487,79 +550,32 @@
 			};
 			name = Debug;
 		};
-		A20AAD278E55D8B03B1F3AC9 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_IDENTITY = "";
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.katha.uitests;
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
-				TEST_TARGET_NAME = KathaApp;
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
-		E4DA97FB789AE86565C1CABA /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5DDFF268EFD6A96578615467 /* Release.xcconfig */;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGNING_ALLOWED = YES;
-				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = KathaApp/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.katha.app;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_STRICT_CONCURRENCY = complete;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = 1;
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		26AE46C4CA3E86753BF74FF0 /* Build configuration list for PBXProject "KathaApp" */ = {
+		4901CB51DC46E6CB1756FC0B /* Build configuration list for PBXProject "KathaApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				7FA6760A242FC943B1C6CE37 /* Debug */,
-				0454826E23466C9F8AF85BB0 /* Release */,
+				C7A076CDF87317E11DE446DE /* Debug */,
+				3EF090E439D7A7C88087D721 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		D37D34E8CA36CE3F80DC826F /* Build configuration list for PBXNativeTarget "KathaApp" */ = {
+		CAE26970A9C7156897687432 /* Build configuration list for PBXNativeTarget "KathaApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				E4DA97FB789AE86565C1CABA /* Release */,
-				01F3543C1F80B44DB2D51919 /* Debug */,
+				68FEB12BB1BC94D674A8B4EE /* Release */,
+				22097846687344E21304A544 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		EB03079B4836D3676A3E1044 /* Build configuration list for PBXNativeTarget "KathaAppUITests" */ = {
+		F57DBA203441A6125B45E4A1 /* Build configuration list for PBXNativeTarget "KathaAppUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A20AAD278E55D8B03B1F3AC9 /* Release */,
-				04486FAE63ABD503F4C93D7D /* Debug */,
+				8B611B57B22CE62FC27F0FF5 /* Release */,
+				1289B5C870BA94321F40373D /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -567,19 +583,19 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		427B90AE16788234C39176E7 /* XCLocalSwiftPackageReference "KathaKit" */ = {
+		2C5AF3A083B19479EB89B822 /* XCLocalSwiftPackageReference "KathaKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = KathaKit;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		D2532E5F58FB4AE6DF021E3D /* KathaKit */ = {
+		E4EEEBCFD234B523CD1B50AF /* KathaKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 427B90AE16788234C39176E7 /* XCLocalSwiftPackageReference "KathaKit" */;
+			package = 2C5AF3A083B19479EB89B822 /* XCLocalSwiftPackageReference "KathaKit" */;
 			productName = KathaKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = B3DDD5ECE36E00CCB0FC3482 /* Project object */;
+	rootObject = 6062AB573E0C9DC96B06BC39 /* Project object */;
 }

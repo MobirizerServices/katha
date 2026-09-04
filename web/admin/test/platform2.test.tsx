@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor, fireEvent, act, within } from "@testing-library/react";
 import { Route, Routes } from "react-router-dom";
 import { Overview } from "../src/views/Overview";
+import { Analytics } from "../src/views/Analytics";
 import { Users } from "../src/views/Users";
 import { Catalog } from "../src/views/Catalog";
 import { CatalogDetail } from "../src/views/CatalogDetail";
 import { Config } from "../src/views/Config";
 import { api } from "../src/api/client";
-import { renderWithStore, getStore } from "./helpers";
+import { renderWithStore, getStore, LocationDisplay } from "./helpers";
 
 const W = (over: Partial<Record<string, number>> = {}) => ({
   coins_purchased: 1500, revenue_rupees: 225, coins_iap: 1000, coins_web: 500,
@@ -88,34 +89,30 @@ describe("Overview — the business board (#009-#015)", () => {
     });
   }
 
-  it("renders windowed metrics with deltas, funnel, split and liability", async () => {
+  it("shows the compact 7-day cut with deltas, refunds and liability, linking to Analytics", async () => {
     boot();
-    renderWithStore(<Overview />);
-    await screen.findByText("The business");
-    // default 7d window: revenue 1000 vs 500 → ▲ 100%
+    renderWithStore(<><Overview /><LocationDisplay /></>);
+    await screen.findByText("The business · last 7 days");
+    // 7d window: revenue 1000 vs 500 → ▲ 100%
     expect(screen.getByText("₹1,000")).toBeInTheDocument();
     expect(screen.getByText(/▲ 100%/)).toBeInTheDocument();
-    // funnel for 7d with drop-offs
-    expect(screen.getByText("Saw the paywall")).toBeInTheDocument();
-    expect(screen.getByText(/60% drop/)).toBeInTheDocument();
-    // revenue split names both channels
-    expect(screen.getByText(/App Store 67%/)).toBeInTheDocument();
-    // refunds over the 2% threshold render as danger
-    expect(screen.getByText("6.67%")).toBeInTheDocument();
-    // liability
-    expect(screen.getByText("1,029 coins")).toBeInTheDocument();
-    expect(screen.getByText(/77 coins dormant/)).toBeInTheDocument();
+    // refunds over the 2% threshold render as danger; liability from the trend
+    expect(screen.getByText("6.67%").className).toContain("sev-danger");
+    expect(screen.getByText(/liability 1,029 coins/)).toBeInTheDocument();
+    // the full board (funnel, split, day table) lives on Analytics
+    expect(screen.queryByText("Saw the paywall")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Open analytics →"));
+    expect(screen.getByTestId("location").textContent).toBe("/analytics");
   });
 
-  it("window switcher changes the period", async () => {
-    boot();
+  it("a quiet week renders ok refunds and a zero liability", async () => {
+    boot({ "/analytics": () => ({ ...ANALYTICS, outstanding_trend: [],
+      windows: { ...ANALYTICS.windows,
+        "7d": { current: W({ refund_ratio_pct: 0.4 }), previous: W() } } }) });
     renderWithStore(<Overview />);
-    await screen.findByText("The business");
-    fireEvent.click(screen.getByRole("tab", { name: "Today" }));
-    expect(screen.getByText("₹225")).toBeInTheDocument();
-    expect(screen.getAllByText(/▲ 50%/).length).toBeGreaterThan(0); // 225 vs 150
-    fireEvent.click(screen.getByRole("tab", { name: "30d" }));
-    expect(screen.getAllByText(/±0%/).length).toBeGreaterThan(0);
+    await screen.findByText("The business · last 7 days");
+    expect(screen.getByText("0.4%").className).toContain("sev-ok");
+    expect(screen.getByText(/liability 0 coins/)).toBeInTheDocument();
   });
 
   it("attention items can be acknowledged and show their owner (#016)", async () => {
@@ -424,11 +421,11 @@ describe("coverage sweeps — the unhappy directions", () => {
       "/overview": () => ({ kpis: [], pipeline: [], attention: [] }),
       "/analytics": () => shrunk,
     });
-    renderWithStore(<Overview />);
+    renderWithStore(<Analytics />);
     await screen.findByText("The business");
     // 7d: previous new_users 0, current 3 → "new" chip
     expect(screen.getAllByText("new").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("tab", { name: "Today" }));
+    fireEvent.click(screen.getByText("Today"));
     expect(screen.getAllByText(/▼ 50%/).length).toBeGreaterThan(0);
     // refunds at 1% render as ok, an all-zero funnel renders without drops
     expect(screen.getByText("1%")).toBeInTheDocument();
@@ -745,36 +742,18 @@ describe("comms: Outbox view + drop pushes", () => {
   });
 });
 
-describe("invoice register (finance)", () => {
-  it("renders rows and GST totals inside the Outbox view", async () => {
+describe("outbox is comms only", () => {
+  it("shows the empty state and points finance at the register's new home", async () => {
     const { Outbox } = await import("../src/views/Outbox");
-    stub({
-      ...SIGNALS,
-      "/attention": () => ({ items: [] }),
-      "/invoices": () => ({
-        totals: { count: 2, gross_minor: 29800, gst_minor: 4546 },
-        rows: [
-          { id: "KATHA-INV-2627-000001", user_id: "u1", sku: "coins_web_popular_in",
-            coins: 1300, bonus_coins: 130, total_minor: 19900,
-            taxable_minor: 16864, gst_minor: 3036, gst_rate_pct: 18,
-            created_at: "2026-09-01T10:00:00+00:00" },
-          { id: "KATHA-INV-2627-000002", user_id: "u2", sku: "coins_starter_in",
-            coins: 600, bonus_coins: 0, total_minor: 9900,
-            taxable_minor: 8390, gst_minor: 1510, gst_rate_pct: 18,
-            created_at: "2026-09-01T11:00:00+00:00" }],
-      }),
-      "/outbox": () => ({ rows: [], transports: { email: false, push: false } }),
-    });
+    stub({ ...SIGNALS, "/outbox": () => ({ rows: [], transports: { email: false, push: false } }) });
     renderWithStore(<Outbox />);
-    await screen.findByText("KATHA-INV-2627-000001");
-    expect(screen.getByText(/gross ₹298.00/)).toBeInTheDocument();
-    expect(screen.getByText(/GST ₹45.46/)).toBeInTheDocument();
-    expect(screen.getByText("₹30.36")).toBeInTheDocument();
-    expect(screen.getByText("1,300 +130 coins")).toBeInTheDocument();
+    await screen.findByText("Nothing sent yet");
+    expect(screen.getByText(/register moved to/)).toBeInTheDocument();
+    expect(screen.queryByText("Export CSV")).not.toBeInTheDocument();
   });
 });
 
-describe("outbox retry + CSV export", () => {
+describe("outbox retry", () => {
   it("re-sends a failed email, reports failed-again truth, links the CSV", async () => {
     const { Outbox } = await import("../src/views/Outbox");
     let attempt = 0;
@@ -815,7 +794,7 @@ describe("outbox retry + CSV export", () => {
     fireEvent.click(screen.getAllByText("Retry")[0]);
     await waitFor(() => expect(getStore().toasts.some((t) =>
       t.text.includes("failed again: relay refused"))).toBe(true));
-    expect(screen.getByText("Export CSV").getAttribute("href"))
-      .toContain("/invoices.csv");
+    // the invoice register moved to Finance: Outbox is comms only
+    expect(screen.queryByText("Export CSV")).not.toBeInTheDocument();
   });
 });

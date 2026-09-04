@@ -36,6 +36,24 @@
         "family conflict",
         "mild peril"
       ],
+      "cast": [
+        {
+          "name": "Aditi Rawal",
+          "role": "Lead"
+        },
+        {
+          "name": "Rohan Mehrotra",
+          "role": "Lead"
+        },
+        {
+          "name": "Nandita Kulshreshtha",
+          "role": "Antagonist"
+        },
+        {
+          "name": "Vikrant Bajaj",
+          "role": "Support"
+        }
+      ],
       "episode_count": 60,
       "free_episode_count": 10,
       "cover_hue": "0x1B2A4A",
@@ -490,6 +508,20 @@
       "content_rating": "U/A 13+",
       "rating_descriptors": [
         "mild language"
+      ],
+      "cast": [
+        {
+          "name": "Sana Qureshi",
+          "role": "Lead"
+        },
+        {
+          "name": "Arjun Talwar",
+          "role": "Lead"
+        },
+        {
+          "name": "Yashpal Nagar",
+          "role": "Support"
+        }
       ],
       "episode_count": 72,
       "free_episode_count": 10,
@@ -1031,6 +1063,20 @@
         "crime",
         "violence"
       ],
+      "cast": [
+        {
+          "name": "Imran Siddiqui",
+          "role": "Lead"
+        },
+        {
+          "name": "Ritika Chauhan",
+          "role": "Support"
+        },
+        {
+          "name": "Dev Malhotra",
+          "role": "Antagonist"
+        }
+      ],
       "episode_count": 60,
       "free_episode_count": 10,
       "cover_hue": "0x4A1B1B",
@@ -1485,6 +1531,20 @@
       "content_rating": "U/A 13+",
       "rating_descriptors": [
         "family conflict"
+      ],
+      "cast": [
+        {
+          "name": "Kritika Sehgal",
+          "role": "Lead"
+        },
+        {
+          "name": "Aryan Bhargava",
+          "role": "Lead"
+        },
+        {
+          "name": "Usha Rathore",
+          "role": "Support"
+        }
       ],
       "episode_count": 60,
       "free_episode_count": 10,
@@ -1941,6 +2001,20 @@
       "rating_descriptors": [
         "historical violence"
       ],
+      "cast": [
+        {
+          "name": "Pooja Shekhawat",
+          "role": "Lead"
+        },
+        {
+          "name": "Kunal Rajvanshi",
+          "role": "Antagonist"
+        },
+        {
+          "name": "Mohan Choudhary",
+          "role": "Support"
+        }
+      ],
       "episode_count": 54,
       "free_episode_count": 10,
       "cover_hue": "0x4A3A1B",
@@ -2354,6 +2428,20 @@
       "rating_descriptors": [
         "frightening scenes"
       ],
+      "cast": [
+        {
+          "name": "Tara Mishra",
+          "role": "Lead"
+        },
+        {
+          "name": "Nikhil Dubey",
+          "role": "Antagonist"
+        },
+        {
+          "name": "Farhan Ali",
+          "role": "Support"
+        }
+      ],
       "episode_count": 48,
       "free_episode_count": 10,
       "cover_hue": "0x2E2E3E",
@@ -2723,6 +2811,20 @@
       "content_rating": "U/A 13+",
       "rating_descriptors": [
         "legal themes"
+      ],
+      "cast": [
+        {
+          "name": "Siddharth Awasthi",
+          "role": "Lead"
+        },
+        {
+          "name": "Manav Tiwari",
+          "role": "Support"
+        },
+        {
+          "name": "Renuka Joshi",
+          "role": "Antagonist"
+        }
       ],
       "episode_count": 48,
       "free_episode_count": 10,
@@ -3095,6 +3197,20 @@
       "rating_descriptors": [
         "crime"
       ],
+      "cast": [
+        {
+          "name": "Faisal Baig",
+          "role": "Lead"
+        },
+        {
+          "name": "Zoya Hashmi",
+          "role": "Support"
+        },
+        {
+          "name": "Sharat Reddy",
+          "role": "Antagonist"
+        }
+      ],
       "episode_count": 48,
       "free_episode_count": 10,
       "cover_hue": "0x4A2A1B",
@@ -3464,6 +3580,20 @@
       "release_mode": "drip",
       "content_rating": "U/A 7+",
       "rating_descriptors": [],
+      "cast": [
+        {
+          "name": "Divya Sundaram",
+          "role": "Lead"
+        },
+        {
+          "name": "Ashwin Rajan",
+          "role": "Lead"
+        },
+        {
+          "name": "Sathya Moorthy",
+          "role": "Antagonist"
+        }
+      ],
       "episode_count": 60,
       "free_episode_count": 10,
       "cover_hue": "0x3A2A5A",
@@ -3918,6 +4048,24 @@
       "rating_descriptors": [
         "sports injury",
         "gambling reference"
+      ],
+      "cast": [
+        {
+          "name": "Keerthana Pillai",
+          "role": "Lead"
+        },
+        {
+          "name": "Vignesh Kumar",
+          "role": "Support"
+        },
+        {
+          "name": "Bala Ganesan",
+          "role": "Support"
+        },
+        {
+          "name": "Naveen Chandran",
+          "role": "Antagonist"
+        }
       ],
       "episode_count": 66,
       "free_episode_count": 10,
@@ -4413,6 +4561,20 @@
       "release_mode": "binge",
       "content_rating": "U/A 7+",
       "rating_descriptors": [],
+      "cast": [
+        {
+          "name": "Lakshmi Venkatesan",
+          "role": "Lead"
+        },
+        {
+          "name": "Gopi Ramaswamy",
+          "role": "Support"
+        },
+        {
+          "name": "Meenakshi Iyer",
+          "role": "Support"
+        }
+      ],
       "episode_count": 42,
       "free_episode_count": 10,
       "cover_hue": "0x4A4020",
@@ -4741,6 +4903,24 @@
       "content_rating": "U/A 7+",
       "rating_descriptors": [
         "academic pressure"
+      ],
+      "cast": [
+        {
+          "name": "Nikhila Yadagiri",
+          "role": "Lead"
+        },
+        {
+          "name": "Rahul Vemula",
+          "role": "Lead"
+        },
+        {
+          "name": "Chandra Mohan Rao",
+          "role": "Support"
+        },
+        {
+          "name": "Suresh Kondapalli",
+          "role": "Antagonist"
+        }
       ],
       "episode_count": 60,
       "free_episode_count": 10,
@@ -5198,6 +5378,20 @@
         "family conflict",
         "bereavement"
       ],
+      "cast": [
+        {
+          "name": "Lavanya Peddi",
+          "role": "Lead"
+        },
+        {
+          "name": "Srinivas Kota",
+          "role": "Antagonist"
+        },
+        {
+          "name": "Anand Dasari",
+          "role": "Support"
+        }
+      ],
       "episode_count": 60,
       "free_episode_count": 10,
       "cover_hue": "0x1B3A2A",
@@ -5652,6 +5846,20 @@
       "rating_descriptors": [
         "peril",
         "medical scenes"
+      ],
+      "cast": [
+        {
+          "name": "Teja Bandaru",
+          "role": "Lead"
+        },
+        {
+          "name": "Amrutha Lingala",
+          "role": "Support"
+        },
+        {
+          "name": "Kishore Yerramilli",
+          "role": "Antagonist"
+        }
       ],
       "episode_count": 48,
       "free_episode_count": 10,

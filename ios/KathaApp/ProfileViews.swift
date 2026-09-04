@@ -162,12 +162,14 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @State private var pinSheetMode: PinSheetMode?
     @State private var showDelete = false
+    @State private var toast: String?
+    @State private var signingOutOthers = false
 
     var body: some View {
         @Bindable var model = model
         List {
-            Section("Language") {
-                Picker("Content language", selection: $model.contentLanguage) {
+            Section {
+                Picker(model.t("settings.contentLanguage"), selection: $model.contentLanguage) {
                     Text("हिन्दी").tag("hi")
                     Text("தமிழ்").tag("ta")
                     Text("తెలుగు").tag("te")
@@ -175,49 +177,98 @@ struct SettingsView: View {
                 .onChange(of: model.contentLanguage) { _, lang in
                     Task { await model.loadHome(lang: lang) }
                 }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(model.t("settings.appLanguage"))
+                    // Segmented, not a pushed list: one glance, one tap, and the
+                    // whole chrome re-renders in place.
+                    Picker(model.t("settings.appLanguage"),
+                           selection: Binding(get: { model.uiLanguage },
+                                              set: { model.setUILanguage($0) })) {
+                        ForEach(L10n.supported, id: \.code) { opt in
+                            Text(opt.native).tag(opt.code)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("settings.appLanguage")
+                }
+            } header: { Text(model.t("settings.language")) } footer: {
+                Text(model.t("settings.appLanguage.footer"))
             }
             Section {
-                Toggle("Data saver", isOn: $model.dataSaver)
-                Toggle("Auto-unlock next episodes", isOn: $model.autoUnlock)
-            } header: { Text("Playback") } footer: {
-                Text("Data saver caps streaming quality on mobile data. Auto-unlock charges coins only when an episode starts.")
+                Toggle(model.t("settings.dataSaver"), isOn: $model.dataSaver)
+                Toggle(model.t("settings.autoUnlock"), isOn: $model.autoUnlock)
+                Toggle(isOn: $model.previewsMuted) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(model.t("settings.previews"))
+                        Text(model.t("settings.previews.caption"))
+                            .font(.system(size: 12))
+                            .foregroundStyle(Katha.Color.text2)
+                    }
+                }
+            } header: { Text(model.t("settings.playback")) } footer: {
+                Text(model.t("settings.playback.footer"))
             }
             Section {
-                Toggle("New episode alerts", isOn: $model.episodeAlerts)
+                Toggle(model.t("settings.alerts"), isOn: $model.episodeAlerts)
                     .onChange(of: model.episodeAlerts) { _, on in
                         if on { model.promoteNotificationAuth() }
                     }
-            } header: { Text("Notifications") } footer: {
-                Text("One alert when your next episode drops. Never between 11 pm and 8 am, at most two a day.")
+            } header: { Text(model.t("settings.notifications")) } footer: {
+                Text(model.t("settings.alerts.footer"))
             }
             Section {
-                Button(model.parentalLockSet ? "Change parental lock" : "Set parental lock") {
+                Button(model.parentalLockSet ? model.t("settings.parental.change")
+                                             : model.t("settings.parental.set")) {
                     pinSheetMode = .set
                 }
                 if model.parentalLockSet {
-                    Button("Remove parental lock", role: .destructive) {
+                    Button(model.t("settings.parental.remove"), role: .destructive) {
                         pinSheetMode = .remove
                     }
                 }
-            } header: { Text("Parental lock") } footer: {
-                Text("A PIN is asked before playing U/A 16+ and A-rated titles (IT Rules 2021). "
-                     + "Changing or removing the lock asks for the current PIN.")
+            } header: { Text(model.t("settings.parental")) } footer: {
+                Text(model.t("settings.parental.footer"))
             }
-            Section("About") {
-                NavigationLink("Help & grievance") { HelpView() }
-                Link("Terms · Privacy Notice", destination: URL(string: "https://katha.example/legal")!)
-                Button("Delete account", role: .destructive) { showDelete = true }
+            if model.isSignedIn {
+                Section(model.t("settings.account")) {
+                    Button(model.t("settings.signOutDevices")) {
+                        guard !signingOutOthers else { return }
+                        signingOutOthers = true
+                        Task {
+                            if await model.signOutOtherDevices() {
+                                Haptics.success()
+                                toast = model.t("settings.signOutDevices.done")
+                            }
+                            signingOutOthers = false
+                        }
+                    }
+                    .disabled(signingOutOthers)
+                }
+            }
+            Section(model.t("settings.about")) {
+                NavigationLink(model.t("settings.help")) { HelpView() }
+                Link(model.t("settings.legal"), destination: URL(string: "https://katha.example/legal")!)
+                Button(model.t("settings.delete"), role: .destructive) { showDelete = true }
             }
         }
         .scrollContentBackground(.hidden)
         .background(Katha.Color.bg)
-        .navigationTitle("Settings")
+        .navigationTitle(model.t("settings.title"))
         .sheet(item: $pinSheetMode) { mode in
-            PinSetupSheet(mode: mode)
+            PinSetupSheet(mode: mode) { toast = $0 }
         }
         .sheet(isPresented: $showDelete) {
             DeleteAccountSheet()
         }
+        .overlay(alignment: .bottom) {
+            if let toast {
+                ToastView(text: toast)
+                    .padding(.bottom, 30)
+                    .task { try? await Task.sleep(for: .seconds(2)); self.toast = nil }
+                    .transition(.opacity)
+            }
+        }
+        .animation(Katha.Motion.spring, value: toast)
     }
 }
 
@@ -232,6 +283,8 @@ enum PinSheetMode: String, Identifiable {
 /// current PIN is the only credential that can change or drop it.
 struct PinSetupSheet: View {
     let mode: PinSheetMode
+    /// A one-line confirmation for the host to toast (e.g. after a PIN reset).
+    var onToast: ((String) -> Void)? = nil
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
@@ -242,9 +295,11 @@ struct PinSetupSheet: View {
     @State private var firstNew = ""
     @State private var message: String?
     @State private var lockedFor = 0
+    @State private var showForgot = false
 
-    init(mode: PinSheetMode) {
+    init(mode: PinSheetMode, onToast: ((String) -> Void)? = nil) {
         self.mode = mode
+        self.onToast = onToast
         // Existing lock → the current PIN comes first for change AND remove.
         _step = State(initialValue: .new)
     }
@@ -286,10 +341,22 @@ struct PinSetupSheet: View {
             }
             .disabled(lockedFor > 0)
             .opacity(lockedFor > 0 ? 0.4 : 1)
+            if step == .current {
+                Button(model.t("pin.forgot")) { showForgot = true }
+                    .font(.system(size: 14))
+                    .foregroundStyle(Katha.Color.accent)
+            }
         }
         .padding(Katha.Spacing.xl)
         .presentationDetents([.large])
         .presentationBackground(Katha.Color.surface)
+        .sheet(isPresented: $showForgot) {
+            ForgotPinSheet {
+                // The lock is gone: nothing left to change or remove here.
+                onToast?(model.t("pin.reset.done"))
+                dismiss()
+            }
+        }
         .onAppear {
             if model.parentalLockSet { step = .current }
             lockedFor = model.parentalLock.lockoutRemaining
@@ -353,10 +420,12 @@ struct PinSetupSheet: View {
 struct PinGateView: View {
     let onSuccess: () -> Void
     let onCancel: () -> Void
+    var onToast: ((String) -> Void)? = nil
     @Environment(AppModel.self) private var model
     @State private var pin = ""
     @State private var message: String?
     @State private var lockedFor = 0
+    @State private var showForgot = false
 
     var body: some View {
         VStack(spacing: Katha.Spacing.lg) {
@@ -395,11 +464,21 @@ struct PinGateView: View {
             }
             .disabled(lockedFor > 0)
             .opacity(lockedFor > 0 ? 0.4 : 1)
-            Button("Go back") { onCancel() }
-                .font(.system(size: 14))
-                .foregroundStyle(Katha.Color.text2)
+            HStack(spacing: 24) {
+                Button("Go back") { onCancel() }
+                    .foregroundStyle(Katha.Color.text2)
+                Button(model.t("pin.forgot")) { showForgot = true }
+                    .foregroundStyle(Katha.Color.accent)
+            }
+            .font(.system(size: 14))
         }
         .padding(Katha.Spacing.xl)
+        .sheet(isPresented: $showForgot) {
+            ForgotPinSheet {
+                onToast?(model.t("pin.reset.done"))
+                onSuccess()
+            }
+        }
         .onAppear {
             lockedFor = model.parentalLock.lockoutRemaining
             if lockedFor > 0 { message = "Too many wrong PINs. Try again in \(lockedFor)s." }
@@ -409,6 +488,130 @@ struct PinGateView: View {
             try? await Task.sleep(for: .seconds(1))
             lockedFor = model.parentalLock.lockoutRemaining
             if lockedFor == 0 { message = nil } else { message = "Too many wrong PINs. Try again in \(lockedFor)s." }
+        }
+    }
+}
+
+/// "Forgot PIN?" — recovery goes through phone verification, not email
+/// (mockup 4.3). A code goes to the phone on the signed-in profile; entering
+/// it re-verifies the session and drops the lock. Guests (and Apple-only
+/// accounts with no phone) are told a phone sign-in is needed first.
+struct ForgotPinSheet: View {
+    /// Called once the lock has been removed.
+    let onReset: () -> Void
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    private enum Step { case intro, code }
+    @State private var step: Step = .intro
+    @State private var code = ""
+    @State private var working = false
+    @State private var error: String?
+    @State private var showLogin = false
+
+    private var phone: String? {
+        guard model.isSignedIn, let p = model.profile?.phone, !p.isEmpty else { return nil }
+        return p
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
+            Capsule().fill(Katha.Color.raised)
+                .frame(width: 36, height: 5)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 8)
+
+            Text(step == .intro ? model.t("pin.reset.title") : model.t("pin.reset.enter"))
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(Katha.Color.text)
+
+            if let phone {
+                if step == .intro {
+                    Text(model.t("pin.reset.body"))
+                        .font(.system(size: 15))
+                        .foregroundStyle(Katha.Color.text2)
+                    Text(masked(phone))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Katha.Color.text)
+                    KathaPrimaryButton(title: working ? "Sending…" : model.t("pin.reset.send"),
+                                       enabled: !working) {
+                        Task { await sendCode(to: phone) }
+                    }
+                } else {
+                    Text("Sent by SMS to \(masked(phone)).")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Katha.Color.text2)
+                    TextField("1234", text: $code)
+                        .keyboardType(.numberPad)
+                        .font(.system(size: 28, weight: .semibold).monospacedDigit())
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Katha.Color.text)
+                        .frame(height: 56)
+                        .background(Katha.Color.raised)
+                        .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
+                        .accessibilityIdentifier("pin.reset.code")
+                        .onChange(of: code) { _, new in
+                            if new.count == 4 { Task { await verify(phone: phone) } }
+                        }
+                    KathaPrimaryButton(title: working ? "Verifying…" : "Verify",
+                                       enabled: !working && code.count == 4) {
+                        Task { await verify(phone: phone) }
+                    }
+                }
+            } else {
+                // No phone on this session: explain, and offer the sign-in.
+                Text(model.t("pin.reset.guest"))
+                    .font(.system(size: 15))
+                    .foregroundStyle(Katha.Color.text2)
+                KathaPrimaryButton(title: "Sign in with phone") { showLogin = true }
+            }
+
+            if let error {
+                Text(error).font(.system(size: 13)).foregroundStyle(Katha.Color.danger)
+            }
+
+            Button("Not now") { dismiss() }
+                .font(.system(size: 15))
+                .foregroundStyle(Katha.Color.text2)
+                .frame(maxWidth: .infinity)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Katha.Spacing.xl)
+        .presentationDetents([.medium])
+        .presentationBackground(Katha.Color.surface)
+        .sheet(isPresented: $showLogin) { LoginSheet().environment(model) }
+    }
+
+    private func masked(_ phone: String) -> String {
+        guard phone.count > 4 else { return phone }
+        return String(phone.prefix(phone.count - 4)).replacingOccurrences(
+            of: "[0-9]", with: "•", options: .regularExpression) + phone.suffix(4)
+    }
+
+    private func sendCode(to phone: String) async {
+        working = true; defer { working = false }
+        do {
+            _ = try await model.api.requestOtp(phone: phone)
+            error = nil
+            step = .code
+        } catch {
+            self.error = "Couldn't send the code. Try again in a moment."
+        }
+    }
+
+    private func verify(phone: String) async {
+        working = true; defer { working = false }
+        // A successful OTP re-verifies the account holder: that is the
+        // credential the lock accepts instead of the forgotten PIN.
+        if await model.signIn(phone: phone, code: code) {
+            model.parentalLock.clearUnconditionally()
+            model.parentalLockSet = false
+            Haptics.success()
+            dismiss()
+            onReset()
+        } else {
+            code = ""
+            error = "That code didn't work. Try again."
         }
     }
 }
@@ -464,11 +667,6 @@ struct PinPad: View {
 
 struct HelpView: View {
     @Environment(AppModel.self) private var model
-    @State private var gContact = ""
-    @State private var gSubject = ""
-    @State private var gAck: GrievanceAck?
-    @State private var gBusy = false
-    @State private var gError = false
     private var faqs: [(q: String, a: String)] {
         [
         ("How do coins work?",
@@ -484,6 +682,31 @@ struct HelpView: View {
 
     var body: some View {
         List {
+            Section {
+                // The assistant is the first door (mockup 4.6).
+                NavigationLink {
+                    HelpAssistantView()
+                } label: {
+                    HStack(spacing: Katha.Spacing.md) {
+                        ZStack {
+                            Circle().fill(Katha.Color.accent.opacity(0.16)).frame(width: 44, height: 44)
+                            Image(systemName: "bubble.left.and.text.bubble.right.fill")
+                                .font(.system(size: 18))
+                                .foregroundStyle(Katha.Color.accent)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(model.t("assistant.title"))
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(Katha.Color.text)
+                            Text(model.t("assistant.card"))
+                                .font(.system(size: 12))
+                                .foregroundStyle(Katha.Color.text2)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .accessibilityIdentifier("help.assistant")
+            }
             Section("Common questions") {
                 ForEach(faqs, id: \.q) { faq in
                     DisclosureGroup(faq.q) {
@@ -493,40 +716,7 @@ struct HelpView: View {
                     }
                 }
             }
-            Section {
-                TextField("Your email or phone", text: $gContact)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
-                TextField("What went wrong?", text: $gSubject)
-                if let ack = gAck {
-                    Text("Filed as \(ack.id). We'll acknowledge within 24 hours and resolve within 15 days.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Katha.Color.success)
-                } else {
-                    Button(gBusy ? "Filing…" : "File grievance") {
-                        gBusy = true
-                        gError = false
-                        Task {
-                            gAck = try? await model.api.fileGrievance(
-                                contact: gContact.trimmingCharacters(in: .whitespaces),
-                                subject: gSubject.trimmingCharacters(in: .whitespaces),
-                                body: "")
-                            gBusy = false
-                            if gAck == nil { gError = true }
-                        }
-                    }
-                    .disabled(gBusy || gContact.trimmingCharacters(in: .whitespaces).isEmpty
-                              || gSubject.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .foregroundStyle(Katha.Color.accent)
-                    if gError {
-                        Text("Couldn't file right now — email us below instead.")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Katha.Color.text2)
-                    }
-                }
-            } header: { Text("File a grievance") } footer: {
-                Text("Goes straight to the grievance officer, no email needed.")
-            }
+            GrievanceFormSection()
 
             Section {
                 Link("help@katha.example", destination: URL(string: "mailto:help@katha.example")!)
@@ -538,6 +728,54 @@ struct HelpView: View {
         .scrollContentBackground(.hidden)
         .background(Katha.Color.bg)
         .navigationTitle("Help & grievance")
+    }
+}
+
+/// The IT-Rules grievance form (contact + subject → ticket id + SLA), shared
+/// by the Help screen and the assistant's "Talk to a person".
+struct GrievanceFormSection: View {
+    @Environment(AppModel.self) private var model
+    @State private var gContact = ""
+    @State private var gSubject = ""
+    @State private var gAck: GrievanceAck?
+    @State private var gBusy = false
+    @State private var gError = false
+
+    var body: some View {
+        Section {
+            TextField("Your email or phone", text: $gContact)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.emailAddress)
+            TextField("What went wrong?", text: $gSubject)
+            if let ack = gAck {
+                Text("Filed as \(ack.id). We'll acknowledge within 24 hours and resolve within 15 days.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Katha.Color.success)
+            } else {
+                Button(gBusy ? "Filing…" : "File grievance") {
+                    gBusy = true
+                    gError = false
+                    Task {
+                        gAck = try? await model.api.fileGrievance(
+                            contact: gContact.trimmingCharacters(in: .whitespaces),
+                            subject: gSubject.trimmingCharacters(in: .whitespaces),
+                            body: "")
+                        gBusy = false
+                        if gAck == nil { gError = true }
+                    }
+                }
+                .disabled(gBusy || gContact.trimmingCharacters(in: .whitespaces).isEmpty
+                          || gSubject.trimmingCharacters(in: .whitespaces).isEmpty)
+                .foregroundStyle(Katha.Color.accent)
+                if gError {
+                    Text("Couldn't file right now — email us below instead.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Katha.Color.text2)
+                }
+            }
+        } header: { Text("File a grievance") } footer: {
+            Text("Goes straight to the grievance officer, no email needed.")
+        }
     }
 }
 

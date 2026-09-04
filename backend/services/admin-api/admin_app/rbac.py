@@ -106,4 +106,14 @@ MATRIX: list[dict] = [
     {"capability": "Audit log",
      "roles": ["admin", "finance", "analyst", "ro"],
      "notes": {"content": "own", "qc": "own", "support": "own"}},
+    # wave 2 views — the same names the routes below gate on
+    {"capability": "Media QC verdicts", "roles": ["admin", "content", "qc"]},
+    {"capability": "Moderation queue review", "roles": ["admin", "content", "qc"]},
+    {"capability": "Localization & writers' room", "roles": ["admin", "content"],
+     "notes": {"qc": "view"}},
+    {"capability": "Programming calendar", "roles": ["admin", "content"],
+     "notes": {"qc": "view"}},
+    {"capability": "Bulk pricing", "roles": ["admin", "finance"]},
+    {"capability": "Finance board", "roles": ["admin", "finance"]},
+    {"capability": "Components (internal)", "roles": ["admin"]},
 ]

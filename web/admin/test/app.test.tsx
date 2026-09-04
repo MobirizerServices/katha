@@ -40,6 +40,20 @@ describe("App routing + guards", () => {
     expect(screen.getByRole("link", { name: "Back to overview" })).toBeInTheDocument();
   });
 
+  it("routes the wave-2 views and keeps Components admin-only", async () => {
+    renderWithStore(<App />, { route: "/components" });
+    await waitFor(() => expect(screen.getByText("Internal · admin only")).toBeInTheDocument());
+    act(() => getStore().setRole("content"));
+    await waitFor(() =>
+      expect(screen.getByText(/can't open Components/)).toBeInTheDocument());
+  });
+
+  it("renders Finance for the finance role and Media for QC", async () => {
+    renderWithStore(<App />, { route: "/finance" });
+    act(() => getStore().setRole("finance"));
+    await waitFor(() => expect(screen.getByText("Money policy in force")).toBeInTheDocument());
+  });
+
   it("renders a toast when the preview role changes", async () => {
     renderWithStore(<App />, { route: "/access" });
     act(() => getStore().setRole("finance"));

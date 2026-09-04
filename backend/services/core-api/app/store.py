@@ -39,8 +39,11 @@ class UserProfile:
     user_id: str
     kind: str = "guest"          # guest | phone | apple
     display_name: str = ""
-    language: str = "hi"         # hi | ta | te
+    language: str = "hi"         # hi | ta | te  (content language)
     phone: str | None = None
+    # App-chrome language (en | hi). In-memory projection only: the shared
+    # user_profile row has no column for it and we don't add migrations here.
+    ui_language: str = "en"
 
 
 @dataclass
@@ -58,6 +61,7 @@ class UserEngagement:
     progress: dict[str, ProgressItem] = field(default_factory=dict)  # episode_id -> item
     order: list[str] = field(default_factory=list)                   # continue-watching order
     my_list: list[str] = field(default_factory=list)                 # series slugs, newest first
+    reminders: list[str] = field(default_factory=list)               # new-episode reminders, newest first
 
 
 def _build_ledger():
@@ -112,7 +116,8 @@ class Store:
             # must not roll the resume point back; only an explicit rewind does.
             position_ms = prev.position_ms
         item = ProgressItem(slug=slug, number=number, episode_id=eid,
-                            position_ms=position_ms, duration_ms=max(0, duration_ms))
+                            position_ms=position_ms, duration_ms=max(0, duration_ms),
+                            updated_at=now_iso())
         eng.progress[eid] = item
         # Move to the front of the continue-watching order.
         if eid in eng.order:
@@ -145,6 +150,22 @@ class Store:
 
     def my_list(self, user_id: str) -> list[str]:
         return self._eng(user_id).my_list
+
+    def add_reminder(self, user_id: str, slug: str) -> list[str]:
+        eng = self._eng(user_id)
+        if slug in eng.reminders:
+            eng.reminders.remove(slug)
+        eng.reminders.insert(0, slug)
+        return eng.reminders
+
+    def remove_reminder(self, user_id: str, slug: str) -> list[str]:
+        eng = self._eng(user_id)
+        if slug in eng.reminders:
+            eng.reminders.remove(slug)
+        return eng.reminders
+
+    def reminders(self, user_id: str) -> list[str]:
+        return self._eng(user_id).reminders
 
     # ---- entitlements ---------------------------------------------------
     _seen_stamp: dict = {}
@@ -234,6 +255,7 @@ class Store:
                 m.progress.setdefault(eid, item)
             m.order += [e for e in g.order if e not in m.order]
             m.my_list += [s for s in g.my_list if s not in m.my_list]
+            m.reminders += [s for s in g.reminders if s not in m.reminders]
         self.emit(member_id, "guest_merge", ref=guest_id, value=bal.total)
         return {"coins": bal.total, "episodes": len(ents)}
 

@@ -9,6 +9,7 @@ struct WalletView: View {
     @State private var history: [LedgerEntry] = []
     @State private var buying: String?
     @State private var restored = false
+    @State private var showPacks = false
 
     var body: some View {
         ScrollView {
@@ -16,10 +17,26 @@ struct WalletView: View {
                 balanceCard
 
                 VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
-                    Text("Get coins")
-                        .font(Katha.Font.label(14))
-                        .kerning(1.2)
-                        .foregroundStyle(Katha.Color.text2)
+                    HStack {
+                        Text("Get coins")
+                            .font(Katha.Font.label(14))
+                            .kerning(1.2)
+                            .foregroundStyle(Katha.Color.text2)
+                        Spacer()
+                        // The 3.4 packs sheet, with the confirming / pending /
+                        // failed states drawn in full.
+                        Button {
+                            showPacks = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("All packs")
+                                Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
+                            }
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Katha.Color.accent)
+                        }
+                        .accessibilityIdentifier("wallet.allPacks")
+                    }
                     ForEach(packs) { pack in
                         PackRow(pack: pack, buying: buying == pack.sku) {
                             Task { await buy(pack) }
@@ -64,6 +81,9 @@ struct WalletView: View {
         .toolbarBackground(Katha.Color.bg, for: .navigationBar)
         .task { await reload() }
         .refreshable { await reload() }
+        .sheet(isPresented: $showPacks) {
+            PacksSheet { Task { await reload() } }
+        }
     }
 
     private var balanceCard: some View {

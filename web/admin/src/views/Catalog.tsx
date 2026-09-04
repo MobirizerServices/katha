@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, mutate, MEDIA_BASE } from "../api/client";
+import { __resetApiCache, api, mutate, MEDIA_BASE } from "../api/client";
 import type { Series } from "../api/types";
 import { Empty, Modal, PageHeader, Skeleton, StatusBadge, fmtN } from "../ui";
 import type { SeriesStatus } from "../api/types";
@@ -97,6 +97,68 @@ function NewSeriesDialog({ onClose, onCreated }:
   );
 }
 
+/** Finance-only bulk repricing (#040 at scale): the same bounds as the single
+ *  lever, applied per slug on the server, one audit row with the slug list.
+ *  Typed confirm "PRICING" — the operator types it; the client never fills it. */
+function BulkPricingDialog({ slugs, onClose, onDone }:
+                           { slugs: string[]; onClose: () => void; onDone: () => void }) {
+  const { showToast } = useStore();
+  const [fields, setFields] = useState({ coin_price: 30, free_episodes: 10 });
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function apply() {
+    setBusy(true);
+    const res = await mutate.bulkPricing(slugs, fields, typed);
+    setBusy(false);
+    if ("offline" in res) return showToast("Offline — pricing unchanged", "error");
+    if (res.error) return showToast(`Pricing not changed: ${res.error}`, "error");
+    const results = res.results as { slug: string; ok: boolean; error?: string }[];
+    const failed = results.filter((r) => !r.ok);
+    showToast(`Repriced ${String(res.applied)} of ${slugs.length} series · audited once`
+      + (failed.length ? ` · not ${failed.map((r) => `${r.slug} (${r.error})`).join(", ")}` : ""),
+      failed.length ? "error" : "info");
+    onDone();
+    onClose();
+  }
+
+  return (
+    <Modal title={`Set pricing for ${slugs.length} series`} onClose={onClose}
+           footer={
+             <>
+               <button className="btn s" onClick={onClose}>Cancel</button>
+               <button className="btn danger" disabled={busy || typed !== "PRICING"}
+                       onClick={() => void apply()}>
+                 Apply to {slugs.length} series
+               </button>
+             </>
+           }>
+      <p className="tiny">
+        Changes what the paywall asks AND what the ledger charges for every
+        selected series, on core-api's next request. Type PRICING to confirm.
+      </p>
+      <div className="frow">
+        <label>
+          Coins per episode
+          <input type="number" value={fields.coin_price} aria-label="Bulk coins per episode"
+                 onChange={(e) => setFields({ ...fields, coin_price: Number(e.target.value) })} />
+        </label>
+        <label>
+          Free episodes
+          <input type="number" value={fields.free_episodes} aria-label="Bulk free episodes"
+                 onChange={(e) => setFields({ ...fields, free_episodes: Number(e.target.value) })} />
+        </label>
+      </div>
+      <p className="tiny mono muted">{slugs.join(", ")}</p>
+      <label>
+        Confirm
+        <input value={typed} onChange={(e) => setTyped(e.target.value)}
+               placeholder="PRICING" aria-label="Confirm PRICING" />
+      </label>
+    </Modal>
+  );
+}
+
 export function Catalog() {
   const { role, online } = useStore();
   const [creating, setCreating] = useState(false);
@@ -104,6 +166,8 @@ export function Catalog() {
   const [q, setQ] = useState("");
   const [lang, setLang] = useState("All");
   const [status, setStatus] = useState("All statuses");
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState(false);
 
   const load = () => void api.listSeries().then(setRows);
   useEffect(load, []);
@@ -125,6 +189,18 @@ export function Catalog() {
   }, [rows, q, lang, status]);
 
   const total = rows?.reduce((n, s) => n + s.episodeCount, 0) ?? 0;
+  const financeRole = canAct(role, "finance");
+  const allPicked = filtered.length > 0 && filtered.every((s) => picked.has(s.slug));
+
+  const togglePick = (slug: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  const toggleAll = () =>
+    setPicked(allPicked ? new Set() : new Set(filtered.map((s) => s.slug)));
 
   return (
     <>
@@ -133,12 +209,21 @@ export function Catalog() {
         subtitle={rows
           ? `${rows.length} series · ${fmtN(total)} episodes · 3 languages. First ${rows[0]?.freeEpisodes ?? 10} episodes of every series are free, then ${rows[0]?.coinPrice ?? 30} coins each.`
           : "Loading catalog…"}
-        actions={canAct(role, "content") ? (
-          <button className="btn p" disabled={!online}
-                  onClick={() => setCreating(true)}>
-            New series…
-          </button>
-        ) : null}
+        actions={
+          <>
+            {financeRole && picked.size > 0 ? (
+              <button className="btn s" disabled={!online} onClick={() => setBulk(true)}>
+                Set pricing for {picked.size} series…
+              </button>
+            ) : null}
+            {canAct(role, "content") ? (
+              <button className="btn p" disabled={!online}
+                      onClick={() => setCreating(true)}>
+                New series…
+              </button>
+            ) : null}
+          </>
+        }
       />
 
       <div className="filters">
@@ -160,6 +245,10 @@ export function Catalog() {
         <table className="table cat">
           <thead>
             <tr>
+              <th>
+                <input type="checkbox" checked={allPicked} onChange={toggleAll}
+                       aria-label="Select all series" />
+              </th>
               <th>Series</th><th>Language</th><th>Rating</th>
               <th style={{ textAlign: "right" }}>Episodes</th>
               <th>Free</th><th>Price</th><th>Bundle</th><th>Status</th>
@@ -168,6 +257,11 @@ export function Catalog() {
           <tbody>
             {filtered.map((s) => (
               <tr key={s.slug}>
+                <td>
+                  <input type="checkbox" checked={picked.has(s.slug)}
+                         onChange={() => togglePick(s.slug)}
+                         aria-label={`Select ${s.title}`} />
+                </td>
                 <td>
                   <Link to={`/catalog/${s.slug}`} className="serieslink">
                     <img className="covermini" alt=""
@@ -193,6 +287,10 @@ export function Catalog() {
       )}
       {creating ? (
         <NewSeriesDialog onClose={() => setCreating(false)} onCreated={load} />
+      ) : null}
+      {bulk ? (
+        <BulkPricingDialog slugs={[...picked]} onClose={() => setBulk(false)}
+                           onDone={() => { setPicked(new Set()); __resetApiCache(); load(); }} />
       ) : null}
     </>
   );

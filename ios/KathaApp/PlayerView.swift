@@ -24,6 +24,19 @@ final class PlayerEngine {
     var failed = false
     var currentSeconds: Double = 0
     var durationSeconds: Double = 0
+    /// True while the viewer holds for 2× (PDD §10.2 long-press).
+    var boosting = false
+
+    // Audio / subtitle selection (the stream's own AVMediaSelectionGroups).
+    var legibleOptions: [AVMediaSelectionOption] = []
+    var audibleOptions: [AVMediaSelectionOption] = []
+    /// The caption language in force: nil = off. Persisted so the next episode
+    /// (and the next launch) starts with the same choice.
+    var captionLang: String?
+    var audioLang: String?
+    private var legibleGroup: AVMediaSelectionGroup?
+    private var audibleGroup: AVMediaSelectionGroup?
+    static let captionPrefKey = "katha.captions.lang"
 
     // Written once in init, read once in deinit (which is nonisolated): kept
     // outside the actor's isolation on purpose, and outside observation.
@@ -103,11 +116,78 @@ final class PlayerEngine {
             player.seek(to: CMTime(seconds: Double(resumeMs) / 1000, preferredTimescale: 600))
         }
         play()
+        Task { await loadMediaSelection(for: item) }
     }
 
     func play() { player.play(); isPlaying = true }
     func pause() { player.pause(); isPlaying = false }
     func toggle() { isPlaying ? pause() : play() }
+
+    /// Hold-to-boost: 2× while the finger is down, back to 1× on release.
+    /// Only ever speeds up playback that is already running.
+    func setBoost(_ on: Bool) {
+        guard on != boosting else { return }
+        boosting = on
+        guard isPlaying, !ended else { return }
+        player.rate = on ? 2.0 : 1.0
+    }
+
+    // MARK: Audio & subtitles
+
+    /// Read the stream's selectable groups, then re-apply the remembered
+    /// caption language so a choice made on E3 is still on for E4.
+    private func loadMediaSelection(for item: AVPlayerItem) async {
+        legibleOptions = []; audibleOptions = []
+        legibleGroup = nil; audibleGroup = nil
+        let asset = item.asset
+        let legible = try? await asset.loadMediaSelectionGroup(for: .legible)
+        let audible = try? await asset.loadMediaSelectionGroup(for: .audible)
+        guard item === player.currentItem else { return }      // a swipe moved on
+        legibleGroup = legible
+        audibleGroup = audible
+        legibleOptions = legible?.options.filter { !$0.hasMediaCharacteristic(.containsOnlyForcedSubtitles) } ?? []
+        audibleOptions = audible?.options ?? []
+        let stored = UserDefaults.standard.string(forKey: Self.captionPrefKey)
+        captionLang = stored == "off" ? nil : stored
+        applyCaptionSelection()
+        if let g = audible, let cur = item.currentMediaSelection.selectedMediaOption(in: g) {
+            audioLang = Self.langCode(cur)
+        }
+    }
+
+    /// Choose a caption language (nil = Off). Applied to the stream when it
+    /// carries that language; remembered either way.
+    func selectCaptions(lang: String?) {
+        captionLang = lang
+        UserDefaults.standard.set(lang ?? "off", forKey: Self.captionPrefKey)
+        applyCaptionSelection()
+    }
+
+    func selectAudio(lang: String) {
+        audioLang = lang
+        guard let g = audibleGroup, let item = player.currentItem else { return }
+        if let opt = audibleOptions.first(where: { Self.langCode($0) == lang }) {
+            item.select(opt, in: g)
+        }
+    }
+
+    private func applyCaptionSelection() {
+        guard let g = legibleGroup, let item = player.currentItem else { return }
+        if let lang = captionLang,
+           let opt = legibleOptions.first(where: { Self.langCode($0) == lang }) {
+            item.select(opt, in: g)
+        } else {
+            item.select(nil, in: g)
+        }
+    }
+
+    /// "hi-IN" → "hi": the payload and the stream speak in two-letter codes.
+    static func langCode(_ option: AVMediaSelectionOption) -> String {
+        if let tag = option.extendedLanguageTag ?? option.locale?.identifier {
+            return String(tag.split(separator: "-").first ?? Substring(tag)).lowercased()
+        }
+        return option.displayName.lowercased()
+    }
     func seek(to seconds: Double) {
         // Scrubbing back after the end notification means the episode is live
         // again — leaving `ended` set would freeze the end card over playback
@@ -131,22 +211,65 @@ final class PlayerEngine {
 /// Full-bleed AVPlayerLayer host (more control than VideoPlayer — SAD §11.3).
 struct PlayerLayerView: UIViewRepresentable {
     let player: AVPlayer
+    var gravity: AVLayerVideoGravity = .resizeAspect
+    /// Tap / double-tap / hold on the video surface. UIKit recognizers rather
+    /// than SwiftUI gestures: `require(toFail:)` gives the single tap its
+    /// double-tap grace period, and the long press reports began AND ended,
+    /// which SwiftUI's LongPressGesture does not. Nil handlers add nothing
+    /// (the Home preview stays a plain layer under its NavigationLink).
+    var onTap: (() -> Void)? = nil
+    var onDoubleTap: (() -> Void)? = nil
+    var onHold: ((Bool) -> Void)? = nil
 
     final class LayerBackedView: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
         var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
     }
 
+    @MainActor final class Coordinator: NSObject {
+        var onTap: (() -> Void)?
+        var onDoubleTap: (() -> Void)?
+        var onHold: ((Bool) -> Void)?
+
+        @objc func tapped() { onTap?() }
+        @objc func doubleTapped() { onDoubleTap?() }
+        @objc func held(_ g: UILongPressGestureRecognizer) {
+            switch g.state {
+            case .began: onHold?(true)
+            case .ended, .cancelled, .failed: onHold?(false)
+            default: break
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeUIView(context: Context) -> LayerBackedView {
         let v = LayerBackedView()
         v.playerLayer.player = player
-        v.playerLayer.videoGravity = .resizeAspect
+        v.playerLayer.videoGravity = gravity
         v.backgroundColor = .black
+        if onTap != nil || onDoubleTap != nil || onHold != nil {
+            let c = context.coordinator
+            let double = UITapGestureRecognizer(target: c, action: #selector(Coordinator.doubleTapped))
+            double.numberOfTapsRequired = 2
+            let single = UITapGestureRecognizer(target: c, action: #selector(Coordinator.tapped))
+            single.require(toFail: double)
+            let hold = UILongPressGestureRecognizer(target: c, action: #selector(Coordinator.held(_:)))
+            hold.minimumPressDuration = 0.4
+            v.addGestureRecognizer(double)
+            v.addGestureRecognizer(single)
+            v.addGestureRecognizer(hold)
+            v.isUserInteractionEnabled = true
+        }
         return v
     }
 
     func updateUIView(_ view: LayerBackedView, context: Context) {
         view.playerLayer.player = player
+        context.coordinator.onTap = onTap
+        context.coordinator.onDoubleTap = onDoubleTap
+        context.coordinator.onHold = onHold
     }
 }
 
@@ -165,8 +288,12 @@ struct PlayerView: View {
     @State private var current: Int = 0                 // episode currently loaded
     @State private var showPaywall = false
     @State private var showDrawer = false
+    @State private var showTracks = false
     @State private var chromeVisible = true
     @State private var liked = false
+    /// Heart burst on double-tap; bumps so each burst replays.
+    @State private var burstToken = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// UI-test runs record the screen by design; the env flag keeps the §12.9
     /// capture shield honest in production while letting automation through.
     private static let allowCapture =
@@ -199,15 +326,28 @@ struct PlayerView: View {
             if captured {
                 recordingBlocked
             } else if needsPin {
-                PinGateView { pinPassed = true } onCancel: { dismiss() }
+                PinGateView { pinPassed = true } onCancel: { dismiss() } onToast: { toast = $0 }
             } else {
-                PlayerLayerView(player: engine.player)
-                    .ignoresSafeArea()
-                    .onTapGesture { withAnimation { chromeVisible.toggle() }; engineTapPlayPause() }
+                // Tap = play/pause (after the double-tap grace), double-tap =
+                // like, hold = 2× while held. The vertical swipe on the ZStack
+                // below still advances: a moving finger fails all three.
+                PlayerLayerView(
+                    player: engine.player,
+                    onTap: {
+                        withAnimation { chromeVisible.toggle() }
+                        engineTapPlayPause()
+                    },
+                    onDoubleTap: { doubleTapped() },
+                    onHold: { on in setBoost(on) }
+                )
+                .ignoresSafeArea()
+                .accessibilityIdentifier("player.surface")
 
                 if engine.isBuffering && playback?.isEntitled == true {
                     ProgressView().tint(.white).scaleEffect(1.4)
                 }
+                if engine.boosting { boostPill }
+                HeartBurst(token: burstToken)
                 if playback?.locked == true { lockedFrame }
                 if engine.failed || loadFailed { connectionLost }
                 if engine.ended { seriesEndOrNext }
@@ -290,6 +430,9 @@ struct PlayerView: View {
                 }
             }
         }
+        .sheet(isPresented: $showTracks) {
+            TrackPickerSheet(engine: engine, playback: playback)
+        }
     }
 
     // MARK: chrome (rail + labels + scrubber)
@@ -322,6 +465,12 @@ struct PlayerView: View {
                     railButton(icon: "square.stack.3d.down.right", label: "E\(current)", tint: .white) {
                         showDrawer = true
                     }
+                    railButton(icon: engine.captionLang == nil ? "captions.bubble" : "captions.bubble.fill",
+                               label: "CC", tint: engine.captionLang == nil ? .white : Katha.Color.accent) {
+                        showTracks = true
+                    }
+                    .accessibilityLabel(model.t("player.tracks"))
+                    .accessibilityIdentifier("player.cc")
                     ShareLink(item: URL(string: "https://katha.example/e/\(slug)-\(current)")!) {
                         VStack(spacing: 3) {
                             Image(systemName: "square.and.arrow.up").font(.system(size: 24))
@@ -438,6 +587,25 @@ struct PlayerView: View {
         .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
     }
 
+    /// "2×" chip while the long-press holds (top-centre, out of the rail's way).
+    private var boostPill: some View {
+        VStack {
+            Text("2×")
+                .font(.system(size: 15, weight: .bold).monospacedDigit())
+                .foregroundStyle(Katha.Color.text)
+                .padding(.horizontal, 12)
+                .frame(height: 30)
+                .background(.black.opacity(0.6))
+                .clipShape(Capsule())
+                .padding(.top, 56)
+                .accessibilityIdentifier("player.rate2x")
+                .accessibilityLabel("Playing at 2 times speed")
+            Spacer()
+        }
+        .transition(reduceMotion ? .opacity : .scale(scale: 0.8).combined(with: .opacity))
+        .animation(Katha.Motion.snappy, value: engine.boosting)
+    }
+
     private var recordingBlocked: some View {
         VStack(spacing: Katha.Spacing.md) {
             Image(systemName: "video.slash.fill").font(.system(size: 40))
@@ -466,6 +634,27 @@ struct PlayerView: View {
             }
     }
 
+    /// Double-tap = like — the same action as the rail's heart, plus the burst.
+    private func doubleTapped() {
+        guard playback?.isEntitled == true, !captured else { return }
+        like()
+        burstToken += 1
+    }
+
+    /// Long-press ≥ 0.4 s = 2× while held (PDD §10.2), with the "2×" chip.
+    private func setBoost(_ on: Bool) {
+        if on {
+            guard playback?.isEntitled == true, !captured, !engine.boosting else { return }
+            Haptics.tap()
+        }
+        withAnimation(Katha.Motion.snappy) { engine.setBoost(on) }
+    }
+
+    private func like() {
+        if !liked { Haptics.tap() }
+        liked = true
+    }
+
     private func engineTapPlayPause() {
         guard playback?.isEntitled == true, !engine.ended, !captured else { return }
         engine.toggle()
@@ -477,6 +666,7 @@ struct PlayerView: View {
         lastReported = 0        // the throttle window belongs to ONE episode
         current = n
         showPaywall = false
+        engine.setBoost(false)
         engine.stop()
         startLoad(for: n)
     }
@@ -589,6 +779,194 @@ struct PlayerView: View {
         return String(format: "%d:%02d", t / 60, t % 60)
     }
 
+}
+
+// MARK: - Audio & subtitles picker
+
+/// The CC sheet: audio tracks and subtitle languages from the playback
+/// payload merged with what the stream itself advertises. Selecting applies
+/// to the running item; the caption choice is remembered for the next load.
+struct TrackPickerSheet: View {
+    let engine: PlayerEngine
+    let playback: PlaybackResponse?
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    private struct Track: Identifiable {
+        let lang: String
+        let label: String
+        var inStream: Bool
+        var id: String { lang }
+    }
+
+    /// Payload tracks first (server labels), then stream-only languages.
+    private var audioTracks: [Track] {
+        // The server says "dub"; older payloads said "dubbed".
+        merge(payload: (playback?.audio ?? []).map { ($0.lang, $0.kind.hasPrefix("dub") ? "\($0.label) · dubbed" : $0.label) },
+              stream: engine.audibleOptions)
+    }
+    private var captionTracks: [Track] {
+        merge(payload: (playback?.captions ?? []).map { ($0.lang, $0.label) },
+              stream: engine.legibleOptions)
+    }
+
+    private func merge(payload: [(String, String)], stream: [AVMediaSelectionOption]) -> [Track] {
+        let tagged = stream.filter { $0.locale != nil || $0.extendedLanguageTag != nil }
+        let streamLangs = Set(tagged.map(PlayerEngine.langCode))
+        // An untagged stream track (no language metadata) is the one the
+        // payload describes — fold it into the payload's first entry rather
+        // than listing an "Unknown".
+        let untagged = stream.count - tagged.count
+        var out: [Track] = payload.enumerated().map { i, t in
+            Track(lang: t.0, label: Self.nativeName(t.0, t.1),
+                  inStream: streamLangs.contains(t.0) || (i == 0 && untagged > 0))
+        }
+        for opt in tagged where !out.contains(where: { $0.lang == PlayerEngine.langCode(opt) }) {
+            out.append(Track(lang: PlayerEngine.langCode(opt), label: opt.displayName, inStream: true))
+        }
+        if out.isEmpty {
+            for opt in stream {
+                out.append(Track(lang: PlayerEngine.langCode(opt), label: opt.displayName, inStream: true))
+            }
+        }
+        return out
+    }
+
+    /// A bare language code from the payload reads as its own script.
+    private static func nativeName(_ lang: String, _ label: String) -> String {
+        guard label == lang else { return label }
+        switch lang {
+        case "hi": return "हिन्दी"
+        case "ta": return "தமிழ்"
+        case "te": return "తెలుగు"
+        case "en": return "English"
+        default: return lang
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
+            Capsule().fill(Katha.Color.raised)
+                .frame(width: 36, height: 5)
+                .frame(maxWidth: .infinity)
+            HStack {
+                Text(model.t("player.tracks"))
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Katha.Color.text)
+                Spacer()
+                Button(model.t("packs.done")) { dismiss() }
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Katha.Color.accent)
+            }
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
+                    if !audioTracks.isEmpty {
+                        section(model.t("player.audio"))
+                        ForEach(audioTracks) { t in
+                            row(t.label, selected: engine.audioLang == t.lang, available: t.inStream) {
+                                engine.selectAudio(lang: t.lang)
+                            }
+                        }
+                    }
+                    section(model.t("player.subtitles"))
+                    row(model.t("player.subtitles.off"), selected: engine.captionLang == nil, available: true) {
+                        engine.selectCaptions(lang: nil)
+                    }
+                    .accessibilityIdentifier("captions.off")
+                    if captionTracks.isEmpty {
+                        Text(model.t("player.subtitles.none"))
+                            .font(.system(size: 13))
+                            .foregroundStyle(Katha.Color.text2)
+                    }
+                    ForEach(captionTracks) { t in
+                        row(t.label, selected: engine.captionLang == t.lang, available: t.inStream) {
+                            engine.selectCaptions(lang: t.lang)
+                        }
+                        .accessibilityIdentifier("captions.\(t.lang)")
+                    }
+                    Text("Subtitles follow your system caption style. A language the stream doesn't carry yet is remembered and applied when it does.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Katha.Color.text2)
+                }
+            }
+        }
+        .padding(Katha.Spacing.xl)
+        .presentationDetents([.medium, .large])
+        .presentationBackground(Katha.Color.surface)
+    }
+
+    private func section(_ title: String) -> some View {
+        Text(title)
+            .font(Katha.Font.label(14))
+            .kerning(1.2)
+            .foregroundStyle(Katha.Color.text2)
+    }
+
+    private func row(_ label: String, selected: Bool, available: Bool,
+                     action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            HStack {
+                Text(label)
+                    .font(.system(size: 15, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(Katha.Color.text)
+                if !available {
+                    Text("not in this stream")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Katha.Color.text2)
+                }
+                Spacer()
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Katha.Color.accent)
+                }
+            }
+            .padding(.horizontal, Katha.Spacing.md)
+            .frame(height: 46)
+            .background(selected ? Katha.Color.accent.opacity(0.12) : Katha.Color.raised)
+            .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+// MARK: - Heart burst (double-tap like)
+
+/// A heart that swells and fades from the centre on every `token` change.
+/// Under Reduce Motion it simply blinks in and out.
+struct HeartBurst: View {
+    let token: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var visible = false
+    @State private var scale: CGFloat = 0.4
+
+    var body: some View {
+        Image(systemName: "heart.fill")
+            .font(.system(size: 96))
+            .foregroundStyle(Katha.Color.accent)
+            .shadow(color: .black.opacity(0.35), radius: 12)
+            .scaleEffect(reduceMotion ? 1 : scale)
+            .opacity(visible ? 0.95 : 0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .onChange(of: token) { _, _ in
+                guard token > 0 else { return }
+                scale = 0.4
+                withAnimation(reduceMotion ? .linear(duration: 0.1) : .spring(response: 0.3, dampingFraction: 0.55)) {
+                    visible = true
+                    scale = 1.15
+                }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(450))
+                    withAnimation(.easeOut(duration: 0.25)) { visible = false; scale = 1.3 }
+                }
+            }
+    }
 }
 
 // MARK: - Episode drawer (3.2)

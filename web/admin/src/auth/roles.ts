@@ -32,14 +32,19 @@ export const ROLE_ORDER: Role[] = [
 ];
 
 // Which views each role may open. "*" for admin = all.
+// "components" (the design-system page) is internal: admin only.
 const ROLE_VIEWS: Record<Role, "*" | string[]> = {
   admin: "*",
-  content: ["overview", "catalog", "config", "audit", "approvals", "access"],
-  qc: ["overview", "catalog", "audit", "access"],
-  support: ["overview", "users", "audit", "approvals", "grievances", "access", "outbox"],
-  finance: ["overview", "users", "config", "audit", "approvals", "access", "outbox"],
-  analyst: ["overview", "config", "access", "audit", "outbox"],
-  ro: ["overview", "catalog", "audit", "access"],
+  content: ["overview", "catalog", "media", "moderation", "localization", "writers",
+            "programming", "config", "analytics", "audit", "approvals", "access"],
+  qc: ["overview", "catalog", "media", "moderation", "localization", "writers",
+       "programming", "analytics", "audit", "access"],
+  support: ["overview", "users", "audit", "approvals", "grievances", "access", "outbox",
+            "analytics"],
+  finance: ["overview", "users", "finance", "config", "audit", "approvals", "access",
+            "outbox", "analytics"],
+  analyst: ["overview", "config", "access", "audit", "outbox", "analytics"],
+  ro: ["overview", "catalog", "audit", "access", "analytics"],
 };
 
 export function canView(role: Role, view: string): boolean {
@@ -77,4 +82,12 @@ export const PERMISSION_MATRIX: MatrixRow[] = [
   { cap: "Flags, experiments, SKUs", cells: ["yes", "flags", "no", "no", "SKUs", "experiments", "no"] },
   { cap: "Analytics dashboards", cells: ["yes", "yes", "yes", "yes", "yes", "yes", "yes"] },
   { cap: "Audit log", cells: ["yes", "own", "own", "own", "yes", "no", "yes"] },
+  // wave-2 views — mirrors admin_app/rbac.py MATRIX
+  { cap: "Media QC verdicts", cells: ["yes", "yes", "yes", "no", "no", "no", "no"] },
+  { cap: "Moderation queue review", cells: ["yes", "yes", "yes", "no", "no", "no", "no"] },
+  { cap: "Localization & writers' room", cells: ["yes", "yes", "view", "no", "no", "no", "no"] },
+  { cap: "Programming calendar", cells: ["yes", "yes", "view", "no", "no", "no", "no"] },
+  { cap: "Bulk pricing", cells: ["yes", "no", "no", "no", "yes", "no", "no"] },
+  { cap: "Finance board", cells: ["yes", "no", "no", "no", "yes", "no", "no"] },
+  { cap: "Components (internal)", cells: ["yes", "no", "no", "no", "no", "no", "no"] },
 ];

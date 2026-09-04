@@ -17,11 +17,19 @@ export default function SiteFooter() {
           </div>
           <div>
             <h4>Katha</h4>
-            <Link href="/#series">Series</Link>
+            <Link href="/browse">Browse series</Link>
+            <Link href="/search">Search</Link>
             <Link href="/#how">How coins work</Link>
             <Link href="/coins">Get coins</Link>
             <a href="#">Careers</a>
             <a href="#">Press</a>
+          </div>
+          <div>
+            <h4>Work with us</h4>
+            <Link href="/#business">For studios &amp; brands</Link>
+            <Link href="/#creators">Creators</Link>
+            <Link href="/#brands">Brands and agencies</Link>
+            <Link href="/#pitch">Tell us what you want to make</Link>
           </div>
           <div>
             <h4>Legal</h4>

@@ -216,6 +216,10 @@ public struct PlaybackResponse: Codable, Hashable, Sendable {
     public let remainingLocked: Int?
     /// Entitled: whether this episode is free (vs bought).
     public let free: Bool?
+    /// Entitled: subtitle tracks the server knows about (absent on old servers).
+    public let captions: [CaptionTrack]?
+    /// Entitled: audio tracks (original / dubbed) the server knows about.
+    public let audio: [AudioTrack]?
 
     public var isEntitled: Bool { !locked }
 
@@ -228,19 +232,109 @@ public struct PlaybackResponse: Codable, Hashable, Sendable {
         case balance
         case bundleOfferCoins = "bundle_offer_coins"
         case remainingLocked = "remaining_locked"
-        case free
+        case free, captions, audio
     }
 
     public init(locked: Bool, episodeId: String, hlsMasterUrl: String? = nil,
                 resumePositionMs: Int? = nil, priceCoins: Int? = nil,
                 balance: Int? = nil, bundleOfferCoins: Int? = nil,
-                remainingLocked: Int? = nil, free: Bool? = nil) {
+                remainingLocked: Int? = nil, free: Bool? = nil,
+                captions: [CaptionTrack]? = nil, audio: [AudioTrack]? = nil) {
         self.locked = locked; self.episodeId = episodeId
         self.hlsMasterUrl = hlsMasterUrl; self.resumePositionMs = resumePositionMs
         self.priceCoins = priceCoins; self.balance = balance; self.bundleOfferCoins = bundleOfferCoins
         self.remainingLocked = remainingLocked
         self.free = free
+        self.captions = captions; self.audio = audio
     }
+}
+
+/// One subtitle track advertised by the playback payload.
+public struct CaptionTrack: Codable, Hashable, Identifiable, Sendable {
+    public let lang: String
+    public let label: String
+    public let url: String
+
+    public var id: String { lang }
+
+    public init(lang: String, label: String = "", url: String = "") {
+        self.lang = lang; self.label = label.isEmpty ? lang : label; self.url = url
+    }
+
+    // `label` is optional on the wire (the first server build sent lang + url only).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let lang = try c.decode(String.self, forKey: .lang)
+        self.lang = lang
+        self.label = try c.decodeIfPresent(String.self, forKey: .label) ?? lang
+        self.url = try c.decodeIfPresent(String.self, forKey: .url) ?? ""
+    }
+
+    enum CodingKeys: String, CodingKey { case lang, label, url }
+}
+
+/// One audio track advertised by the playback payload (`kind`: original | dubbed).
+public struct AudioTrack: Codable, Hashable, Identifiable, Sendable {
+    public let lang: String
+    public let label: String
+    public let kind: String
+
+    public var id: String { lang + ":" + kind }
+
+    public init(lang: String, label: String = "", kind: String = "original") {
+        self.lang = lang; self.label = label.isEmpty ? lang : label; self.kind = kind
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let lang = try c.decode(String.self, forKey: .lang)
+        self.lang = lang
+        self.label = try c.decodeIfPresent(String.self, forKey: .label) ?? lang
+        self.kind = try c.decodeIfPresent(String.self, forKey: .kind) ?? "original"
+    }
+
+    enum CodingKeys: String, CodingKey { case lang, label, kind }
+}
+
+/// `GET /v1/search`: series matches plus people (cast/crew) whose series match.
+public struct SearchResponse: Codable, Hashable, Sendable {
+    public let query: String
+    public let series: [SeriesSummary]
+    public let people: [SearchPerson]
+
+    public init(query: String, series: [SeriesSummary], people: [SearchPerson] = []) {
+        self.query = query; self.series = series; self.people = people
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        query = try c.decodeIfPresent(String.self, forKey: .query) ?? ""
+        series = try c.decodeIfPresent([SeriesSummary].self, forKey: .series) ?? []
+        people = try c.decodeIfPresent([SearchPerson].self, forKey: .people) ?? []
+    }
+
+    enum CodingKeys: String, CodingKey { case query, series, people }
+}
+
+public struct SearchPerson: Codable, Hashable, Identifiable, Sendable {
+    public let name: String
+    public let role: String
+    public let series: [SeriesSummary]
+
+    public var id: String { name + "|" + role }
+
+    public init(name: String, role: String, series: [SeriesSummary]) {
+        self.name = name; self.role = role; self.series = series
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        role = try c.decodeIfPresent(String.self, forKey: .role) ?? ""
+        series = try c.decodeIfPresent([SeriesSummary].self, forKey: .series) ?? []
+    }
+
+    enum CodingKeys: String, CodingKey { case name, role, series }
 }
 
 public struct UnlockResult: Codable, Hashable, Sendable {

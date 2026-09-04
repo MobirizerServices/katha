@@ -1,4 +1,5 @@
 import SwiftUI
+@preconcurrency import AVFoundation
 import KathaKit
 
 /// Home (mockup 2.1): check-in card pinned on top, one large For You hero,
@@ -29,7 +30,14 @@ struct FeedView: View {
             }
             .toolbarBackground(Katha.Color.bg, for: .navigationBar)
             .navigationDestination(for: SearchRoute.self) { _ in SearchView() }
-            .task { if model.feed.rows.isEmpty { await model.loadHome() } }
+            .navigationDestination(for: ContinueRoute.self) { _ in ContinueWatchingView() }
+            .task {
+                if model.feed.rows.isEmpty { await model.loadHome() }
+                // Returning from the player: let its final progress flush land,
+                // then refresh the continue row.
+                try? await Task.sleep(for: .milliseconds(400))
+                await model.loadEngagement()
+            }
             .overlay(alignment: .bottom) {
                 if let coins = claimedToast {
                     ToastView(text: "+\(coins) coins · day streak")
@@ -161,11 +169,23 @@ struct FeedView: View {
 
     private var continueRow: some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
-            Text("Continue watching")
-                .font(Katha.Font.label(14))
-                .kerning(1.2)
-                .foregroundStyle(Katha.Color.text2)
-                .padding(.horizontal, Katha.Spacing.lg)
+            HStack {
+                Text(model.t("continue.title"))
+                    .font(Katha.Font.label(14))
+                    .kerning(1.2)
+                    .foregroundStyle(Katha.Color.text2)
+                Spacer()
+                NavigationLink(value: ContinueRoute()) {
+                    HStack(spacing: 3) {
+                        Text(model.t("continue.seeAll"))
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Katha.Color.accent)
+                }
+                .accessibilityIdentifier("continue.seeAll")
+            }
+            .padding(.horizontal, Katha.Spacing.lg)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Katha.Spacing.md) {
                     ForEach(model.continueItems) { item in
@@ -190,9 +210,14 @@ struct FeedView: View {
                                     .padding(.horizontal, 6)
                                     .padding(.bottom, 5)
                                 }
-                                Text("E\(item.number) · \(item.slug.replacingOccurrences(of: "-", with: " ").capitalized)")
+                                Text(model.title(forSlug: item.slug))
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(Katha.Color.text)
+                                    .lineLimit(1)
+                                    .frame(width: 168, alignment: .leading)
+                                Text(ContinueWatchingView.subtitle(for: item))
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Katha.Color.text2)
                                     .lineLimit(1)
                                     .frame(width: 168, alignment: .leading)
                             }
@@ -217,6 +242,13 @@ private struct HeroCard: View {
             ZStack(alignment: .bottomLeading) {
                 CoverImage(url: series.coverWideUrl)
                     .frame(height: 500)
+                    .overlay {
+                        // Muted E1 preview (mockup 2.1) — off under data saver
+                        // and via Settings → "Autoplay trailers".
+                        if model.previewsMuted && !model.dataSaver {
+                            HeroPreview(slug: series.slug)
+                        }
+                    }
                     .overlay {
                         // Fade seamlessly into the page ground — full-bleed,
                         // no card frame: the story IS the screen.
@@ -432,5 +464,54 @@ struct FeedLoadingState: View {
         .scrollDisabled(true)
         .background(Katha.Color.bg)
         .accessibilityLabel("Loading stories")
+    }
+}
+
+// MARK: - Hero preview (muted, looping E1)
+
+/// The For You card's muted trailer: E1's stream, looped, no sound, fading in
+/// once the first frame is up. Honors Settings → "Autoplay trailers" (the
+/// caller decides whether to mount it) and stops the moment it leaves the
+/// screen. Free E1 only — never a locked episode.
+private struct HeroPreview: View {
+    let slug: String
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var player: AVQueuePlayer?
+    @State private var looper: AVPlayerLooper?
+    @State private var ready = false
+
+    var body: some View {
+        ZStack {
+            if let player {
+                PlayerLayerView(player: player, gravity: .resizeAspectFill)
+                    .opacity(ready ? 1 : 0)
+                    .animation(reduceMotion ? nil : .easeIn(duration: 0.6), value: ready)
+            }
+        }
+        .accessibilityHidden(true)
+        .accessibilityIdentifier("hero.preview")
+        .task(id: slug) {
+            guard let pb = try? await model.api.playback(slug: slug, number: 1),
+                  pb.isEntitled, let u = pb.hlsMasterUrl, let url = URL(string: u) else { return }
+            let item = AVPlayerItem(url: url)
+            item.preferredPeakBitRate = 900_000        // a preview, not the episode
+            let queue = AVQueuePlayer()
+            queue.isMuted = true
+            queue.preventsDisplaySleepDuringVideoPlayback = false
+            looper = AVPlayerLooper(player: queue, templateItem: item)
+            player = queue
+            queue.play()
+            // Fade in once the item actually plays (a black frame otherwise).
+            for _ in 0..<40 where !ready {
+                try? await Task.sleep(for: .milliseconds(150))
+                if queue.timeControlStatus == .playing { ready = true }
+            }
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+            looper = nil
+        }
     }
 }

@@ -22,9 +22,16 @@ class SeriesSummary(BaseModel):
     cover_wide_url: str = ""          # 16:9 billboard
 
 
+class CastMember(BaseModel):
+    name: str
+    role: str                         # Lead | Support | Antagonist
+
+
 class SeriesDetail(SeriesSummary):
     synopsis: str
+    title_native: str = ""            # title in the series' own script
     tropes: list[str] = Field(default_factory=list)
+    cast: list[CastMember] = Field(default_factory=list)
     free_episode_count: int
     episode_coin_price: int
     bundle_discount_pct: int
@@ -38,6 +45,18 @@ class HomeRow(BaseModel):
 
 class HomeResponse(BaseModel):
     rows: list[HomeRow]
+
+
+class SearchPerson(BaseModel):
+    name: str
+    role: str
+    series: list[SeriesSummary]
+
+
+class SearchResponse(BaseModel):
+    query: str
+    series: list[SeriesSummary]
+    people: list[SearchPerson]
 
 
 class WalletResponse(BaseModel):
@@ -67,6 +86,18 @@ class PlaybackLocked(BaseModel):
     bundle_offer_coins: int | None = None   # unlock-all price after 25% bundle discount
 
 
+class CaptionTrack(BaseModel):
+    lang: str                 # file stem under media/{slug}/e{NNN}/subs/, e.g. "en"
+    label: str                # human name, e.g. "English"
+    url: str                  # served under the SAME stream token as the HLS tree
+
+
+class AudioTrack(BaseModel):
+    lang: str
+    label: str
+    kind: str = "original"    # original | dub
+
+
 class PlaybackGranted(BaseModel):
     locked: bool = False
     episode_id: str
@@ -74,7 +105,8 @@ class PlaybackGranted(BaseModel):
     hls_master_url: str
     expires_at: str
     resume_position_ms: int = 0
-    captions: list[dict] = Field(default_factory=list)
+    captions: list[CaptionTrack] = Field(default_factory=list)
+    audio: list[AudioTrack] = Field(default_factory=list)
 
 
 class UnlockRequest(BaseModel):
@@ -142,13 +174,15 @@ class UserProfileResponse(BaseModel):
     user_id: str
     kind: str
     display_name: str
-    language: str
+    language: str                     # content language: hi | ta | te
+    ui_language: str = "en"           # app chrome language: en | hi
     phone: str | None = None
 
 
 class UserProfilePatch(BaseModel):
     display_name: str | None = None
     language: str | None = None
+    ui_language: str | None = None
 
 
 # ---- engagement -----------------------------------------------------------
@@ -172,8 +206,13 @@ class ContinueItem(BaseModel):
     episode_id: str
     position_ms: int
     duration_ms: int
-    title: str
+    title: str                        # series title (kept for existing clients)
     percent: int
+    series_title: str = ""            # same as `title`, explicit for the full-list screen
+    episode_title: str = ""
+    cover_url: str = ""               # 9:16 poster
+    cover_wide_url: str = ""          # 16:9 billboard
+    updated_at: str = ""              # ISO-8601 of the last progress report
 
 
 class ContinueResponse(BaseModel):
@@ -183,6 +222,10 @@ class ContinueResponse(BaseModel):
 class MyListResponse(BaseModel):
     slugs: list[str]
     series: list[SeriesSummary]
+
+
+class RemindersResponse(BaseModel):
+    slugs: list[str]                  # series with "remind me when a new episode drops" on
 
 
 class CheckinResponse(BaseModel):
@@ -197,7 +240,8 @@ AuthToken.model_rebuild()
 
 # ---- back-office draft (admin review #043) -----------------------------------
 CONTENT_RATINGS = ("U", "U/A 7+", "U/A 13+", "U/A 16+", "A")   # IT Rules 2021
-LANGUAGES = ("hi", "ta", "te")
+LANGUAGES = ("hi", "ta", "te")            # content languages
+UI_LANGUAGES = ("en", "hi")               # app-chrome languages
 
 
 class SeriesDraft(BaseModel):

@@ -34,6 +34,35 @@ TAGLINES = {
     "nalugu-ghantalu": "The same four hours, until he asks the right question."
 }
 
+# slug -> billed cast. Fictional performers (owned placeholder slate, bible 2.1);
+# the roles follow the bible's "cast of six" where one is written. Drives
+# people search (GET /v1/search) and the series-page cast strip.
+CAST = {
+    "kaanch-ka-mahal": [("Aditi Rawal", "Lead"), ("Rohan Mehrotra", "Lead"),
+                        ("Nandita Kulshreshtha", "Antagonist"), ("Vikrant Bajaj", "Support")],
+    "ceo-sahab": [("Sana Qureshi", "Lead"), ("Arjun Talwar", "Lead"), ("Yashpal Nagar", "Support")],
+    "dilli-6-ka-raaz": [("Imran Siddiqui", "Lead"), ("Ritika Chauhan", "Support"),
+                        ("Dev Malhotra", "Antagonist")],
+    "saat-pheron-ka-sauda": [("Kritika Sehgal", "Lead"), ("Aryan Bhargava", "Lead"),
+                             ("Usha Rathore", "Support")],
+    "raja-ki-beti": [("Pooja Shekhawat", "Lead"), ("Kunal Rajvanshi", "Antagonist"),
+                     ("Mohan Choudhary", "Support")],
+    "neend-se-pehle": [("Tara Mishra", "Lead"), ("Nikhil Dubey", "Antagonist"), ("Farhan Ali", "Support")],
+    "kabir-ka-kanoon": [("Siddharth Awasthi", "Lead"), ("Manav Tiwari", "Support"),
+                        ("Renuka Joshi", "Antagonist")],
+    "nizam-ka-sauda": [("Faisal Baig", "Lead"), ("Zoya Hashmi", "Support"), ("Sharat Reddy", "Antagonist")],
+    "kadhal-kanakku": [("Divya Sundaram", "Lead"), ("Ashwin Rajan", "Lead"), ("Sathya Moorthy", "Antagonist")],
+    "vetri-vaasal": [("Keerthana Pillai", "Lead"), ("Vignesh Kumar", "Support"),
+                     ("Bala Ganesan", "Support"), ("Naveen Chandran", "Antagonist")],
+    "sunday-sambar": [("Lakshmi Venkatesan", "Lead"), ("Gopi Ramaswamy", "Support"),
+                      ("Meenakshi Iyer", "Support")],
+    "prema-pariksha": [("Nikhila Yadagiri", "Lead"), ("Rahul Vemula", "Lead"),
+                       ("Chandra Mohan Rao", "Support"), ("Suresh Kondapalli", "Antagonist")],
+    "rajahmundry-rani": [("Lavanya Peddi", "Lead"), ("Srinivas Kota", "Antagonist"), ("Anand Dasari", "Support")],
+    "nalugu-ghantalu": [("Teja Bandaru", "Lead"), ("Amrutha Lingala", "Support"),
+                        ("Kishore Yerramilli", "Antagonist")],
+}
+
 # slug, title, native, meaning, lang, genres, tropes, tier, eps, drop, rating, descriptors, hue, synopsis
 SERIES = [
     ("kaanch-ka-mahal", "Kaanch Ka Mahal", "काँच का महल", "The Glass Mansion", "hi",
@@ -162,6 +191,7 @@ def build():
             "release_mode": drop,
             "content_rating": rating,
             "rating_descriptors": descriptors,
+            "cast": [{"name": n, "role": r} for (n, r) in CAST[slug]],
             "episode_count": eps,
             "free_episode_count": PRICING["free_episode_count"],
             "cover_hue": hue,

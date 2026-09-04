@@ -214,3 +214,67 @@ export function Sev({ level, children }: { level: "danger" | "warn" | "info" | "
                                             children: ReactNode }) {
   return <span className={`sev sev-${level}`}>{children}</span>;
 }
+
+// ---- business-board pieces shared by Overview (compact), Analytics and Finance
+/** Period-over-period change. */
+export function Delta({ cur, prev }: { cur: number; prev: number }) {
+  if (!prev) return cur ? <span className="delta">new</span> : null;
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  if (pct === 0) return <span className="delta muted">±0%</span>;
+  return (
+    <span className={pct < 0 ? "delta down" : "delta"}>
+      {pct > 0 ? "▲" : "▼"} {Math.abs(pct)}%
+    </span>
+  );
+}
+
+/** One business metric with its period delta + optional 30-day sparkline. */
+export function Metric({ label, value, cur, prev, spark }:
+                       { label: string; value: string; cur: number; prev: number;
+                         spark?: number[] }) {
+  return (
+    <div className="kpi">
+      <div className="lbl">{label}</div>
+      <div className="val">{value}</div>
+      <Delta cur={cur} prev={prev} />
+      {spark ? <div style={{ marginTop: 6 }}><Spark points={spark} /></div> : null}
+    </div>
+  );
+}
+
+export function Funnel({ f }: { f: { paywall_view: number; purchase: number; unlock: number } }) {
+  const stages = [
+    { label: "Saw the paywall", n: f.paywall_view },
+    { label: "Bought coins", n: f.purchase },
+    { label: "Unlocked an episode", n: f.unlock },
+  ];
+  const max = Math.max(f.paywall_view, 1);
+  return (
+    <div className="funnel">
+      {stages.map((s, i) => {
+        const prev = i === 0 ? s.n : stages[i - 1].n;
+        const drop = i > 0 && prev > 0
+          ? ` · ${Math.round(((prev - s.n) / prev) * 100)}% drop`
+          : "";
+        return (
+          <div key={s.label} className="fstage">
+            <div className="fbar" style={{ width: `${(s.n / max) * 100}%` }} />
+            <span>{s.label}</span>
+            <b className="mono">{fmtN(s.n)}{drop}</b>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Filter chip (selected = accent tint + border), per the design system. */
+export function Chip({ on, onClick, children }:
+                     { on?: boolean; onClick?: () => void; children: ReactNode }) {
+  return (
+    <button type="button" className={on ? "chip on" : "chip"} onClick={onClick}
+            aria-pressed={!!on}>
+      {children}
+    </button>
+  );
+}

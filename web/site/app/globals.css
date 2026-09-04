@@ -234,17 +234,85 @@ footer.site { border-top: 1px solid var(--line); padding: 56px 0 40px; color: va
 .ocard .balance small { color: var(--text2); font-weight: 500; }
 .ocard .olink { display: inline-block; margin-top: 6px; color: var(--text2); font-size: 13px; }
 
+/* ---- browse / search / my list ---- */
+.muted { color: var(--text2); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; padding: 18px max(20px,4vw) 0; }
+.chip { height: 34px; padding: 0 15px; border-radius: 999px; background: var(--surface); color: var(--text2); font-size: 13.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; border: 1px solid transparent; }
+.chip.on { background: rgba(255,92,58,.16); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.chip[disabled] { opacity: .6; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; padding: 20px max(20px,4vw); max-width: 1200px; margin: 0 auto; }
+.cardactions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.cardactions .chip { height: 30px; padding: 0 11px; font-size: 12.5px; }
+.empty { padding: 80px 20px; text-align: center; color: var(--text2); }
+.empty h3 { color: var(--text); margin: 0 0 6px; font-size: 18px; }
+.empty p { margin: 0 0 18px; font-size: 14px; }
+.rowhead { display: flex; align-items: baseline; justify-content: space-between; padding-top: 22px; }
+.rowhead h2 { margin: 0; font-size: 20px; }
+.searchinput { width: 100%; box-sizing: border-box; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; color: var(--text); padding: 13px 18px; font: inherit; font-size: 16px; }
+.person { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.personrow { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: left; color: var(--text); font-size: 14px; }
+.personrow > span:nth-child(2) { flex: 1; }
+.person .grid { padding: 4px 14px 14px; }
+
+/* ---- profile ---- */
+.phead { display: flex; align-items: center; gap: 16px; padding-top: 34px; }
+.phead .avatar { width: 56px; height: 56px; font-size: 22px; }
+.phead h1 { margin: 0; font-size: 24px; letter-spacing: -.02em; }
+.phead p { margin: 4px 0 0; color: var(--text2); font-size: 14px; }
+.pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 22px; padding-bottom: 50px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 20px 22px; }
+.panel h3 { margin: 0 0 8px; font-size: 16px; }
+.setrow { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 14px; }
+.setrow:last-child { border-bottom: 0; }
+.setrow .d { flex: 1; }
+.setrow .d span { display: block; font-size: 12.5px; color: var(--text2); }
+.confirm { margin-top: 10px; padding: 14px; border-radius: 12px; background: rgba(229,72,77,.08); border: 1px solid rgba(229,72,77,.35); font-size: 13.5px; }
+.confirm p { margin: 0 0 12px; color: var(--text2); }
+.lockform { margin-top: 12px; }
+.pininput { display: block; width: 140px; margin: 0 auto 14px; text-align: center; letter-spacing: .5em; font-size: 24px; font-weight: 700; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; color: var(--text); padding: 12px 0 12px .5em; }
+
+/* ---- player rail + end card ---- */
+.prail { position: absolute; right: 12px; bottom: 120px; display: flex; flex-direction: column; gap: 10px; z-index: 5; }
+.prail button { width: 44px; height: 44px; border-radius: 50%; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; background: rgba(0,0,0,.35); backdrop-filter: blur(6px); font-size: 18px; line-height: 1; }
+.prail button small { font-size: 9px; font-weight: 700; margin-top: 2px; max-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prail button[aria-pressed="true"] { color: var(--accent); }
+
+/* ---- work with us ---- */
+.aud { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.aud article { background: var(--raised, var(--surface)); border-radius: 18px; padding: 28px 26px; display: flex; flex-direction: column; }
+.aud h3 { margin: 0 0 8px; font-size: 22px; letter-spacing: -.015em; }
+.aud p { margin: 0 0 16px; color: var(--text2); }
+.aud ul { margin: 0 0 20px; padding-left: 18px; color: var(--text2); font-size: 15px; }
+.aud ul li { margin: 6px 0; }
+.aud .btn { margin-top: auto; align-self: flex-start; }
+.tiers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.tier { background: var(--raised, var(--surface)); border-radius: 14px; padding: 20px; }
+.tier b { display: block; font-size: 17px; }
+.tier span { color: var(--coin); font-weight: 600; display: block; margin: 6px 0 8px; }
+.tier p { margin: 0; color: var(--text2); font-size: 14px; }
+.process { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; counter-reset: pr; }
+.process div { background: var(--surface); border-radius: 14px; padding: 18px; }
+.process div::before { counter-increment: pr; content: counter(pr); color: var(--accent); font-weight: 800; font-size: 22px; display: block; margin-bottom: 8px; }
+.process b { display: block; margin-bottom: 4px; }
+.process p { margin: 0; color: var(--text2); font-size: 14px; }
+.formgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--text2); }
+.field input, .field select, .field textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; color: var(--text); padding: 14px; font: inherit; }
+.field textarea { min-height: 120px; resize: vertical; }
+.field.full, .formgrid .full { grid-column: 1 / -1; }
+
 /* ---- responsive ---- */
 @media (max-width: 1000px) {
   .hero { grid-template-columns: 1fr; padding-top: 40px; }
   .herophones { order: -1; }
   .cards { grid-template-columns: repeat(3, 1fr); }
-  .steps, .why { grid-template-columns: 1fr 1fr; }
+  .steps, .why, .aud, .tiers { grid-template-columns: 1fr 1fr; }
+  .process { grid-template-columns: repeat(3, 1fr); }
   .fgrid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 680px) {
   .links { display: none; }
   .cards { grid-template-columns: repeat(2, 1fr); }
-  .steps, .why, .fgrid { grid-template-columns: 1fr; }
+  .steps, .why, .fgrid, .aud, .tiers, .process, .formgrid, .pgrid { grid-template-columns: 1fr; }
   section.band { padding: 56px 0; }
 }

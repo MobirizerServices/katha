@@ -235,6 +235,48 @@ export interface Policy {
   min_app_version: string;
 }
 
+// ---- wave-2 back-office views -----------------------------------------------
+export type QcStatus = "pending" | "passed" | "failed";
+export interface QcVerdict { status: QcStatus; note: string; by: string; at: string }
+export interface MediaQcEpisode { number: number; title: string; hasMedia: boolean; qc: QcVerdict }
+export interface MediaQcSeries {
+  slug: string; title: string; episodeCount: number;
+  episodes_with_media: number; episodes_missing: number;
+  qc: Record<QcStatus, number>;
+  episodes: MediaQcEpisode[];
+}
+
+export interface ModerationItem {
+  id: string; kind: "rating" | "grievance"; title: string; detail: string;
+  at: string; to: string;
+  slug?: string; rating?: string; by?: string;
+  gid?: string; status?: string; channel?: string;
+  reviewed?: { by: string; at: string; note: string };
+}
+
+export type LocStatus = "none" | "in_progress" | "done";
+export interface LocCell { status: LocStatus; owner: string; due: string; by: string; at: string }
+export interface LocSeries {
+  slug: string; title: string; primary: string; language: string;
+  langs: Record<string, Record<string, LocCell>>;
+}
+
+export interface WritersRow {
+  slug: string; title: string; episodeCount: number; completeness_pct: number;
+  hooks: number; outlines: number; by: string; updated_at: string;
+}
+export interface Outline { number: number; beat: string }
+export interface WritersWorkspace {
+  slug: string; title: string; episodeCount: number; completeness_pct: number;
+  logline: string; hooks: string[]; episode_outlines: Outline[]; notes: string;
+  by: string; updated_at: string;
+}
+
+export interface ProgrammingRow {
+  slug: string; title: string; language: string; episodeCount: number;
+  status: string; release_at: string; scheduled_by: string; scheduled_at: string;
+}
+
 export const api = {
   async getOverview(): Promise<Overview> {
     return get<Overview>("/overview", MOCK_OVERVIEW, 0, null as unknown as Overview);
@@ -365,6 +407,27 @@ export const api = {
                            last_seen: string }[] }> {
     return get(`/users/${userId}/devices`, { devices: [] });
   },
+  // Wave-2 boards: offline shows an honest empty board (the banner says why),
+  // never sample verdicts or schedules that could pass for real ones.
+  async mediaQc(): Promise<{ series: MediaQcSeries[]; generated_at: string }> {
+    return get("/media/qc", { series: [], generated_at: "" });
+  },
+  async moderation(): Promise<{ items: ModerationItem[]; open: number }> {
+    return get("/moderation", { items: [], open: 0 });
+  },
+  async localization(): Promise<{ series: LocSeries[]; languages: string[]; kinds: string[] }> {
+    return get("/localization",
+               { series: [], languages: ["hi", "ta", "te"], kinds: ["dub", "sub"] });
+  },
+  async writersIndex(): Promise<{ series: WritersRow[] }> {
+    return get("/writers", { series: [] });
+  },
+  async writersWorkspace(slug: string): Promise<WritersWorkspace | null> {
+    return get<WritersWorkspace | null>(`/writers/${slug}`, null);
+  },
+  async programming(): Promise<{ series: ProgrammingRow[]; now: string }> {
+    return get("/programming", { series: [], now: "" });
+  },
 };
 
 /** Mutations. Every call resolves to the parsed body, or `{ offline: true }`
@@ -447,4 +510,21 @@ export const mutate = {
     send(`/audit/${id}/note`, "PATCH", { note }),
   notifyDrop: (slug: string, episode: number, resend = false) =>
     send(`/catalog/series/${slug}/notify-drop`, "POST", { episode, resend }),
+  setQc: (slug: string, number: number, status: QcStatus, note = "") =>
+    send(`/media/qc/${slug}/${number}`, "PATCH", { status, note }),
+  modReviewed: (id: string, note = "") =>
+    send(`/moderation/${encodeURIComponent(id)}/reviewed`, "POST", { note }),
+  setLocalization: (slug: string, cell: { lang: string; kind: string; status: LocStatus;
+                                          owner: string; due: string }) =>
+    send(`/localization/${slug}`, "PATCH", cell),
+  saveWriters: (slug: string, ws: { logline: string; hooks: string[];
+                                    episode_outlines: Outline[]; notes: string }) =>
+    send(`/writers/${slug}`, "PUT", ws),
+  setSchedule: (slug: string, releaseAt: string) =>
+    send(`/catalog/series/${slug}/schedule`, "PATCH",
+         { release_at: releaseAt, confirm: slug }),
+  // The typed "PRICING" confirm is what the operator entered — never auto-filled.
+  bulkPricing: (slugs: string[], fields: { coin_price?: number; free_episodes?: number },
+                confirm: string) =>
+    send("/catalog/pricing/bulk", "POST", { slugs, ...fields, confirm }),
 };

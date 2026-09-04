@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { coverUrl, jsonLdString } from "@/lib/catalog";
 import SiteFooter from "@/components/SiteFooter";
+import PitchForm, { PARTNERS_EMAIL } from "@/components/PitchForm";
 import {
   SERIES,
   COIN_PACKS,
@@ -320,6 +321,96 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ---- work with us: studios, brands, creators ---- */}
+      <div id="business">
+        <section className="band alt" id="pitch-intro">
+          <div className="wrap">
+            <h2 className="sec">Make the next binge.</h2>
+            <p className="lead2">
+              Katha commissions Indian-language micro-dramas from studios, places brands inside stories instead
+              of between them, and pays creators for the audiences they bring.
+            </p>
+            <div className="trust" style={{ marginTop: 0, marginBottom: 32 }}>
+              <span><i className="dot" />Every series in 3 languages within 24 hours</span>
+              <span><i className="dot" />Greenlight decisions in 10 working days</span>
+              <span><i className="dot" />Payment on delivery, not on performance</span>
+            </div>
+            <div className="aud">
+              <article id="studios">
+                <h3>Studios and production houses</h3>
+                <p>We commission 50–100 episode vertical series in Hindi, Tamil and Telugu, and license finished catalogues for dubbing.</p>
+                <ul>
+                  <li>Budget tiers from lean single-location series to star-led tentpoles</li>
+                  <li>Six-week concept-to-master schedule on core titles</li>
+                  <li>We handle subtitles, dubs, marketing clips and distribution</li>
+                  <li>Rights buyout with sequel options; payment on delivery</li>
+                </ul>
+                <a className="btn p" href="#pitch">Pitch a series</a>
+              </article>
+              <article id="brands">
+                <h3>Brands and agencies</h3>
+                <p>Your product as a character in a story people chose to watch — not an interruption they skip.</p>
+                <ul>
+                  <li>Branded micro-drama series (5–20 episodes) written around your brief</li>
+                  <li>Integrations inside existing hits; sponsored premieres</li>
+                  <li>Ad-free environment: 100% of attention is on the story</li>
+                  <li>Reported on completion, replays, saves and brand recall</li>
+                </ul>
+                <a className="btn p" href="#pitch">Talk to us</a>
+              </article>
+              <article id="creators">
+                <h3>Creators</h3>
+                <p>Share the series you love and earn on every first purchase your audience makes.</p>
+                <ul>
+                  <li>20% of first purchases for 90 days after install</li>
+                  <li>Early access to premieres and cast collaborations</li>
+                  <li>Ready-made clips with your own link, in your language</li>
+                  <li>Monthly payouts by UPI; transparent dashboard</li>
+                </ul>
+                <a className="btn p" href="#pitch">Join the creator program</a>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="band">
+          <div className="wrap">
+            <h2 className="sec">What we commission</h2>
+            <p className="lead2">
+              Four budget tiers, one quality bar. Every series is shot vertical, delivered to our technical spec,
+              and released in three languages.
+            </p>
+            <div className="tiers">
+              <div className="tier"><b>Tentpole</b><span>Star-led · 60–100 episodes</span><p>One a month. Recognizable lead, premiere event, marketing anchor for the whole slate.</p></div>
+              <div className="tier"><b>Core original</b><span>60 episodes · 8–10 shoot days</span><p>The bulk of what we make. Romance, family drama, revenge, thriller, fantasy and comedy.</p></div>
+              <div className="tier"><b>Lean original</b><span>45–60 episodes · 3–5 shoot days</span><p>Single location, small cast, AI-assisted post. Fast, frequent, experimental.</p></div>
+              <div className="tier"><b>Licensed catalogue</b><span>Finished series · dubbed</span><p>Chinese, Korean and Turkish micro-dramas we adapt and dub for Indian audiences.</p></div>
+            </div>
+            <div style={{ marginTop: 48 }}>
+              <h2 className="sec" style={{ fontSize: 28 }}>How a series gets made with us</h2>
+              <div className="process">
+                <div><b>Pitch</b><p>A one-page premise, tropes, language and budget tier. We reply within 10 working days.</p></div>
+                <div><b>Greenlight</b><p>Outline and pilot cut tested with real viewers in the target language.</p></div>
+                <div><b>Produce</b><p>Your crew, our spec and QC. Six weeks for a core title.</p></div>
+                <div><b>Launch</b><p>Subtitles and dubs within 24 hours; clip factory and paid campaigns from day one.</p></div>
+                <div><b>Get paid</b><p>On delivery and acceptance. Bonus for titles that pass 3× payback.</p></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="band alt" id="pitch">
+          <div className="wrap" style={{ maxWidth: 860 }}>
+            <h2 className="sec">Tell us what you want to make</h2>
+            <p className="lead2">
+              Studios, brands and creators use the same form — it opens in your mail app addressed to{" "}
+              <a href={`mailto:${PARTNERS_EMAIL}`}>{PARTNERS_EMAIL}</a>. We reply within three working days.
+            </p>
+            <PitchForm />
+          </div>
+        </section>
+      </div>
 
       <SiteFooter />
     </>

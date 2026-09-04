@@ -7,7 +7,13 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from .schemas import Episode, SeriesDetail, SeriesSummary
+from .schemas import CastMember, Episode, SeriesDetail, SeriesSummary
+
+LANGUAGE_NAMES = {"en": "English", "hi": "Hindi", "ta": "Tamil", "te": "Telugu"}
+
+
+def language_name(code: str) -> str:
+    return LANGUAGE_NAMES.get(code, code.upper())
 
 DEFAULT_SEED = (
     Path(__file__).resolve().parents[3]
@@ -46,7 +52,9 @@ def all_series() -> list[SeriesDetail]:
                 cover_url=f"{base}/media/{s['slug']}/cover_9x16.jpg",
                 cover_wide_url=f"{base}/media/{s['slug']}/cover_16x9.jpg",
                 synopsis=s["synopsis"],
+                title_native=s.get("title_native") or "",
                 tropes=s.get("tropes", []),
+                cast=[CastMember(**c) for c in s.get("cast", [])],
                 free_episode_count=prof["free_episode_count"],
                 episode_coin_price=prof["episode_coin_price"],
                 bundle_discount_pct=prof["bundle_discount_pct"],

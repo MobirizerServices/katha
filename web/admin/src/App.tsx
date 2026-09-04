@@ -20,6 +20,14 @@ const Audit = lazy(() => import("./views/Audit").then((m) => ({ default: m.Audit
 const Grievances = lazy(() => import("./views/Grievances").then((m) => ({ default: m.Grievances })));
 const Access = lazy(() => import("./views/Access").then((m) => ({ default: m.Access })));
 const Outbox = lazy(() => import("./views/Outbox").then((m) => ({ default: m.Outbox })));
+const Media = lazy(() => import("./views/Media").then((m) => ({ default: m.Media })));
+const Moderation = lazy(() => import("./views/Moderation").then((m) => ({ default: m.Moderation })));
+const Localization = lazy(() => import("./views/Localization").then((m) => ({ default: m.Localization })));
+const Writers = lazy(() => import("./views/Writers").then((m) => ({ default: m.Writers })));
+const Programming = lazy(() => import("./views/Programming").then((m) => ({ default: m.Programming })));
+const Finance = lazy(() => import("./views/Finance").then((m) => ({ default: m.Finance })));
+const Analytics = lazy(() => import("./views/Analytics").then((m) => ({ default: m.Analytics })));
+const Components = lazy(() => import("./views/Components").then((m) => ({ default: m.Components })));
 
 function Denied({ view }: { view: string }) {
   const { role } = useStore();
@@ -321,6 +329,14 @@ export default function App() {
                 <Route path="/audit" element={<Guard view="audit"><Audit /></Guard>} />
                 <Route path="/outbox" element={<Guard view="outbox"><Outbox /></Guard>} />
                 <Route path="/access" element={<Guard view="access"><Access /></Guard>} />
+                <Route path="/media" element={<Guard view="media"><Media /></Guard>} />
+                <Route path="/moderation" element={<Guard view="moderation"><Moderation /></Guard>} />
+                <Route path="/localization" element={<Guard view="localization"><Localization /></Guard>} />
+                <Route path="/writers" element={<Guard view="writers"><Writers /></Guard>} />
+                <Route path="/programming" element={<Guard view="programming"><Programming /></Guard>} />
+                <Route path="/finance" element={<Guard view="finance"><Finance /></Guard>} />
+                <Route path="/analytics" element={<Guard view="analytics"><Analytics /></Guard>} />
+                <Route path="/components" element={<Guard view="components"><Components /></Guard>} />
                 <Route path="*" element={<Navigate to="/overview" replace />} />
               </Routes>
             </Suspense>

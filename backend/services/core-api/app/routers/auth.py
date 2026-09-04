@@ -12,6 +12,7 @@ import uuid
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from katha_domain.schemas import (
+    UI_LANGUAGES,
     AppleAuthBody,
     AuthToken,
     OtpRequestBody,
@@ -95,7 +96,7 @@ def _profile_response(user_id: str) -> UserProfileResponse:
     u = store.get_or_create_user(user_id)
     return UserProfileResponse(
         user_id=u.user_id, kind=u.kind, display_name=u.display_name,
-        language=u.language, phone=u.phone,
+        language=u.language, ui_language=u.ui_language, phone=u.phone,
     )
 
 
@@ -214,7 +215,26 @@ def patch_me(body: UserProfilePatch, user: str = Depends(current_user)) -> UserP
         if body.language not in ("hi", "ta", "te"):
             raise HTTPException(status_code=400, detail="language must be hi | ta | te")
         u.language = body.language
+        store.persist_profile(user)
+    if body.ui_language is not None:
+        if body.ui_language not in UI_LANGUAGES:
+            raise HTTPException(status_code=400,
+                                detail=f"ui_language must be one of {' | '.join(UI_LANGUAGES)}")
+        u.ui_language = body.ui_language
     return _profile_response(user)
+
+
+@router.post("/me/signout-devices", response_model=AuthToken)
+def signout_devices(user: str = Depends(current_user)) -> AuthToken:
+    """Sign out everywhere else: bump this user's token_version so every JWT
+    issued before now stops validating, then hand THIS device a fresh token
+    (issued under the new version). Without persistence there is no version
+    to move, so it is a no-op that still returns a fresh token."""
+    store.get_or_create_user(user)          # ensures the shared profile row exists
+    if store.shared is not None:
+        store.shared.bump_token_version(user)
+    store.emit(user, "signout_devices")
+    return _token(user)
 
 
 @router.delete("/me")

@@ -37,6 +37,10 @@ struct KathaApp: App {
         WindowGroup {
             RootView()
                 .environment(model)
+                // App language (Settings → App language): system-formatted
+                // pieces (dates, numbers, VoiceOver) follow it; the chrome
+                // strings come from L10n.
+                .environment(\.locale, Locale(identifier: model.uiLanguage))
                 .preferredColorScheme(.dark)
                 .tint(Katha.Color.accent)
         }
@@ -81,6 +85,8 @@ final class AppModel {
     var continueItems: [ContinueItem] = []
     var myListSlugs: Set<String> = []
     var myListSeries: [SeriesSummary] = []
+    /// Series with the new-episode bell on (`/v1/me/reminders`).
+    var reminderSlugs: Set<String> = []
 
     // Check-in
     var checkinClaimedToday = false
@@ -96,6 +102,15 @@ final class AppModel {
     private let defaults = UserDefaults.standard
     var contentLanguage = "hi" {
         didSet { defaults.set(contentLanguage, forKey: "katha.lang") }
+    }
+    /// App (UI) language — en | hi. Separate from the content languages.
+    /// Persisted locally and mirrored to the profile (PATCH /v1/me ui_language).
+    var uiLanguage = "en" {
+        didSet { defaults.set(uiLanguage, forKey: "katha.uilang") }
+    }
+    /// Home hero autoplays a muted preview (mockup 4.2 "Autoplay trailers").
+    var previewsMuted = true {
+        didSet { defaults.set(previewsMuted, forKey: "katha.previews.muted") }
     }
     var onboarded = false {
         didSet { defaults.set(onboarded, forKey: "katha.onboarded") }
@@ -146,7 +161,8 @@ final class AppModel {
         if env["KATHA_RESET"] != nil {
             for key in ["katha.token", "katha.onboarded", "katha.lang", "katha.interests",
                         "katha.autounlock", "katha.datasaver", "katha.pin", "katha.alerts",
-                        "katha.checkin.day", "katha.recentSearches", "katha.coachmarks.seen"] {
+                        "katha.checkin.day", "katha.recentSearches", "katha.coachmarks.seen",
+                        "katha.uilang", "katha.previews.muted", "katha.captions.lang"] {
                 UserDefaults.standard.removeObject(forKey: key)
             }
             KeychainStore.delete(Self.tokenKey)
@@ -187,6 +203,9 @@ final class AppModel {
         // Load persisted preferences into the observed stored properties.
         let d = UserDefaults.standard
         contentLanguage = d.string(forKey: "katha.lang") ?? "hi"
+        uiLanguage = d.string(forKey: "katha.uilang") ?? "en"
+        previewsMuted = d.object(forKey: "katha.previews.muted") == nil
+            ? true : d.bool(forKey: "katha.previews.muted")
         // UI-test hook: KATHA_ONBOARDED skips onboarding without persisting.
         onboarded = env["KATHA_ONBOARDED"] != nil || d.bool(forKey: "katha.onboarded")
         interests = d.stringArray(forKey: "katha.interests") ?? []
@@ -336,7 +355,7 @@ final class AppModel {
         storedToken = nil
         profile = nil
         wallet = WalletStore()
-        continueItems = []; myListSlugs = []; myListSeries = []
+        continueItems = []; myListSlugs = []; myListSeries = []; reminderSlugs = []
         await api.setAuthToken(nil)
         await startGuest()
         await refreshWallet()
@@ -381,11 +400,31 @@ final class AppModel {
         storedToken = nil
         profile = nil
         wallet = WalletStore()
-        continueItems = []; myListSlugs = []; myListSeries = []
+        continueItems = []; myListSlugs = []; myListSeries = []; reminderSlugs = []
         await api.setAuthToken(nil)
         await startGuest()
         await refreshWallet()
     }
+
+    /// "Sign out of other devices": the server rotates the session and hands
+    /// THIS device a fresh token, so only the current phone stays signed in.
+    func signOutOtherDevices() async -> Bool {
+        guard let auth = try? await api.signOutDevices() else { return false }
+        storedToken = auth.accessToken
+        profile = auth.user
+        return true
+    }
+
+    /// Change the app language: persisted at once (the UI re-renders), then
+    /// mirrored to the profile so the next device picks it up.
+    func setUILanguage(_ lang: String) {
+        guard uiLanguage != lang else { return }
+        uiLanguage = lang
+        Task { if let me = try? await api.updateMe(uiLanguage: lang) { profile = me } }
+    }
+
+    /// App-language string lookup (see Strings.swift).
+    func t(_ key: String) -> String { L10n.string(key, lang: uiLanguage) }
 
     /// Account deletion (App Store requirement). Ledger is retained server-side.
     func deleteAccount() async {
@@ -438,7 +477,46 @@ final class AppModel {
             myListSlugs = Set(list.slugs)
             myListSeries = list.series
         }
+        // Reminders are additive to the session: a server without the
+        // endpoint yet leaves whatever the bell toggled locally.
+        if let r = try? await api.reminders() { reminderSlugs = Set(r.slugs) }
     }
+
+    /// New-episode reminder bell for a series. Optimistic; the server's list
+    /// wins when it answers, and a failed call leaves the optimistic state so
+    /// the bell never flips back under the finger.
+    func toggleReminder(slug: String) async {
+        let wasOn = reminderSlugs.contains(slug)
+        if wasOn { reminderSlugs.remove(slug) } else { reminderSlugs.insert(slug) }
+        let result = wasOn
+            ? try? await api.removeReminder(slug: slug)
+            : try? await api.addReminder(slug: slug)
+        if let result { reminderSlugs = Set(result.slugs) }
+    }
+
+    /// `/v1/search` (series + people). The DEBUG harness may answer locally so
+    /// the UI test for the People section does not depend on the endpoint.
+    func search(_ q: String) async throws -> SearchResponse {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["KATHA_STUB_SEARCH"] == "1" {
+            return Self.stubSearch(q, lang: contentLanguage, catalog: feed.allSeries)
+        }
+        #endif
+        return try await api.search(q: q, lang: contentLanguage)
+    }
+
+    #if DEBUG
+    /// Title match over the cached feed plus one canned person (the seed
+    /// catalog's Kaanch Ka Mahal lead) — UI-test scaffolding only.
+    static func stubSearch(_ q: String, lang: String, catalog: [SeriesSummary]) -> SearchResponse {
+        let needle = q.lowercased()
+        let series = catalog.filter { $0.title.lowercased().contains(needle) }
+        let lead = catalog.first { $0.slug == "kaanch-ka-mahal" }
+        let people: [SearchPerson] = "aditi rawal".contains(needle) && lead != nil
+            ? [SearchPerson(name: "Aditi Rawal", role: "Lead", series: [lead!])] : []
+        return SearchResponse(query: q, series: series, people: people)
+    }
+    #endif
 
     func toggleMyList(slug: String) async {
         let wasSaved = myListSlugs.contains(slug)
@@ -466,6 +544,14 @@ final class AppModel {
         let all = feed.rows.flatMap(\.series) + myListSeries
         guard let s = all.first(where: { $0.slug == slug }) else { return "" }
         return wide ? s.coverWideUrl : s.coverUrl
+    }
+
+    /// Series title for a slug from the caches, else the slug prettified
+    /// ("kaanch-ka-mahal" → "Kaanch Ka Mahal").
+    func title(forSlug slug: String) -> String {
+        let all = feed.rows.flatMap(\.series) + myListSeries
+        if let s = all.first(where: { $0.slug == slug }) { return s.title }
+        return slug.split(separator: "-").map(\.capitalized).joined(separator: " ")
     }
 
     // MARK: Parental lock
@@ -535,13 +621,13 @@ struct MainTabView: View {
                 TabView {
                     tabStack(path: $homePath) { FeedView() }
                         .environment(\.zoomNamespace, heroZoom)
-                        .tabItem { Label("Home", systemImage: "play.rectangle.fill") }
+                        .tabItem { Label(model.t("tab.home"), systemImage: "play.rectangle.fill") }
                     tabStack { BrowseView() }
-                        .tabItem { Label("Browse", systemImage: "square.grid.2x2.fill") }
+                        .tabItem { Label(model.t("tab.browse"), systemImage: "square.grid.2x2.fill") }
                     tabStack { MyListView() }
-                        .tabItem { Label("My list", systemImage: "bookmark.fill") }
+                        .tabItem { Label(model.t("tab.mylist"), systemImage: "bookmark.fill") }
                     tabStack { ProfileView() }
-                        .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
+                        .tabItem { Label(model.t("tab.profile"), systemImage: "person.crop.circle.fill") }
                 }
                 .background(Katha.Color.bg)
             }
@@ -608,6 +694,12 @@ struct MainTabView: View {
             }
             .navigationDestination(for: EpisodeRoute.self) { route in
                 PlayerView(slug: route.slug, number: route.number)
+            }
+            // Search → person page. Registered here, not inside SearchView: a
+            // destination declared in the pushed view itself leaves its links
+            // disabled on iOS 17/18.
+            .navigationDestination(for: SearchPerson.self) { person in
+                PersonView(person: person)
             }
         return Group {
             if let path {

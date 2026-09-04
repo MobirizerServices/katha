@@ -15,7 +15,17 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 // The server's answer is the only access decision: stub it per test.
 const playback = vi.fn();
-vi.mock("@/lib/api", () => ({ api: { playback: (...a: unknown[]) => playback(...a) } }));
+const reminders = vi.fn();
+const addReminder = vi.fn();
+const removeReminder = vi.fn();
+vi.mock("@/lib/api", () => ({
+  api: {
+    playback: (...a: unknown[]) => playback(...a),
+    reminders: (...a: unknown[]) => reminders(...a),
+    addReminder: (...a: unknown[]) => addReminder(...a),
+    removeReminder: (...a: unknown[]) => removeReminder(...a),
+  },
+}));
 
 // hls.js is mocked so the MSE branch (what Chrome runs) is exercised in jsdom.
 type Handler = (evt: unknown, data: { fatal: boolean }) => void;
@@ -23,6 +33,7 @@ const hlsState = {
   supported: false,
   importFails: false,
   handlers: [] as Handler[],
+  subtitleTracks: [] as { lang?: string; name: string }[],
   loadSource: vi.fn(),
   attachMedia: vi.fn(),
   destroy: vi.fn(),
@@ -34,6 +45,9 @@ vi.mock("hls.js", () => {
       return hlsState.supported;
     }
     static Events = { ERROR: "hlsError" };
+    subtitleTracks = hlsState.subtitleTracks;
+    subtitleTrack = -1;
+    subtitleDisplay = false;
     loadSource(u: string) { hlsState.loadSource(u); }
     attachMedia(v: unknown) { hlsState.attachMedia(v); }
     on(_e: string, h: Handler) { hlsState.handlers.push(h); }
@@ -85,10 +99,14 @@ function makeWallet(over: Partial<WalletCtx> = {}): WalletCtx {
 beforeEach(() => {
   push.mockClear();
   playback.mockReset();
+  reminders.mockReset().mockResolvedValue({ slugs: [] });
+  addReminder.mockReset();
+  removeReminder.mockReset();
   mockWallet = makeWallet();
   hlsState.supported = false;
   hlsState.importFails = false;
   hlsState.handlers = [];
+  hlsState.subtitleTracks = [];
   hlsState.loadSource.mockClear();
   hlsState.attachMedia.mockClear();
   hlsState.destroy.mockClear();
@@ -239,11 +257,13 @@ describe("Player — paywall rendered from the server payload", () => {
     playback.mockResolvedValue(paywall({ balance: 100, bundle_offer_coins: 50 }));
     render(<Player series={series} n={11} />);
     await user.click(await screen.findByRole("button", { name: /Unlock for 30 coins/ }));
-    expect(toast).toHaveBeenLastCalledWith("Not enough coins — top up to unlock");
+    await waitFor(() => expect(toast).toHaveBeenLastCalledWith("Not enough coins — top up to unlock"));
+    await waitFor(() => expect(playback).toHaveBeenCalledTimes(2));   // re-asked after the refusal
     await user.click(await screen.findByRole("button", { name: /Unlock for 30 coins/ }));
-    expect(toast).toHaveBeenLastCalledWith("Couldn't confirm the unlock — you weren't charged");
+    await waitFor(() => expect(toast).toHaveBeenLastCalledWith("Couldn't confirm the unlock — you weren't charged"));
+    await waitFor(() => expect(playback).toHaveBeenCalledTimes(3));
     await user.click(await screen.findByRole("button", { name: /Unlock all/ }));
-    expect(toast).toHaveBeenLastCalledWith("Couldn't confirm the bundle — you weren't charged");
+    await waitFor(() => expect(toast).toHaveBeenLastCalledWith("Couldn't confirm the bundle — you weren't charged"));
   });
 
   it("a bundle the ledger refuses for funds is reported as such", async () => {
@@ -285,10 +305,21 @@ describe("SiteHeader", () => {
     expect(openSignIn).toHaveBeenCalled();
   });
 
-  it("shows the profile avatar initial when signed in", () => {
+  it("shows the profile avatar initial (linking to /profile) and the My list link when signed in", () => {
     mockWallet = makeWallet({ ready: true, signed: true, name: "Meera", balance: 0 });
     render(<SiteHeader />);
     expect(screen.getByLabelText("Profile")).toHaveTextContent("M");
+    expect(screen.getByLabelText("Profile")).toHaveAttribute("href", "/profile");
+    expect(screen.getByRole("link", { name: "My list" })).toHaveAttribute("href", "/mylist");
+  });
+
+  it("always links Browse, Search and the studios/brands anchor; My list only when signed in", () => {
+    mockWallet = makeWallet({ ready: true, signed: false });
+    render(<SiteHeader />);
+    expect(screen.getByRole("link", { name: "Browse" })).toHaveAttribute("href", "/browse");
+    expect(screen.getByRole("link", { name: "Search" })).toHaveAttribute("href", "/search");
+    expect(screen.getByRole("link", { name: "For studios & brands" })).toHaveAttribute("href", "/#business");
+    expect(screen.queryByRole("link", { name: "My list" })).not.toBeInTheDocument();
   });
 
   it("shows 0 before the wallet is ready", () => {
@@ -304,6 +335,9 @@ describe("SiteFooter", () => {
     expect(screen.getByRole("heading", { name: "Legal" })).toBeInTheDocument();
     expect(screen.getByText(/Grievance officer/)).toBeInTheDocument();
     expect(screen.getByText(/© 2026 Katha Media/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Creators" })).toHaveAttribute("href", "/#creators");
+    expect(screen.getByRole("link", { name: "Brands and agencies" })).toHaveAttribute("href", "/#brands");
+    expect(screen.getByRole("link", { name: "Browse series" })).toHaveAttribute("href", "/browse");
   });
 });
 

@@ -2,7 +2,7 @@
 for dev, CDN-edge in production.
 
 A stream URL is ``/media/t/{token}/{path}``. The token binds a PATH PREFIX
-(the episode's hls directory) to a user and an expiry, HMAC-signed with
+(the episode's directory: its hls/ tree and subs/) to a user and an expiry, HMAC-signed with
 ``KATHA_STREAM_SECRET``. HLS's relative references — master playlist →
 variant playlist → segments — all resolve under the same ``/media/t/{token}/``
 root, so ONE token authorizes the whole episode tree with no playlist

@@ -74,6 +74,55 @@ const PRESENTATION: Record<string, { c1: string; c2: string; language: string; r
 
 const LANG_NAMES: Record<string, string> = { hi: "Hindi", ta: "Tamil", te: "Telugu" };
 
+/** Display name for a content-language code ("hi" -> "Hindi"); unknown codes pass through. */
+export function languageName(code: string): string {
+  return LANG_NAMES[code] ?? code;
+}
+
+/** The content languages the catalog serves, in the order the UI lists them. */
+export const LANGUAGES: { code: string; name: string; native: string }[] = [
+  { code: "hi", name: "Hindi", native: "हिन्दी" },
+  { code: "ta", name: "Tamil", native: "தமிழ்" },
+  { code: "te", name: "Telugu", native: "తెలుగు" },
+];
+
+/** Every genre in the catalog, alphabetical, for the browse filter chips. */
+export function allGenres(series: { genres: string[] }[]): string[] {
+  return Array.from(new Set(series.flatMap((s) => s.genres))).sort();
+}
+
+/** Browse filter: a series matches when it carries the genre AND is in the language. */
+export function filterSeries<T extends { genres: string[]; language: string }>(
+  series: T[],
+  f: { genre?: string | null; lang?: string | null }
+): T[] {
+  return series.filter(
+    (s) => (!f.genre || s.genres.includes(f.genre)) && (!f.lang || s.language === f.lang)
+  );
+}
+
+/** The card meta line: "Hindi · Romance · 60 episodes" (a missing genre is skipped). */
+export function metaLine(language: string, genre: string | undefined, episodes: number): string {
+  return [language, genre, `${episodes} episodes`].filter(Boolean).join(" · ");
+}
+
+/** Phone for display: "+91 98765 43210" -> "+91 98765 •••10". The three
+ * digits before the last two are hidden; everything else is kept as typed. */
+export function maskPhone(phone: string): string {
+  let seen = 0;
+  const out: string[] = [];
+  for (let i = phone.length - 1; i >= 0; i--) {
+    const ch = phone[i];
+    if (/\d/.test(ch)) {
+      seen++;
+      out.push(seen >= 3 && seen <= 5 ? "•" : ch);
+    } else {
+      out.push(ch);
+    }
+  }
+  return out.reverse().join("");
+}
+
 const FALLBACK_PRES = { c1: "#1D1A2F", c2: "#6C4AB6", language: "Hindi", rating: "U/A 16+" };
 
 export const SERIES: Series[] = seed.series.map((s: any, i: number): Series => {

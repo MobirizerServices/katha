@@ -467,7 +467,7 @@ describe("Overview, Catalog, App-level ternaries", () => {
     await screen.findByText(/Good morning/);
     expect(screen.getByText("-3%")).toBeInTheDocument();     // down-delta class
     expect(screen.getByText("Mystery metric")).toBeInTheDocument(); // unlinked kpi
-    expect(screen.getByText(/App Store 0%/)).toBeInTheDocument();
+    expect(screen.getByText(/liability 0 coins/)).toBeInTheDocument();  // empty trend
     vi.useRealTimers();
   });
 

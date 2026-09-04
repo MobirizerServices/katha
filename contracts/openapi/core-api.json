@@ -342,6 +342,56 @@
         }
       }
     },
+    "/v1/me/signout-devices": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Signout Devices",
+        "description": "Sign out everywhere else: bump this user's token_version so every JWT\nissued before now stops validating, then hand THIS device a fresh token\n(issued under the new version). Without persistence there is no version\nto move, so it is a no-op that still returns a fresh token.",
+        "operationId": "signout_devices_v1_me_signout_devices_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthToken"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/home": {
       "get": {
         "tags": [
@@ -469,6 +519,66 @@
         }
       }
     },
+    "/v1/search": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Search",
+        "description": "Catalog search (no auth). Series match on title / native title / tropes /\ngenres, case-insensitive substring; people match on the billed cast name.\nOnly served (live) series are searchable or listed under a person \u2014 the\nsame gate as the catalog listing, so an archived title never leaks.",
+        "operationId": "search_v1_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lang"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/progress": {
       "put": {
         "tags": [
@@ -535,8 +645,21 @@
           "engagement"
         ],
         "summary": "Get Continue",
+        "description": "Continue watching, most recent first. `limit` sizes the rail (20) or the\nfull-list screen (up to 100).",
         "operationId": "get_continue_v1_me_continue_get",
         "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -724,6 +847,169 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MyListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/reminders": {
+      "get": {
+        "tags": [
+          "engagement"
+        ],
+        "summary": "Get Reminders",
+        "operationId": "get_reminders_v1_me_reminders_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemindersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/reminders/{slug}": {
+      "put": {
+        "tags": [
+          "engagement"
+        ],
+        "summary": "Add Reminder",
+        "operationId": "add_reminder_v1_me_reminders__slug__put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemindersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "engagement"
+        ],
+        "summary": "Remove Reminder",
+        "operationId": "remove_reminder_v1_me_reminders__slug__delete",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemindersResponse"
                 }
               }
             }
@@ -1596,6 +1882,24 @@
         ],
         "title": "AuthToken"
       },
+      "CastMember": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "role"
+        ],
+        "title": "CastMember"
+      },
       "CheckinResponse": {
         "properties": {
           "granted_coins": {
@@ -1695,6 +1999,31 @@
           "percent": {
             "type": "integer",
             "title": "Percent"
+          },
+          "series_title": {
+            "type": "string",
+            "title": "Series Title",
+            "default": ""
+          },
+          "episode_title": {
+            "type": "string",
+            "title": "Episode Title",
+            "default": ""
+          },
+          "cover_url": {
+            "type": "string",
+            "title": "Cover Url",
+            "default": ""
+          },
+          "cover_wide_url": {
+            "type": "string",
+            "title": "Cover Wide Url",
+            "default": ""
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "default": ""
           }
         },
         "type": "object",
@@ -1976,6 +2305,77 @@
         ],
         "title": "ProgressItemBody"
       },
+      "RemindersResponse": {
+        "properties": {
+          "slugs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Slugs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slugs"
+        ],
+        "title": "RemindersResponse"
+      },
+      "SearchPerson": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesSummary"
+            },
+            "type": "array",
+            "title": "Series"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "role",
+          "series"
+        ],
+        "title": "SearchPerson"
+      },
+      "SearchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesSummary"
+            },
+            "type": "array",
+            "title": "Series"
+          },
+          "people": {
+            "items": {
+              "$ref": "#/components/schemas/SearchPerson"
+            },
+            "type": "array",
+            "title": "People"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "series",
+          "people"
+        ],
+        "title": "SearchResponse"
+      },
       "SeriesDetail": {
         "properties": {
           "slug": {
@@ -2020,12 +2420,24 @@
             "type": "string",
             "title": "Synopsis"
           },
+          "title_native": {
+            "type": "string",
+            "title": "Title Native",
+            "default": ""
+          },
           "tropes": {
             "items": {
               "type": "string"
             },
             "type": "array",
             "title": "Tropes"
+          },
+          "cast": {
+            "items": {
+              "$ref": "#/components/schemas/CastMember"
+            },
+            "type": "array",
+            "title": "Cast"
           },
           "free_episode_count": {
             "type": "integer",
@@ -2179,6 +2591,17 @@
               }
             ],
             "title": "Language"
+          },
+          "ui_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ui Language"
           }
         },
         "type": "object",
@@ -2201,6 +2624,11 @@
           "language": {
             "type": "string",
             "title": "Language"
+          },
+          "ui_language": {
+            "type": "string",
+            "title": "Ui Language",
+            "default": "en"
           },
           "phone": {
             "anyOf": [

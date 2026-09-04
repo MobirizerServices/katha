@@ -8,6 +8,7 @@ struct SeriesView: View {
     @Environment(AppModel.self) private var model
     @State private var detail: SeriesDetail?
     @State private var error: String?
+    @State private var toast: String?
 
     /// Where the viewer left off in THIS series, if anywhere.
     private var continuePoint: ContinueItem? {
@@ -36,7 +37,19 @@ struct SeriesView: View {
         .background(Katha.Color.bg)
         .navigationBarTitleDisplayMode(.inline)
         .zoomDestination(id: slug)
+        .overlay(alignment: .bottom) {
+            if let toast {
+                ToastView(text: toast)
+                    .padding(.bottom, 30)
+                    .task { try? await Task.sleep(for: .seconds(2)); self.toast = nil }
+                    .transition(.opacity)
+            }
+        }
+        .animation(Katha.Motion.spring, value: toast)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                ReminderBell(slug: slug) { toast = $0 }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Haptics.tap()
@@ -194,6 +207,35 @@ struct SeriesView: View {
             detail = try await model.api.seriesDetail(slug: slug)
             error = nil
         } catch { self.error = String(describing: error) }
+    }
+}
+
+/// The new-episode reminder bell for one series (My list 4.4 "Reminder on",
+/// and the series toolbar). State lives in AppModel.reminderSlugs.
+struct ReminderBell: View {
+    let slug: String
+    var onToggled: ((String) -> Void)? = nil
+    @Environment(AppModel.self) private var model
+
+    private var isOn: Bool { model.reminderSlugs.contains(slug) }
+
+    var body: some View {
+        Button {
+            Haptics.tap()
+            let turningOn = !isOn
+            Task {
+                await model.toggleReminder(slug: slug)
+                onToggled?(model.t(turningOn ? "reminder.toast.on" : "reminder.toast.off"))
+            }
+        } label: {
+            Image(systemName: isOn ? "bell.fill" : "bell")
+                .foregroundStyle(isOn ? Katha.Color.coin : Katha.Color.text)
+                .symbolEffect(.bounce, value: isOn)
+                .accessibilityLabel(model.t(isOn ? "reminder.on" : "reminder.off"))
+                .accessibilityHint("New-episode reminder for this series")
+        }
+        .accessibilityIdentifier("reminder.\(slug)")
+        .accessibilityValue(isOn ? "on" : "off")
     }
 }
 

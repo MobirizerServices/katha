@@ -11,8 +11,16 @@ describe("nav", () => {
   it("covers every routed view exactly once", () => {
     const views = ALL_NAV_ITEMS.map((i) => i.view).sort();
     expect(views).toEqual(
-      ["access", "approvals", "audit", "catalog", "config", "grievances", "outbox", "overview", "users"].sort()
+      ["access", "analytics", "approvals", "audit", "catalog", "components", "config",
+       "finance", "grievances", "localization", "media", "moderation", "outbox",
+       "overview", "programming", "users", "writers"].sort()
     );
+  });
+
+  it("keyboard hints are unique g-chords", () => {
+    const kbs = ALL_NAV_ITEMS.map((i) => i.kb).filter(Boolean) as string[];
+    expect(new Set(kbs).size).toBe(kbs.length);
+    for (const kb of kbs) expect(kb).toMatch(/^g [a-z]$/);
   });
 
   it("each item's path matches /<view>", () => {

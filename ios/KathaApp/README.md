@@ -16,6 +16,18 @@ verification, which covers the pure `KathaKit` package on macOS.
 - `PlayerView.swift` — vertical player; gates via playback, shows paywall.
 - `PaywallView.swift` — episode vs bundle unlock, optimistic + reconcile.
 - `WalletView.swift` — balance + coin store (IAP verify).
+- `PacksSheet.swift` — 3.4 coin packs sheet with the confirming / pending
+  (Ask to Buy) / failed states; reached from Wallet and the paywall.
+- `ContinueWatchingView.swift` — 4.5 full continue-watching list ("E7 · 1 min left").
+- `HelpAssistantView.swift` — 4.6 chat-style help over the FAQ (local intent
+  matcher, English/Hindi, "Talk to a person" → grievance form). No network AI.
+- `Strings.swift` — app-language table (en/hi) for tabs, Settings, paywall,
+  assistant; applied through `AppModel.t(_:)` and `.environment(\.locale)`.
+- `DiscoverViews.swift` — Browse, Search (`/v1/search`: Series + People,
+  `PersonView`), My list (reminder bell).
+- `ProfileViews.swift` — Profile, Settings (app language, muted previews,
+  sign out of other devices), parental lock incl. "Forgot PIN?" (OTP reset),
+  Help & grievance, delete account.
 
 ## Wiring into an Xcode project
 1. Create an iOS App target (iOS 17+).

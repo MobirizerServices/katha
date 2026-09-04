@@ -20,6 +20,7 @@ struct PaywallView: View {
     @State private var errorText: String?
     @State private var packs: [CoinPack] = []
     @State private var restored = false
+    @State private var showPacks = false
 
     private var price: Int { playback.priceCoins ?? detail.episodeCoinPrice }
     private var bundleCoins: Int? { playback.bundleOfferCoins }
@@ -80,13 +81,17 @@ struct PaywallView: View {
 
                 // Primary action
                 if canAfford {
-                    KathaPrimaryButton(title: working ? "Unlocking…" : "Unlock episode",
+                    KathaPrimaryButton(title: working ? model.t("paywall.unlocking")
+                                                      : model.t("paywall.unlock"),
                                        enabled: !working) {
                         Task { await unlockEpisode() }
                     }
                 } else {
-                    KathaPrimaryButton(title: "Get coins", enabled: false) {}
-                        .opacity(0.9)
+                    // Opens the full packs sheet (3.4); the same packs also sit
+                    // inline below so the fastest path stays one tap.
+                    KathaPrimaryButton(title: model.t("paywall.getCoins")) {
+                        showPacks = true
+                    }
                 }
 
                 // Bundle (server-advertised total; the ledger charges exactly this)
@@ -145,7 +150,7 @@ struct PaywallView: View {
                 // Not enough? The packs come to the paywall — never a dead end.
                 if !canAfford {
                     VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
-                        Text("Buy once, keep watching")
+                        Text(model.t("paywall.buyOnce"))
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(Katha.Color.text)
                         ForEach(packs) { pack in
@@ -177,6 +182,9 @@ struct PaywallView: View {
         .presentationDetents(canAfford ? [.medium, .large] : [.large])
         .presentationBackground(Katha.Color.surface)
         .presentationCornerRadius(24)
+        .sheet(isPresented: $showPacks) {
+            PacksSheet(context: "E\(episodeNumber) unlocks the moment coins land.")
+        }
         .task {
             if packs.isEmpty {
                 packs = ((try? await model.api.packs(storefront: "IN")) ?? [])

@@ -4,8 +4,11 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWallet } from "./WalletProvider";
-import { api } from "@/lib/api";
+import PinGate from "./PinGate";
+import { api, type CaptionDTO } from "@/lib/api";
 import { Series, fmt } from "@/lib/catalog";
+import { isPinSet, needsPin } from "@/lib/parentalLock";
+import { CAPTIONS_OFF, getCaptionPref, setCaptionPref } from "@/lib/prefs";
 
 /**
  * The server decides. Every render of this page starts with the playback
@@ -13,32 +16,68 @@ import { Series, fmt } from "@/lib/catalog";
  * unlocked) or with the paywall and every number the paywall shows (price,
  * balance, how many episodes are left, the exact bundle offer). Nothing here
  * computes a price or remembers an unlock.
+ *
+ * The one local gate is the parental PIN: a U/A 16+ or A series behind a set
+ * PIN is not even asked of the server until the PIN clears.
  */
 type Access =
   | { kind: "loading" }
   | { kind: "error" }
-  | { kind: "play"; url: string; free: boolean }
+  | { kind: "play"; url: string; free: boolean; captions: CaptionDTO[] }
   | { kind: "locked"; price: number; balance: number; remaining: number; bundle: number };
+
+/** The slice of hls.js the player drives (narrow so tests can fake it). */
+interface HlsLike {
+  destroy(): void;
+  loadSource(url: string): void;
+  attachMedia(video: HTMLVideoElement): void;
+  on(evt: string, handler: (evt: unknown, data: { fatal: boolean }) => void): void;
+  subtitleTracks: { lang?: string; name: string }[];
+  subtitleTrack: number;
+  subtitleDisplay: boolean;
+}
+
+type CaptionOption = { lang: string; label: string };
 
 export default function Player({ series, n }: { series: Series; n: number }) {
   const w = useWallet();
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const hlsRef = useRef<HlsLike | null>(null);
   const [access, setAccess] = useState<Access>({ kind: "loading" });
   const [videoOk, setVideoOk] = useState(false);
   const [streamError, setStreamError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [busy, setBusy] = useState<"episode" | "bundle" | null>(null);
+  // Parental lock: unknown until mounted (localStorage), then locked or open.
+  const [gate, setGate] = useState<"unknown" | "locked" | "open">("unknown");
+  // Player actions.
+  const [captionLang, setCaptionLang] = useState<string | null>(null);
+  const [hlsSubs, setHlsSubs] = useState<CaptionOption[]>([]);
+  const [muted, setMuted] = useState(true);
+  const [liked, setLiked] = useState(false); // local heart only — there is no like endpoint yet
+  const [remind, setRemind] = useState(false);
+  const [ended, setEnded] = useState(false);
 
   const ep = series.episodes.find((e) => e.number === n) || series.episodes[0];
+  const nextEp = series.episodes.find((e) => e.number === n + 1);
+  const hasNext = n < series.episodeCount;
+  const here = `/watch/${series.slug}/${n}`;
+
+  // 0. Is this series behind the parental PIN on this browser?
+  useEffect(() => {
+    setGate(needsPin(series.rating) && isPinSet() ? "locked" : "open");
+    setCaptionLang(getCaptionPref());
+  }, [series.rating]);
 
   // 1. Ask the server whether this viewer may watch this episode. Re-asked
   //    whenever identity or the wallet changes (sign-in, purchase, unlock).
   useEffect(() => {
-    if (!w.ready) return;
+    if (!w.ready || gate !== "open") return;
     let cancelled = false;
     setAccess({ kind: "loading" });
     setVideoOk(false);
+    setEnded(false);
     api
       .playback(series.slug, n)
       .then((pb) => {
@@ -52,7 +91,7 @@ export default function Player({ series, n }: { series: Series; n: number }) {
             bundle: pb.bundle_offer_coins,
           });
         } else if (pb.hls_master_url) {
-          setAccess({ kind: "play", url: pb.hls_master_url, free: pb.free });
+          setAccess({ kind: "play", url: pb.hls_master_url, free: pb.free, captions: pb.captions ?? [] });
         } else {
           setAccess({ kind: "error" });
         }
@@ -61,7 +100,20 @@ export default function Player({ series, n }: { series: Series; n: number }) {
     return () => {
       cancelled = true;
     };
-  }, [series.slug, n, w.ready, w.signed, w.balance, retryKey]);
+  }, [series.slug, n, w.ready, w.signed, w.balance, retryKey, gate]);
+
+  // 1b. Is a "new episode" reminder set for this series? Members only.
+  useEffect(() => {
+    if (!w.ready || !w.signed) return;
+    let cancelled = false;
+    api
+      .reminders()
+      .then((r) => !cancelled && setRemind(r.slugs.includes(series.slug)))
+      .catch(() => !cancelled && setRemind(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [series.slug, w.ready, w.signed]);
 
   // 2. Attach hls.js only once the server has handed us a stream.
   const src = access.kind === "play" ? access.url : null;
@@ -69,10 +121,11 @@ export default function Player({ series, n }: { series: Series; n: number }) {
     if (!src) return;
     const video = videoRef.current;
     if (!video) return;
-    let hls: { destroy: () => void } | null = null;
+    let hls: HlsLike | null = null;
     let cancelled = false;
 
     setStreamError(false);
+    setHlsSubs([]);
     (async () => {
       try {
         const reveal = () => !cancelled && setVideoOk(true);
@@ -82,13 +135,23 @@ export default function Player({ series, n }: { series: Series; n: number }) {
         const Hls = mod.default;
         if (cancelled) return;
         if (Hls.isSupported()) {
-          const inst = new Hls({ maxBufferLength: 10 });
+          const inst = new Hls({ maxBufferLength: 10 }) as unknown as HlsLike;
           hls = inst;
+          hlsRef.current = inst;
           inst.loadSource(src);
           inst.attachMedia(video);
           // Reveal on real frames (not MANIFEST_PARSED): if the media stack
           // can't open MSE the gradient poster simply stays.
-          video.addEventListener("loadeddata", reveal, { once: true });
+          video.addEventListener(
+            "loadeddata",
+            () => {
+              reveal();
+              // Subtitle renditions inside the HLS manifest join the CC menu.
+              if (!cancelled)
+                setHlsSubs(inst.subtitleTracks.map((t) => ({ lang: t.lang ?? t.name, label: t.name })));
+            },
+            { once: true }
+          );
           // Signed stream tokens expire mid-play: on the first fatal error,
           // re-fetch a fresh playback URL once; after that, surface the error.
           let recovered = false;
@@ -121,12 +184,71 @@ export default function Player({ series, n }: { series: Series; n: number }) {
     return () => {
       cancelled = true;
       if (hls) hls.destroy();
+      hlsRef.current = null;
     };
   }, [src, series.slug, n]);
+
+  // 3. Apply the caption choice to whatever is rendering text: the <track>
+  //    elements from the playback payload and/or hls.js subtitle renditions.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoOk) return;
+    const want = captionLang ?? CAPTIONS_OFF;
+    const tracks = video.textTracks;
+    for (let i = 0; i < tracks.length; i++) tracks[i].mode = tracks[i].language === want ? "showing" : "hidden";
+    const hls = hlsRef.current;
+    if (hls) {
+      const idx = hls.subtitleTracks.findIndex((t) => (t.lang ?? t.name) === want);
+      hls.subtitleTrack = idx;
+      hls.subtitleDisplay = idx >= 0;
+    }
+  }, [captionLang, videoOk, hlsSubs]);
 
   const goto = (num: number) => router.push(`/watch/${series.slug}/${num}`);
   const playing = access.kind === "play";
   const locked = access.kind === "locked" ? access : null;
+
+  // Caption options: Off, then every language the payload or the manifest offers (deduped).
+  const captionOptions: CaptionOption[] = [{ lang: CAPTIONS_OFF, label: "Off" }];
+  if (playing) {
+    for (const c of [...access.captions, ...hlsSubs])
+      if (!captionOptions.some((o) => o.lang === c.lang)) captionOptions.push({ lang: c.lang, label: c.label });
+  }
+  const currentCaption = captionOptions.find((o) => o.lang === captionLang) ?? captionOptions[0];
+  const cycleCaptions = () => {
+    const i = captionOptions.indexOf(currentCaption);
+    const next = captionOptions[(i + 1) % captionOptions.length].lang;
+    setCaptionLang(next);
+    setCaptionPref(next);
+  };
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    if (videoRef.current) videoRef.current.muted = next;
+  };
+
+  const toggleRemind = () => {
+    if (!w.signed) {
+      w.openSignIn(here);
+      return;
+    }
+    (remind ? api.removeReminder(series.slug) : api.addReminder(series.slug))
+      .then((r) => {
+        setRemind(r.slugs.includes(series.slug));
+        w.toast(remind ? "Reminder off" : `We'll tell you when ${series.title} drops a new episode`);
+      })
+      .catch(() => w.toast("Couldn't save the reminder — try again"));
+  };
+
+  const replay = () => {
+    setEnded(false);
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = 0;
+    const p = video.play();
+    if (p) p.catch(() => { /* autoplay refused: the viewer taps play */ });
+  };
 
   const unlockOne = async () => {
     if (!locked || busy) return;
@@ -162,11 +284,16 @@ export default function Player({ series, n }: { series: Series; n: number }) {
             ref={videoRef}
             playsInline
             controls={false}
-            muted
+            muted={muted}
             autoPlay
-            loop
+            crossOrigin="anonymous"
+            onEnded={() => setEnded(true)}
             style={{ opacity: videoOk ? 1 : 0 }}
-          />
+          >
+            {access.captions.map((c) => (
+              <track key={c.lang} kind="subtitles" src={c.url} srcLang={c.lang} label={c.label} />
+            ))}
+          </video>
         )}
         <div className="vig" />
 
@@ -181,6 +308,25 @@ export default function Player({ series, n }: { series: Series; n: number }) {
             </span>
           </div>
         </div>
+
+        {playing && (
+          <div className="prail">
+            <button aria-label={liked ? "Unlike" : "Like"} aria-pressed={liked} onClick={() => setLiked((l) => !l)}>
+              {liked ? "♥" : "♡"}
+            </button>
+            {captionOptions.length > 1 && (
+              <button aria-label={`Captions: ${currentCaption.label}`} onClick={cycleCaptions}>
+                CC<small>{currentCaption.label}</small>
+              </button>
+            )}
+            <button aria-label={muted ? "Unmute" : "Mute"} onClick={toggleMute}>
+              {muted ? "🔇" : "🔊"}
+            </button>
+            <button aria-label={remind ? "Stop reminders" : "Remind me"} aria-pressed={remind} onClick={toggleRemind}>
+              {remind ? "🔔" : "🔕"}
+            </button>
+          </div>
+        )}
 
         {playing && (
           <div className="pbottom">
@@ -202,11 +348,41 @@ export default function Player({ series, n }: { series: Series; n: number }) {
           </div>
         )}
 
+        {gate === "locked" && (
+          <PinGate rating={series.rating} backHref={`/series/${series.slug}`} onUnlocked={() => setGate("open")} />
+        )}
         {locked && <Paywall {...locked} />}
         {(access.kind === "error" || (playing && streamError)) && <StreamError />}
+        {playing && ended && !streamError && <EndCard />}
       </div>
     </div>
   );
+
+  function EndCard() {
+    return (
+      <div className="overlay">
+        <div className="ocard">
+          <h3>Episode {n} finished</h3>
+          {hasNext ? (
+            <p>Next: E{n + 1}{nextEp ? ` · ${nextEp.title}` : ""}</p>
+          ) : (
+            <p>That was the last episode of {series.title}.</p>
+          )}
+          {hasNext && (
+            <button className="btn p" onClick={() => goto(n + 1)}>
+              Play E{n + 1}
+            </button>
+          )}
+          <button className="btn s" onClick={replay}>
+            Replay
+          </button>
+          <Link className="olink" href={`/series/${series.slug}`}>
+            Back to the series
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   function StreamError() {
     return (
@@ -247,7 +423,7 @@ export default function Player({ series, n }: { series: Series; n: number }) {
                 The free episodes are behind you. Sign in with your phone to unlock the rest with coins —
                 this one is {fmt(price)} coins.
               </p>
-              <button className="btn p" onClick={() => w.openSignIn(`/watch/${series.slug}/${n}`)}>
+              <button className="btn p" onClick={() => w.openSignIn(here)}>
                 Sign in to continue
               </button>
             </>

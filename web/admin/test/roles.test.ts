@@ -39,6 +39,20 @@ describe("RBAC — canView", () => {
     expect(canView("content", "users")).toBe(false);
   });
 
+  it("wave-2 views follow the mockup: content/qc get the content boards, finance gets Finance, components is admin-only", () => {
+    for (const v of ["media", "moderation", "localization", "writers", "programming", "analytics"]) {
+      expect(canView("content", v)).toBe(true);
+      expect(canView("qc", v)).toBe(true);
+      expect(canView("support", v)).toBe(v === "analytics");
+    }
+    expect(canView("finance", "finance")).toBe(true);
+    expect(canView("support", "finance")).toBe(false);
+    for (const r of ROLE_ORDER) {
+      expect(canView(r, "components")).toBe(r === "admin");
+      expect(canView(r, "analytics")).toBe(true);
+    }
+  });
+
   it("everyone can open overview", () => {
     for (const r of ROLE_ORDER) expect(canView(r, "overview")).toBe(true);
   });
@@ -107,6 +121,14 @@ describe("permission matrix shape", () => {
     expect(row.cells[3]).toBe("request"); // support requests
     expect(row.cells[4]).toBe("approve"); // finance approves
     expect(row.cells[1]).toBe("no"); // content cannot
+  });
+
+  it("lists the wave-2 capabilities with the same roles the server enforces", () => {
+    const row = (cap: string) => PERMISSION_MATRIX.find((r) => r.cap === cap)!.cells;
+    expect(row("Media QC verdicts")).toEqual(["yes", "yes", "yes", "no", "no", "no", "no"]);
+    expect(row("Bulk pricing")[4]).toBe("yes");
+    expect(row("Components (internal)")).toEqual(["yes", "no", "no", "no", "no", "no", "no"]);
+    expect(row("Programming calendar")[2]).toBe("view");
   });
 
   it("finance sees masked PII in the matrix", () => {

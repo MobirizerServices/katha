@@ -7,21 +7,50 @@ public struct UserProfile: Codable, Hashable, Sendable {
     public let userId: String
     public let kind: String            // guest | phone | apple
     public let displayName: String
-    public let language: String        // hi | ta | te
+    public let language: String        // hi | ta | te  (content language)
     public let phone: String?
+    /// App (UI) language: en | hi. Optional on the wire — servers before the
+    /// setting existed omit it, and the app then reads "en".
+    public let uiLanguage: String
 
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case kind
         case displayName = "display_name"
         case language, phone
+        case uiLanguage = "ui_language"
     }
 
     public init(userId: String, kind: String, displayName: String = "",
-                language: String = "hi", phone: String? = nil) {
+                language: String = "hi", phone: String? = nil, uiLanguage: String = "en") {
         self.userId = userId; self.kind = kind; self.displayName = displayName
-        self.language = language; self.phone = phone
+        self.language = language; self.phone = phone; self.uiLanguage = uiLanguage
     }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        userId = try c.decode(String.self, forKey: .userId)
+        kind = try c.decode(String.self, forKey: .kind)
+        displayName = try c.decodeIfPresent(String.self, forKey: .displayName) ?? ""
+        language = try c.decodeIfPresent(String.self, forKey: .language) ?? "hi"
+        phone = try c.decodeIfPresent(String.self, forKey: .phone)
+        uiLanguage = try c.decodeIfPresent(String.self, forKey: .uiLanguage) ?? "en"
+    }
+}
+
+/// `GET/PUT/DELETE /v1/me/reminders[/{slug}]`: the series this account wants
+/// new-episode reminders for.
+public struct ReminderList: Codable, Hashable, Sendable {
+    public let slugs: [String]
+
+    public init(slugs: [String]) { self.slugs = slugs }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        slugs = try c.decodeIfPresent([String].self, forKey: .slugs) ?? []
+    }
+
+    enum CodingKeys: String, CodingKey { case slugs }
 }
 
 public struct AuthToken: Codable, Hashable, Sendable {

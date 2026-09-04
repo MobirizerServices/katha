@@ -82,9 +82,22 @@ public actor KathaAPIClient {
         try await get("/v1/me")
     }
 
-    public func updateMe(language: String? = nil, displayName: String? = nil) async throws -> UserProfile {
+    /// `uiLanguage` is the app language ("en" | "hi"), distinct from the
+    /// content `language`. Only the fields given are sent.
+    public func updateMe(language: String? = nil, displayName: String? = nil,
+                         uiLanguage: String? = nil) async throws -> UserProfile {
         try await send("/v1/me", method: "PATCH",
-                       body: MePatchBody(language: language, displayName: displayName))
+                       body: MePatchBody(language: language, displayName: displayName,
+                                         uiLanguage: uiLanguage))
+    }
+
+    /// Invalidate every other session of this account. The server answers with
+    /// a fresh token for THIS device, which is stored for later calls.
+    public func signOutDevices() async throws -> AuthToken {
+        let token: AuthToken = try await send("/v1/me/signout-devices", method: "POST",
+                                              body: Optional<Empty>.none)
+        authToken = token.accessToken
+        return token
     }
 
     /// Account deletion (App Store requirement). Clears the client token on success.
@@ -99,8 +112,23 @@ public actor KathaAPIClient {
         let _: Ack = try await send("/v1/progress", method: "PUT", body: ProgressBody(items: items))
     }
 
-    public func continueWatching() async throws -> ContinueList {
-        try await get("/v1/me/continue")
+    /// Continue-watching list; `limit` asks for more than the Home row shows.
+    public func continueWatching(limit: Int? = nil) async throws -> ContinueList {
+        try await get("/v1/me/continue", query: limit.map { ["limit": String($0)] } ?? [:])
+    }
+
+    // MARK: - Reminders (new-episode bell per series)
+
+    public func reminders() async throws -> ReminderList {
+        try await get("/v1/me/reminders")
+    }
+
+    public func addReminder(slug: String) async throws -> ReminderList {
+        try await send("/v1/me/reminders/\(slug)", method: "PUT", body: Optional<Empty>.none)
+    }
+
+    public func removeReminder(slug: String) async throws -> ReminderList {
+        try await send("/v1/me/reminders/\(slug)", method: "DELETE", body: Optional<Empty>.none)
     }
 
     public func myList() async throws -> MyList {
@@ -131,6 +159,11 @@ public actor KathaAPIClient {
 
     public func seriesDetail(slug: String) async throws -> SeriesDetail {
         try await get("/v1/series/\(slug)")
+    }
+
+    /// Type-ahead across titles, cast and tropes in a content language.
+    public func search(q: String, lang: String = "hi") async throws -> SearchResponse {
+        try await get("/v1/search", query: ["q": q, "lang": lang])
     }
 
     // MARK: - Playback
@@ -288,9 +321,11 @@ private struct AppleBody: Encodable {
 private struct MePatchBody: Encodable {
     let language: String?
     let displayName: String?
+    let uiLanguage: String?
     enum CodingKeys: String, CodingKey {
         case language
         case displayName = "display_name"
+        case uiLanguage = "ui_language"
     }
 }
 

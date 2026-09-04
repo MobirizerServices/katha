@@ -412,8 +412,10 @@ def _series_exists(slug: str) -> bool:
 def catalog_series(actor: Actor = Depends(require(Role.CONTENT, Role.QC, Role.ANALYST, Role.RO))):
     """The catalog in the back-office client shape — real lifecycle status,
     media-derived live counts (#037), rights (#039), panel drafts (#043)."""
+    from app.overrides import apply_pricing
     out = []
     for s in _admin_all_series():
+        s = apply_pricing(s)          # the panel's per-series price, as detail shows it
         status, _rating, touched = _series_overrides(s.slug)
         rights = _rights(s.slug)
         out.append({
@@ -1149,8 +1151,8 @@ def attention_ack(item_id: str, request: Request = None,
 
 # ---- the analytics rollup (#009-#015) ---------------------------------------
 @router.get("/analytics", tags=["overview"])
-def analytics(actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE,
-                                             Role.ANALYST, Role.RO, Role.CONTENT))):
+def analytics(actor: Actor = Depends(require(Role.SUPPORT, Role.FINANCE, Role.ANALYST,
+                                             Role.RO, Role.CONTENT, Role.QC))):
     """Windowed KPIs with deltas (#009), revenue split by channel (#010), the
     paywall→purchase→unlock funnel (#013), refund ratio (#014), the coin
     liability trend + breakage (#012), and 30-day sparklines (#015)."""
@@ -1209,21 +1211,32 @@ def set_series_pricing(slug: str, request: Request = None, body: dict = Body(...
         raise HTTPException(status_code=428, detail="type the slug to confirm")
     if SHARED is None:
         raise HTTPException(status_code=503, detail="needs persistence")
-    fields = {}
-    if "coin_price" in body:
-        fields["coin_price"] = int(body["coin_price"])
-        if not (1 <= fields["coin_price"] <= 1000):
-            raise HTTPException(status_code=400, detail="coin_price must be 1-1000")
-    if "free_episodes" in body:
-        fields["free_episodes"] = int(body["free_episodes"])
-        if not (0 <= fields["free_episodes"] <= 100):
-            raise HTTPException(status_code=400, detail="free_episodes must be 0-100")
-    if not fields:
-        raise HTTPException(status_code=400, detail="nothing to change")
+    fields = _pricing_fields(body)
     SHARED.kv_set(f"price:{slug}", _json.dumps(fields))
     SHARED.kv_set(f"touched:{slug}", now_iso())
     audit(actor, "series.pricing", slug, fields, request)
     return {"slug": slug, **fields}
+
+
+def _pricing_fields(body: dict) -> dict:
+    """The one set of pricing bounds — the single-series lever and the bulk
+    action validate with exactly the same rule (coin_price 1-1000, free
+    window 0-100, at least one field)."""
+    fields = {}
+    try:
+        if "coin_price" in body:
+            fields["coin_price"] = int(body["coin_price"])
+        if "free_episodes" in body:
+            fields["free_episodes"] = int(body["free_episodes"])
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="pricing values must be integers")
+    if "coin_price" in fields and not (1 <= fields["coin_price"] <= 1000):
+        raise HTTPException(status_code=400, detail="coin_price must be 1-1000")
+    if "free_episodes" in fields and not (0 <= fields["free_episodes"] <= 100):
+        raise HTTPException(status_code=400, detail="free_episodes must be 0-100")
+    if not fields:
+        raise HTTPException(status_code=400, detail="nothing to change")
+    return fields
 
 
 @router.patch("/catalog/series/{slug}/episodes/{number}", tags=["catalog"])
@@ -1546,6 +1559,424 @@ def notify_drop(slug: str, request: Request = None, body: dict = Body(...),
     audit(actor, "series.notify_drop", slug,
           {"episode": episode, "devices": len(tokens)}, request)
     return {"slug": slug, "episode": episode, "devices": len(tokens)}
+
+
+# ---- back-office views, wave 2: Media & QC, Moderation queue, Localization,
+# Writers' Room, Programming calendar, bulk pricing. Panel state lives in the
+# shared KV (one key family per view); every write is role-gated + audited.
+_QC_STATES = ("pending", "passed", "failed")
+_LOC_LANGS = ("hi", "ta", "te")
+_LOC_KINDS = ("dub", "sub")
+_LOC_STATES = ("none", "in_progress", "done")
+_MOD_WORDS = ("content", "vulgar", "objectionable", "rating", "minor")
+_WR_MAX_STR = 2000
+_WR_MAX_ITEMS = 200
+
+
+def _kv_json(key: str) -> dict:
+    """A JSON object from the KV, or {} (absent, cleared, or unparseable —
+    one bad row must never take a board down)."""
+    raw = SHARED.kv_get(key) if SHARED is not None else None
+    if raw:
+        try:
+            d = _json.loads(raw)
+        except ValueError:
+            return {}
+        if isinstance(d, dict):
+            return d
+    return {}
+
+
+def _kv_json_prefix(prefix: str) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    if SHARED is None:
+        return out
+    for suffix, raw in SHARED.kv_prefix(prefix).items():
+        try:
+            d = _json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(d, dict):
+            out[suffix] = d
+    return out
+
+
+def _need_persistence() -> None:
+    if SHARED is None:
+        raise HTTPException(status_code=503, detail="needs persistence")
+
+
+def _series_or_404(slug: str):
+    from app.overrides import get_series
+    d = get_series(slug)
+    if d is None:
+        raise HTTPException(status_code=404, detail="series not found")
+    return d
+
+
+def _text(body: dict, key: str, limit: int) -> str:
+    v = body.get(key)
+    if v is None:
+        v = ""
+    if not isinstance(v, str):
+        raise HTTPException(status_code=400, detail=f"{key} must be a string")
+    v = v.strip()
+    if len(v) > limit:
+        raise HTTPException(status_code=400, detail=f"{key} must be at most {limit} chars")
+    return v
+
+
+# ---- 1. Media & QC ----------------------------------------------------------
+@router.get("/media/qc", tags=["media"])
+def media_qc(actor: Actor = Depends(require(Role.CONTENT, Role.QC, Role.ANALYST, Role.RO))):
+    """Per series, per episode: is the HLS rendition on disk (same manifest
+    check as the catalog's media stats), and what did human QC say — KV
+    qc:{slug}:{ep} ∈ pending | passed | failed, with a note."""
+    qc = _kv_json_prefix("qc:")
+    out = []
+    for s in _admin_all_series():
+        base = _media_root() / s.slug
+        counts = {"pending": 0, "passed": 0, "failed": 0}
+        missing = 0
+        eps = []
+        for e in s.episodes:
+            has = (base / f"e{e.number:03d}" / "hls" / "master.m3u8").is_file()
+            rec = qc.get(f"{s.slug}:{e.number}", {})
+            status = rec.get("status") if rec.get("status") in _QC_STATES else "pending"
+            counts[status] += 1
+            if not has:
+                missing += 1
+            eps.append({"number": e.number, "title": e.title, "hasMedia": has,
+                        "qc": {"status": status, "note": str(rec.get("note", "")),
+                               "by": str(rec.get("by", "")), "at": str(rec.get("at", ""))}})
+        out.append({"slug": s.slug, "title": s.title, "episodeCount": s.episode_count,
+                    "episodes_with_media": s.episode_count - missing,
+                    "episodes_missing": missing, "qc": counts, "episodes": eps})
+    return {"series": out, "generated_at": now_iso()}
+
+
+@router.patch("/media/qc/{slug}/{number}", tags=["media"])
+def set_media_qc(slug: str, number: int, request: Request = None, body: dict = Body(...),
+                 actor: Actor = Depends(require(Role.CONTENT, Role.QC))):
+    """Record a human QC verdict on one episode. A fail needs a note — the
+    fix-up crew reads it, not the reviewer's memory."""
+    d = _series_or_404(slug)
+    if not (1 <= number <= d.episode_count):
+        raise HTTPException(status_code=404, detail="no such episode")
+    status = _text(body, "status", 16)
+    note = _text(body, "note", 300)
+    if status not in _QC_STATES:
+        raise HTTPException(status_code=400, detail="status: pending|passed|failed")
+    if status == "failed" and not note:
+        raise HTTPException(status_code=400, detail="a failed QC needs a note")
+    _need_persistence()
+    record = {"status": status, "note": note, "by": actor.id, "at": now_iso()}
+    SHARED.kv_set(f"qc:{slug}:{number}", _json.dumps(record))
+    audit(actor, "media.qc", f"{slug}:e{number}", {"status": status, "note": note}, request)
+    return {"slug": slug, "number": number, "qc": record}
+
+
+# ---- 2. Moderation & ratings queue -------------------------------------------
+def _moderation_items() -> list[dict]:
+    """(a) rating decisions from the last 30 days, (b) grievances whose text
+    mentions content — each with its review mark (KV modq:{id})."""
+    if SHARED is None:
+        return []
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    titles = {s.slug: s.title for s in _admin_all_series()}
+    items = []
+    for slug, r in _kv_json_prefix("rating:").items():
+        at = str(r.get("at", ""))
+        try:
+            when = datetime.fromisoformat(at)
+        except ValueError:
+            continue
+        if when.tzinfo is None or when < cutoff:
+            continue
+        items.append({"id": f"rating:{slug}", "kind": "rating", "slug": slug,
+                      "title": titles.get(slug, slug), "at": at,
+                      "rating": str(r.get("value", "")), "by": str(r.get("by", "")),
+                      "detail": str(r.get("reason", "")), "to": f"/catalog/{slug}"})
+    for g in SHARED.grievance_list():
+        text = f"{g['subject']} {g['body']}".lower()
+        if not any(w in text for w in _MOD_WORDS):
+            continue
+        items.append({"id": f"grievance:{g['id']}", "kind": "grievance", "gid": g["id"],
+                      "title": g["subject"], "detail": g["body"], "status": g["status"],
+                      "channel": g["channel"], "at": g["created_at"], "to": "/grievances"})
+    marks = _kv_json_prefix("modq:")
+    for it in items:
+        if it["id"] in marks:
+            it["reviewed"] = marks[it["id"]]
+    items.sort(key=lambda i: i["at"], reverse=True)        # newest first …
+    items.sort(key=lambda i: "reviewed" in i)              # … open ones on top
+    return items
+
+
+@router.get("/moderation", tags=["moderation"])
+def moderation(actor: Actor = Depends(require(Role.CONTENT, Role.QC))):
+    items = _moderation_items()
+    return {"items": items, "open": sum(1 for i in items if "reviewed" not in i)}
+
+
+@router.post("/moderation/{item_id}/reviewed", tags=["moderation"])
+def moderation_reviewed(item_id: str, request: Request = None, body: dict = Body(default={}),
+                        actor: Actor = Depends(require(Role.CONTENT, Role.QC))):
+    """Mark a queue item as looked at by a person. Confirming the rating
+    itself goes through PATCH /catalog/series/{slug}/rating (accountable)."""
+    note = _text(body, "note", 300)
+    _need_persistence()
+    item = next((i for i in _moderation_items() if i["id"] == item_id), None)
+    if item is None:
+        raise HTTPException(status_code=404, detail="not in the moderation queue")
+    if "reviewed" in item:
+        raise HTTPException(status_code=409,
+                            detail=f"already reviewed by {item['reviewed'].get('by', '?')}")
+    record = {"by": actor.id, "at": now_iso(), "note": note}
+    SHARED.kv_set(f"modq:{item_id}", _json.dumps(record))
+    audit(actor, "moderation.reviewed", item_id, {"kind": item["kind"], "note": note}, request)
+    return {"id": item_id, "reviewed": record}
+
+
+# ---- 3. Localization ----------------------------------------------------------
+def _loc_matrix(slug: str) -> dict:
+    stored = _kv_json(f"loc:{slug}")
+    out: dict = {}
+    for lang in _LOC_LANGS:
+        cell = stored.get(lang)
+        if not isinstance(cell, dict):
+            cell = {}
+        out[lang] = {}
+        for kind in _LOC_KINDS:
+            rec = cell.get(kind)
+            if not isinstance(rec, dict):
+                rec = {}
+            status = rec.get("status")
+            out[lang][kind] = {"status": status if status in _LOC_STATES else "none",
+                               "owner": str(rec.get("owner", "")), "due": str(rec.get("due", "")),
+                               "by": str(rec.get("by", "")), "at": str(rec.get("at", ""))}
+    return out
+
+
+@router.get("/localization", tags=["localization"])
+def localization(actor: Actor = Depends(require(Role.CONTENT, Role.QC, Role.ANALYST, Role.RO))):
+    """Series × language (hi/ta/te): dub and subtitle status with an owner
+    and a due date, from KV loc:{slug}."""
+    rows = [{"slug": s.slug, "title": s.title, "primary": s.primary_language,
+             "language": _LANG_NAMES.get(s.primary_language, s.primary_language),
+             "langs": _loc_matrix(s.slug)}
+            for s in _admin_all_series()]
+    return {"series": rows, "languages": list(_LOC_LANGS), "kinds": list(_LOC_KINDS)}
+
+
+@router.patch("/localization/{slug}", tags=["localization"])
+def set_localization(slug: str, request: Request = None, body: dict = Body(...),
+                     actor: Actor = Depends(require(Role.CONTENT))):
+    """Edit one cell: {lang, kind, status, owner?, due?}."""
+    if not _series_exists(slug):
+        raise HTTPException(status_code=404, detail="series not found")
+    lang = _text(body, "lang", 8)
+    kind = _text(body, "kind", 8)
+    status = _text(body, "status", 16)
+    owner = _text(body, "owner", 80)
+    due = _text(body, "due", 10)
+    if lang not in _LOC_LANGS:
+        raise HTTPException(status_code=400, detail="lang: hi|ta|te")
+    if kind not in _LOC_KINDS:
+        raise HTTPException(status_code=400, detail="kind: dub|sub")
+    if status not in _LOC_STATES:
+        raise HTTPException(status_code=400, detail="status: none|in_progress|done")
+    if due:
+        from datetime import date
+        try:
+            date.fromisoformat(due)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="due must be YYYY-MM-DD")
+    _need_persistence()
+    stored = _kv_json(f"loc:{slug}")
+    cell = stored.get(lang)
+    if not isinstance(cell, dict):
+        cell = {}
+    record = {"status": status, "owner": owner, "due": due, "by": actor.id, "at": now_iso()}
+    cell[kind] = record
+    stored[lang] = cell
+    SHARED.kv_set(f"loc:{slug}", _json.dumps(stored))
+    audit(actor, "series.localization", slug,
+          {"lang": lang, "kind": kind, "status": status, "owner": owner, "due": due}, request)
+    return {"slug": slug, "lang": lang, "kind": kind, **record, "langs": _loc_matrix(slug)}
+
+
+# ---- 4. AI Writers' Room (no external model: a local outline helper) -------
+def _writers_ws(slug: str) -> dict:
+    d = _kv_json(f"writers:{slug}")
+    hooks = d.get("hooks")
+    outlines = d.get("episode_outlines")
+    return {"logline": str(d.get("logline", "")),
+            "hooks": [str(h) for h in hooks] if isinstance(hooks, list) else [],
+            "episode_outlines": [o for o in outlines if isinstance(o, dict)]
+                                if isinstance(outlines, list) else [],
+            "notes": str(d.get("notes", "")),
+            "by": str(d.get("by", "")), "updated_at": str(d.get("at", ""))}
+
+
+def _completeness(ws: dict, episode_count: int) -> int:
+    pct = 25 if ws["logline"] else 0
+    pct += 25 if ws["hooks"] else 0
+    pct += round(50 * min(1.0, len(ws["episode_outlines"]) / max(1, episode_count)))
+    return int(pct)
+
+
+@router.get("/writers", tags=["writers"])
+def writers_index(actor: Actor = Depends(require(Role.CONTENT, Role.QC, Role.ANALYST, Role.RO))):
+    rows = []
+    for s in _admin_all_series():
+        ws = _writers_ws(s.slug)
+        rows.append({"slug": s.slug, "title": s.title, "episodeCount": s.episode_count,
+                     "completeness_pct": _completeness(ws, s.episode_count),
+                     "hooks": len(ws["hooks"]), "outlines": len(ws["episode_outlines"]),
+                     "by": ws["by"], "updated_at": ws["updated_at"]})
+    rows.sort(key=lambda r: (-r["completeness_pct"], r["slug"]))
+    return {"series": rows}
+
+
+@router.get("/writers/{slug}", tags=["writers"])
+def writers_workspace(slug: str,
+                      actor: Actor = Depends(require(Role.CONTENT, Role.QC, Role.ANALYST, Role.RO))):
+    d = _series_or_404(slug)
+    ws = _writers_ws(slug)
+    return {"slug": slug, "title": d.title, "episodeCount": d.episode_count,
+            "completeness_pct": _completeness(ws, d.episode_count), **ws}
+
+
+@router.put("/writers/{slug}", tags=["writers"])
+def writers_save(slug: str, request: Request = None, body: dict = Body(...),
+                 actor: Actor = Depends(require(Role.CONTENT))):
+    """Replace the workspace {logline, hooks[], episode_outlines[{number, beat}],
+    notes}. Capped: ≤200 items per list, ≤2000 chars per string."""
+    d = _series_or_404(slug)
+    logline = _text(body, "logline", _WR_MAX_STR)
+    notes = _text(body, "notes", _WR_MAX_STR)
+    hooks_in = body.get("hooks") or []
+    outlines_in = body.get("episode_outlines") or []
+    if not isinstance(hooks_in, list) or len(hooks_in) > _WR_MAX_ITEMS:
+        raise HTTPException(status_code=400, detail=f"hooks: a list of at most {_WR_MAX_ITEMS}")
+    if not isinstance(outlines_in, list) or len(outlines_in) > _WR_MAX_ITEMS:
+        raise HTTPException(status_code=400,
+                            detail=f"episode_outlines: a list of at most {_WR_MAX_ITEMS}")
+    hooks = []
+    for h in hooks_in:
+        h = _text({"hook": h}, "hook", _WR_MAX_STR)
+        if h:
+            hooks.append(h)
+    outlines = []
+    for o in outlines_in:
+        if not isinstance(o, dict):
+            raise HTTPException(status_code=400, detail="each outline is {number, beat}")
+        try:
+            number = int(o.get("number", 0))
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="outline number must be an integer")
+        if not (1 <= number <= d.episode_count):
+            raise HTTPException(status_code=400,
+                                detail=f"outline number must be 1-{d.episode_count}")
+        outlines.append({"number": number, "beat": _text(o, "beat", _WR_MAX_STR)})
+    _need_persistence()
+    record = {"logline": logline, "hooks": hooks, "episode_outlines": outlines,
+              "notes": notes, "by": actor.id, "at": now_iso()}
+    SHARED.kv_set(f"writers:{slug}", _json.dumps(record))
+    ws = _writers_ws(slug)
+    pct = _completeness(ws, d.episode_count)
+    audit(actor, "writers.save", slug,
+          {"hooks": len(hooks), "outlines": len(outlines), "completeness": pct}, request)
+    return {"slug": slug, "title": d.title, "episodeCount": d.episode_count,
+            "completeness_pct": pct, **ws}
+
+
+# ---- 5. Programming: the release calendar ------------------------------------
+@router.get("/programming", tags=["programming"])
+def programming(actor: Actor = Depends(require(Role.CONTENT, Role.QC, Role.ANALYST, Role.RO))):
+    rows = []
+    for s in _admin_all_series():
+        status, _rating, _touched = _series_overrides(s.slug)
+        sched = _kv_json(f"sched:{s.slug}")
+        rows.append({"slug": s.slug, "title": s.title,
+                     "language": _LANG_NAMES.get(s.primary_language, s.primary_language),
+                     "episodeCount": s.episode_count, "status": status,
+                     "release_at": str(sched.get("release_at", "")),
+                     "scheduled_by": str(sched.get("by", "")),
+                     "scheduled_at": str(sched.get("at", ""))})
+    rows.sort(key=lambda r: (r["release_at"] == "", r["release_at"], r["slug"]))
+    return {"series": rows, "now": now_iso()}
+
+
+@router.patch("/catalog/series/{slug}/schedule", tags=["catalog"])
+def set_series_schedule(slug: str, request: Request = None, body: dict = Body(...),
+                        actor: Actor = Depends(require(Role.CONTENT))):
+    """Set (or clear, with an empty release_at) the release moment. Setting
+    it flips the series to `scheduled` through the same lifecycle rule the
+    status endpoint enforces; clearing it returns a scheduled series to
+    draft and leaves any other status alone. Typed confirm: the slug."""
+    if not _series_exists(slug):
+        raise HTTPException(status_code=404, detail="series not found")
+    if body.get("confirm") != slug:
+        raise HTTPException(status_code=428, detail="type the slug to confirm")
+    release_at = _text(body, "release_at", 40)
+    _need_persistence()
+    if release_at:
+        from datetime import datetime
+        try:
+            when = datetime.fromisoformat(release_at)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="release_at must be ISO-8601")
+        if when.tzinfo is None:
+            raise HTTPException(status_code=400, detail="release_at needs a timezone offset")
+        record = {"release_at": when.isoformat(timespec="seconds"), "by": actor.id,
+                  "at": now_iso()}
+        SHARED.kv_set(f"sched:{slug}", _json.dumps(record))
+        set_series_status(slug, request,
+                          {"status": "scheduled", "reason": f"release {record['release_at']}"},
+                          actor)
+        audit(actor, "series.schedule", slug, {"release_at": record["release_at"]}, request)
+        return {"slug": slug, "status": "scheduled", **record}
+    SHARED.kv_set(f"sched:{slug}", "")
+    status = _series_overrides(slug)[0]
+    if status == "scheduled":
+        set_series_status(slug, request, {"status": "draft", "reason": "unscheduled"}, actor)
+        status = "draft"
+    audit(actor, "series.unschedule", slug, {"status": status}, request)
+    return {"slug": slug, "status": status, "release_at": ""}
+
+
+# ---- 9. Bulk pricing (finance) -------------------------------------------------
+@router.post("/catalog/pricing/bulk", tags=["catalog"])
+def bulk_pricing(request: Request = None, body: dict = Body(...),
+                 actor: Actor = Depends(require(Role.FINANCE))):
+    """Reprice many series at once: the same bounds as the single lever,
+    applied per slug, audited ONCE with the slug list; per-slug results so
+    an unknown slug is reported, not silently skipped."""
+    if body.get("confirm") != "PRICING":
+        raise HTTPException(status_code=428, detail="type PRICING to confirm")
+    slugs = body.get("slugs")
+    if not isinstance(slugs, list) or not slugs or len(slugs) > 100:
+        raise HTTPException(status_code=400, detail="slugs: 1-100 series")
+    fields = _pricing_fields(body)
+    _need_persistence()
+    results = []
+    applied = []
+    for slug in dict.fromkeys(str(s).strip() for s in slugs):
+        if not _series_exists(slug):
+            results.append({"slug": slug, "ok": False, "error": "series not found"})
+            continue
+        SHARED.kv_set(f"price:{slug}", _json.dumps(fields))
+        SHARED.kv_set(f"touched:{slug}", now_iso())
+        applied.append(slug)
+        results.append({"slug": slug, "ok": True, **fields})
+    if applied:
+        audit(actor, "series.pricing.bulk", f"{len(applied)} series",
+              {"slugs": ",".join(applied), **fields}, request)
+    return {"applied": len(applied), "results": results, **fields}
+
 
 app.include_router(router)
 

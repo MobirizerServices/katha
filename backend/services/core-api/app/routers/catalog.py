@@ -6,7 +6,15 @@ from fastapi import APIRouter, Header, HTTPException
 import json as _json
 
 from katha_domain import catalog
-from katha_domain.schemas import HomeResponse, HomeRow, SeriesDetail, SeriesSummary
+from katha_domain.schemas import (
+    LANGUAGES,
+    HomeResponse,
+    HomeRow,
+    SearchPerson,
+    SearchResponse,
+    SeriesDetail,
+    SeriesSummary,
+)
 
 from .. import overrides
 from ..store import store
@@ -88,3 +96,40 @@ def series_detail(slug: str) -> SeriesDetail:
     if ratings.get(slug):
         s = s.model_copy(update={"content_rating": ratings[slug]})
     return s
+
+
+@router.get("/search", response_model=SearchResponse)
+def search(q: str = "", lang: str | None = None) -> SearchResponse:
+    """Catalog search (no auth). Series match on title / native title / tropes /
+    genres, case-insensitive substring; people match on the billed cast name.
+    Only served (live) series are searchable or listed under a person — the
+    same gate as the catalog listing, so an archived title never leaks."""
+    needle = q.strip().casefold()
+    if not needle:
+        raise HTTPException(status_code=400, detail="q is required")
+    if lang is not None and lang not in LANGUAGES:
+        raise HTTPException(status_code=400,
+                            detail=f"lang must be one of {', '.join(LANGUAGES)}")
+    served = _served(overrides.all_summaries())
+    if lang:
+        served = [x for x in served if x.primary_language == lang]
+    ranked: list[tuple[int, SeriesSummary]] = []
+    people: dict[str, SearchPerson] = {}
+    for summary in served:
+        d = overrides.get_series(summary.slug)
+        if d is None:  # pragma: no cover - a summary always has a detail
+            continue
+        if needle in d.title.casefold() or needle in d.title_native.casefold():
+            ranked.append((0, summary))
+        elif any(needle in t.casefold() for t in [*d.tropes, *d.genres]):
+            ranked.append((1, summary))
+        for c in d.cast:
+            if needle not in c.name.casefold():
+                continue
+            person = people.get(c.name)
+            if person is None:
+                person = people[c.name] = SearchPerson(name=c.name, role=c.role, series=[])
+            person.series.append(summary)
+    ranked.sort(key=lambda t: t[0])   # stable: title hits first, catalog order within
+    return SearchResponse(query=q.strip(), series=[x for _, x in ranked],
+                          people=list(people.values()))

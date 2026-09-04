@@ -1,7 +1,7 @@
 """Engagement: watch progress, continue-watching, My List, daily check-in reward."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from katha_domain import catalog
 from katha_domain.schemas import (
@@ -10,6 +10,7 @@ from katha_domain.schemas import (
     ContinueResponse,
     MyListResponse,
     ProgressBatchBody,
+    RemindersResponse,
     WalletResponse,
 )
 from katha_ledger import TxType
@@ -44,20 +45,29 @@ def put_progress(body: ProgressBatchBody, user: str = Depends(current_user)) -> 
 
 
 @router.get("/me/continue", response_model=ContinueResponse)
-def get_continue(user: str = Depends(current_user)) -> ContinueResponse:
-    return _continue(user)
+def get_continue(limit: int = Query(20, ge=1, le=100),
+                 user: str = Depends(current_user)) -> ContinueResponse:
+    """Continue watching, most recent first. `limit` sizes the rail (20) or the
+    full-list screen (up to 100)."""
+    return _continue(user, limit=limit)
 
 
-def _continue(user: str) -> ContinueResponse:
+def _continue(user: str, *, limit: int = 20) -> ContinueResponse:
+    from ..overrides import get_series
     items: list[ContinueItem] = []
-    for p in store.continue_watching(user):
-        series = catalog.get_series(p.slug)
+    for p in store.continue_watching(user)[:limit]:
+        series = get_series(p.slug)
         title = series.title if series else p.slug
+        ep = series.episodes[p.number - 1] if series and 0 < p.number <= len(series.episodes) else None
         percent = int(p.position_ms * 100 / p.duration_ms) if p.duration_ms else 0
         items.append(ContinueItem(
             slug=p.slug, number=p.number, episode_id=p.episode_id,
             position_ms=p.position_ms, duration_ms=p.duration_ms,
-            title=title, percent=percent,
+            title=title, percent=percent, series_title=title,
+            episode_title=ep.title if ep else "",
+            cover_url=series.cover_url if series else "",
+            cover_wide_url=series.cover_wide_url if series else "",
+            updated_at=p.updated_at,
         ))
     return ContinueResponse(items=items)
 
@@ -87,6 +97,28 @@ def _list_response(user: str) -> MyListResponse:
     summaries = {s.slug: s for s in catalog.summaries()}
     series = [summaries[s] for s in slugs if s in summaries]
     return MyListResponse(slugs=slugs, series=series)
+
+
+# ---- reminders: "remind me when a new episode drops" -----------------------
+@router.get("/me/reminders", response_model=RemindersResponse)
+def get_reminders(user: str = Depends(current_user)) -> RemindersResponse:
+    return RemindersResponse(slugs=store.reminders(user))
+
+
+@router.put("/me/reminders/{slug}", response_model=RemindersResponse)
+def add_reminder(slug: str, user: str = Depends(current_user)) -> RemindersResponse:
+    from ..overrides import get_series, is_served
+    if not is_served(slug) or get_series(slug) is None:
+        raise HTTPException(status_code=404, detail="series not found")
+    store.add_reminder(user, slug)
+    store.emit(user, "reminder_set", ref=slug)
+    return RemindersResponse(slugs=store.reminders(user))
+
+
+@router.delete("/me/reminders/{slug}", response_model=RemindersResponse)
+def remove_reminder(slug: str, user: str = Depends(current_user)) -> RemindersResponse:
+    store.remove_reminder(user, slug)
+    return RemindersResponse(slugs=store.reminders(user))
 
 
 @router.post("/rewards/checkin", response_model=CheckinResponse)
