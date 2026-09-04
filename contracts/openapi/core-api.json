@@ -1378,6 +1378,12 @@
               }
             }
           },
+          "402": {
+            "description": "insufficient coins"
+          },
+          "409": {
+            "description": "idempotency key already used for a different unlock"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -1445,6 +1451,12 @@
                 }
               }
             }
+          },
+          "402": {
+            "description": "insufficient coins"
+          },
+          "409": {
+            "description": "idempotency key already used for a different unlock"
           },
           "422": {
             "description": "Validation Error",

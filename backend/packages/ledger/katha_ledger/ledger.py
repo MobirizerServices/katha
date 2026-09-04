@@ -40,6 +40,13 @@ class BalanceNegative(LedgerError):
     """Unlocks are blocked while a refund clawback has left a pool negative."""
 
 
+class IdempotencyConflict(LedgerError):
+    """The key was already used for a DIFFERENT operation (another user, type,
+    reference, or amount). A replay must be byte-for-byte the same request;
+    anything else is a client bug or an attempt to pre-empt someone else's key,
+    and must never be answered with the original's result."""
+
+
 class Ledger:
     def __init__(self) -> None:
         self._log: list[Transaction] = []
@@ -56,10 +63,27 @@ class Ledger:
     def _wallet(self, user_id: str) -> Wallet:
         return self._wallets.setdefault(user_id, Wallet(user_id))
 
+    @staticmethod
+    def _same_operation(existing: Transaction, *, user_id: str, tx_type: TxType,
+                        reference_type: str, reference_id: str,
+                        amounts: tuple[int, int] | None = None) -> bool:
+        if (existing.user_id, existing.type, existing.reference_type,
+                existing.reference_id) != (user_id, tx_type, reference_type, reference_id):
+            return False
+        return amounts is None or amounts == (existing.amount_bought, existing.amount_bonus)
+
     def _append(self, tx: Transaction) -> Transaction:
-        # Idempotency: a replayed key returns the original, appends nothing.
+        # Idempotency: a replayed key returns the original, appends nothing —
+        # but only for the SAME operation; a different one under a used key
+        # is a conflict, never a silent no-op wearing the original's result.
         existing = self._by_key.get(tx.idempotency_key)
         if existing is not None:
+            if not self._same_operation(
+                    existing, user_id=tx.user_id, tx_type=tx.type,
+                    reference_type=tx.reference_type, reference_id=tx.reference_id,
+                    amounts=(tx.amount_bought, tx.amount_bonus)):
+                raise IdempotencyConflict(
+                    f"idempotency key {tx.idempotency_key!r} already used for a different operation")
             return existing
         self._log.append(tx)
         self._by_key[tx.idempotency_key] = tx
@@ -136,6 +160,13 @@ class Ledger:
         """
         if idempotency_key in self._by_key:
             original = self._by_key[idempotency_key]
+            # Amounts are state-dependent for an unlock, so a replay is judged
+            # on who/what, not on how much was spent the first time.
+            if not self._same_operation(original, user_id=user_id, tx_type=TxType.UNLOCK,
+                                        reference_type=reference_type,
+                                        reference_id=reference_id):
+                raise IdempotencyConflict(
+                    f"idempotency key {idempotency_key!r} already used for a different operation")
             ents = [self._entitlements[(user_id, e)] for e in episode_ids
                     if (user_id, e) in self._entitlements]
             return UnlockResult(transaction=original, entitlements=ents,

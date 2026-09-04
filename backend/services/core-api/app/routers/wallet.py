@@ -12,7 +12,7 @@ from katha_domain.schemas import (
     WalletResponse,
     WebOrderRequest,
 )
-from katha_ledger import InsufficientCoins, TxType
+from katha_ledger import IdempotencyConflict, InsufficientCoins, TxType
 from ..deps import current_user
 import json as _json
 
@@ -154,7 +154,22 @@ def web_order(req: WebOrderRequest, user: str = Depends(current_user)) -> Wallet
     return _wallet_response(user)
 
 
-@router.post("/series/{slug}/episodes/{number}/unlock", response_model=UnlockResponse)
+def _client_key(user: str, key: str) -> str:
+    """Ledger idempotency keys are one global namespace shared with the keys the
+    server mints (checkin:, web:, merge:…). A client-chosen key is therefore
+    scoped to the caller before it reaches the ledger, so one user can neither
+    collide with nor pre-empt another user's operation."""
+    return f"unlock:{user}:{key}"
+
+
+_UNLOCK_RESPONSES = {
+    402: {"description": "insufficient coins"},
+    409: {"description": "idempotency key already used for a different unlock"},
+}
+
+
+@router.post("/series/{slug}/episodes/{number}/unlock", response_model=UnlockResponse,
+             responses=_UNLOCK_RESPONSES)
 def unlock_episode(slug: str, number: int, req: UnlockRequest,
                    user: str = Depends(current_user)) -> UnlockResponse:
     from ..overrides import get_series, is_served
@@ -165,15 +180,19 @@ def unlock_episode(slug: str, number: int, req: UnlockRequest,
     try:
         res = store.ledger.unlock(user, [eid], price_per_episode=series.episode_coin_price,
                                   reference_type="episode", reference_id=eid,
-                                  idempotency_key=req.idempotency_key, created_at=now_iso())
+                                  idempotency_key=_client_key(user, req.idempotency_key),
+                                  created_at=now_iso())
     except InsufficientCoins as e:
         raise HTTPException(status_code=402, detail=str(e))
+    except IdempotencyConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
     store.emit(user, "unlock", ref=eid, value=res.spent_bonus + res.spent_bought)
     return UnlockResponse(episode_ids=[eid], spent_bonus=res.spent_bonus,
                           spent_bought=res.spent_bought, wallet=_wallet_response(user))
 
 
-@router.post("/series/{slug}/unlock-all", response_model=UnlockResponse)
+@router.post("/series/{slug}/unlock-all", response_model=UnlockResponse,
+             responses=_UNLOCK_RESPONSES)
 def unlock_all(slug: str, req: UnlockRequest, user: str = Depends(current_user)) -> UnlockResponse:
     from ..overrides import get_series, is_served
     series = get_series(slug)
@@ -188,10 +207,12 @@ def unlock_all(slug: str, req: UnlockRequest, user: str = Depends(current_user))
     try:
         res = store.ledger.unlock(user, locked, price_per_episode=series.episode_coin_price,
                                   reference_type="bundle", reference_id=slug,
-                                  idempotency_key=req.idempotency_key, created_at=now_iso(),
-                                  source="bundle", total_cost=bundle_total)
+                                  idempotency_key=_client_key(user, req.idempotency_key),
+                                  created_at=now_iso(), source="bundle", total_cost=bundle_total)
     except InsufficientCoins as e:
         raise HTTPException(status_code=402, detail=str(e))
+    except IdempotencyConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
     store.emit(user, "unlock", ref=f"bundle:{slug}",
                value=res.spent_bonus + res.spent_bought)
     return UnlockResponse(episode_ids=locked, spent_bonus=res.spent_bonus,

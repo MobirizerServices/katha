@@ -7,6 +7,7 @@ import pytest
 
 from katha_ledger import (
     BalanceNegative,
+    IdempotencyConflict,
     InsufficientCoins,
     Ledger,
     TxType,
@@ -195,3 +196,46 @@ def test_reconcile_isolates_users():
              reference_id="t", idempotency_key="kb", created_at=TS)
     assert L.reconcile("a").total == 600
     assert L.reconcile("b").total == 999
+
+
+# ---- idempotency keys identify ONE operation ------------------------------
+def test_replay_under_a_used_key_by_another_user_is_a_conflict_not_a_noop():
+    L = fresh()
+    L.credit("victim", TxType.CHECKIN, coins=5, reference_type="day",
+             reference_id="2026-09-03", idempotency_key="checkin:victim:2026-09-03",
+             created_at=TS)
+    L.credit("attacker", TxType.PURCHASE, coins=600, reference_type="iap",
+             reference_id="p", idempotency_key="buy", created_at=TS)
+    with pytest.raises(IdempotencyConflict):
+        L.unlock("attacker", ["s:e11"], price_per_episode=30, reference_type="episode",
+                 reference_id="s:e11", idempotency_key="checkin:victim:2026-09-03",
+                 created_at=TS)
+    with pytest.raises(IdempotencyConflict):
+        L.credit("attacker", TxType.CHECKIN, coins=5, reference_type="day",
+                 reference_id="2026-09-03", idempotency_key="checkin:victim:2026-09-03",
+                 created_at=TS)
+    assert L.balance("attacker").total == 600            # nothing spent or granted
+    assert L.balance("victim").total == 5
+
+
+def test_same_user_reusing_a_key_for_a_different_operation_is_a_conflict():
+    L = fresh()
+    L.credit("u", TxType.PURCHASE, coins=600, reference_type="iap",
+             reference_id="p", idempotency_key="buy", created_at=TS)
+    L.unlock("u", ["s:e11"], price_per_episode=30, reference_type="episode",
+             reference_id="s:e11", idempotency_key="k", created_at=TS)
+    # exact replay: original result, nothing appended
+    again = L.unlock("u", ["s:e11"], price_per_episode=30, reference_type="episode",
+                     reference_id="s:e11", idempotency_key="k", created_at=TS)
+    assert again.spent_bonus + again.spent_bought == 30
+    assert L.balance("u").total == 570
+    # same key, different episode: conflict, and e12 stays locked
+    with pytest.raises(IdempotencyConflict):
+        L.unlock("u", ["s:e12"], price_per_episode=30, reference_type="episode",
+                 reference_id="s:e12", idempotency_key="k", created_at=TS)
+    assert not L.is_entitled("u", "s:e12")
+    # a credit replay with a different amount is a conflict too
+    with pytest.raises(IdempotencyConflict):
+        L.credit("u", TxType.PURCHASE, coins=999, reference_type="iap",
+                 reference_id="p", idempotency_key="buy", created_at=TS)
+    assert L.balance("u").total == 570

@@ -120,3 +120,59 @@ def test_admin_auth_mode_defaults_to_oidc(monkeypatch):
     from admin_app import oidc
     monkeypatch.delenv("KATHA_ADMIN_AUTH", raising=False)
     assert oidc.auth_mode() == "oidc"
+
+
+# --- B4: client idempotency keys are scoped to the caller --------------------
+
+def _fund(user: str) -> None:
+    client.post("/v1/iap/verify", headers={"Authorization": f"Bearer {user}"},
+                json={"jws": f"receipt-{user}", "sku": "coins_popular_in"})
+
+
+def test_two_users_may_use_the_same_unlock_key():
+    _fund("key-user-a"); _fund("key-user-b")
+    body = {"idempotency_key": "same-client-key"}
+    a = client.post("/v1/series/kaanch-ka-mahal/episodes/11/unlock",
+                    headers={"Authorization": "Bearer key-user-a"}, json=body)
+    b = client.post("/v1/series/kaanch-ka-mahal/episodes/11/unlock",
+                    headers={"Authorization": "Bearer key-user-b"}, json=body)
+    assert a.status_code == b.status_code == 200
+    # B was charged for and granted their own unlock, not handed A's result.
+    assert b.json()["spent_bonus"] + b.json()["spent_bought"] == 30
+    assert b.json()["wallet"]["total"] == a.json()["wallet"]["total"] == 1300 - 30
+
+
+def test_a_client_key_cannot_pre_empt_a_server_minted_key():
+    from katha_domain.timeutil import ist_day
+    from app.store import store
+    _fund("key-attacker")
+    victim = "usr_victim0000000000"
+    # The attacker unlocks under the exact key the server will mint for the
+    # victim's check-in today…
+    r = client.post("/v1/series/kaanch-ka-mahal/episodes/11/unlock",
+                    headers={"Authorization": "Bearer key-attacker"},
+                    json={"idempotency_key": f"checkin:{victim}:{ist_day()}"})
+    assert r.status_code == 200
+    # …and the victim's check-in still grants, because that key never reached
+    # the ledger unscoped.
+    ck = client.post("/v1/rewards/checkin", headers={"Authorization": f"Bearer {victim}"})
+    assert ck.status_code == 200 and ck.json()["granted_coins"] > 0
+    assert store.ledger.balance(victim).total == ck.json()["granted_coins"]
+
+
+def test_reusing_a_key_for_a_different_episode_is_409():
+    _fund("key-reuser")
+    h = {"Authorization": "Bearer key-reuser"}
+    first = client.post("/v1/series/kaanch-ka-mahal/episodes/11/unlock", headers=h,
+                        json={"idempotency_key": "k1"})
+    replay = client.post("/v1/series/kaanch-ka-mahal/episodes/11/unlock", headers=h,
+                         json={"idempotency_key": "k1"})
+    assert first.status_code == replay.status_code == 200
+    assert replay.json()["wallet"]["total"] == first.json()["wallet"]["total"]
+    other = client.post("/v1/series/kaanch-ka-mahal/episodes/12/unlock", headers=h,
+                        json={"idempotency_key": "k1"})
+    assert other.status_code == 409
+    bundle = client.post("/v1/series/kaanch-ka-mahal/unlock-all", headers=h,
+                         json={"idempotency_key": "k1"})
+    assert bundle.status_code == 409
+    assert other.json()["detail"].startswith("idempotency key")
