@@ -19,10 +19,28 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import tempfile
 import urllib.request
 from pathlib import Path
+
+
+SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,39}$")
+
+
+def check_job(slug: str, episode) -> tuple[str, int]:
+    """Validate a (slug, episode) from a plan/map/CLI before it becomes a path:
+    a slug like "../../../Users/x/.ssh/y" would otherwise write outside media/."""
+    if not isinstance(slug, str) or not SLUG_RE.match(slug):
+        raise SystemExit(f"invalid slug {slug!r}: a-z, 0-9 and hyphens, 2-40 chars")
+    try:
+        ep = int(episode)
+    except (TypeError, ValueError):
+        raise SystemExit(f"invalid episode {episode!r} for {slug}") from None
+    if not (1 <= ep <= 999):
+        raise SystemExit(f"episode {ep} out of range for {slug} (1-999)")
+    return slug, ep
 
 META = "https://archive.org/metadata/{id}"
 DL = "https://archive.org/download/{id}/{name}"
@@ -129,6 +147,7 @@ def main() -> None:
 
     downloaded: list[Path] = []
     for job in jobs:
+        job["slug"], job["episode"] = check_job(job.get("slug"), job.get("episode"))
         ident = job["id"]
         try:
             meta = _get_json(META.format(id=ident))

@@ -1,5 +1,8 @@
 # Katha monorepo — dev orchestration. Requires: uv (Python), node/npm (web), swift (iOS).
 PYBIN := backend/.venv/bin/python
+# Local runs are explicitly dev: the backend's production guard treats an UNSET
+# KATHA_ENV as a managed environment and refuses the committed dev secrets.
+export KATHA_ENV ?= dev
 # Paths are relative to backend/ (every recipe cd's there first).
 PP := packages/ledger:packages/domain:packages/infra:services/core-api
 

@@ -1548,10 +1548,9 @@ from . import oidc as _oidc  # noqa: E402  (needs `audit` + SHARED defined above
 app.include_router(_oidc.router)
 
 # Fail-closed config guard (see katha_infra.prodguard). No-op in dev/test.
-try:
-    from katha_infra import enforce_production_config
-    from katha_infra import observability
-    observability.init("admin-api")
-    enforce_production_config("admin-api")
-except ImportError:
-    pass
+# Never wrapped in try/except: a missing infra package must not silently
+# skip the guard.
+from katha_infra import enforce_production_config, observability  # noqa: E402
+
+observability.init("admin-api")
+enforce_production_config("admin-api")

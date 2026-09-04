@@ -38,6 +38,23 @@ import subprocess
 import sys
 from pathlib import Path
 
+
+SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,39}$")
+
+
+def check_job(slug: str, episode) -> tuple[str, int]:
+    """Validate a (slug, episode) from a plan/map/CLI before it becomes a path:
+    a slug like "../../../Users/x/.ssh/y" would otherwise write outside media/."""
+    if not isinstance(slug, str) or not SLUG_RE.match(slug):
+        raise SystemExit(f"invalid slug {slug!r}: a-z, 0-9 and hyphens, 2-40 chars")
+    try:
+        ep = int(episode)
+    except (TypeError, ValueError):
+        raise SystemExit(f"invalid episode {episode!r} for {slug}") from None
+    if not (1 <= ep <= 999):
+        raise SystemExit(f"episode {ep} out of range for {slug} (1-999)")
+    return slug, ep
+
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MEDIA = ROOT / "media"
 
@@ -101,7 +118,10 @@ def _vf(fit: str) -> str:
 
 def ingest_one(src: Path, slug: str, episode: int, *, media_dir: Path,
                fit: str = "cover", encrypt: bool = False, force: bool = False) -> dict:
+    slug, episode = check_job(slug, episode)
     out = media_dir / slug / f"e{episode:03d}"
+    if not out.resolve().is_relative_to(media_dir.resolve()):
+        raise ValueError(f"refusing to write outside {media_dir}: {out}")
     master = out / "hls" / "master.m3u8"
     if master.exists() and not force:
         return {"slug": slug, "episode": episode, "status": "skipped (exists)"}
@@ -167,10 +187,10 @@ def _load_jobs(args) -> list[tuple[Path, str, int]]:
     if args.file:
         if not (args.slug and args.episode):
             sys.exit("--file requires --slug and --episode")
-        jobs.append((Path(args.file), args.slug, int(args.episode)))
+        jobs.append((Path(args.file), *check_job(args.slug, args.episode)))
     elif args.map:
         for row in json.loads(Path(args.map).read_text()):
-            jobs.append((Path(row["file"]), row["slug"], int(row["episode"])))
+            jobs.append((Path(row["file"]), *check_job(row.get("slug"), row.get("episode"))))
     elif args.source_dir:
         pat = re.compile(r"^(?P<slug>[a-z0-9-]+)_e(?P<ep>\d{1,3})\.(mp4|mov|m4v)$", re.I)
         for f in sorted(Path(args.source_dir).iterdir()):

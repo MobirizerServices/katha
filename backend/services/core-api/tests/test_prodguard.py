@@ -19,9 +19,20 @@ def _managed_core(monkeypatch):
 
 
 def test_dev_env_is_a_noop(monkeypatch):
+    for env in ("dev", "test", "local", "DEV"):
+        monkeypatch.setenv("KATHA_ENV", env)
+        enforce("core-api")          # no raise
+        enforce("admin-api")
+
+
+def test_unset_env_counts_as_managed(monkeypatch):
+    """D6: forgetting KATHA_ENV must fail closed, with a hint."""
     monkeypatch.delenv("KATHA_ENV", raising=False)
-    enforce("core-api")          # no raise
-    enforce("admin-api")
+    for k in ("KATHA_JWT_SECRET", "KATHA_STREAM_SECRET"):
+        monkeypatch.delenv(k, raising=False)
+    with pytest.raises(InsecureConfigError) as e:
+        enforce("core-api")
+    assert "KATHA_ENV is not set" in str(e.value)
 
 
 def test_managed_core_missing_everything_raises(monkeypatch):

@@ -8,8 +8,9 @@ the review's hardening from "warns" into "cannot run insecurely" — the dev
 fallbacks (raw-bearer auth, the IAP stub) key off these same secrets, so once
 they are real, the stubs are off.
 
-`KATHA_ENV` unset or "dev"/"test"/"local" → every check is a no-op, so the test
-suite and local runs are untouched.
+`KATHA_ENV` = "dev"/"test"/"local" → every check is a no-op, so the test suite
+and local runs are untouched. UNSET counts as managed: forgetting the variable
+must fail closed, not open.
 """
 from __future__ import annotations
 
@@ -26,8 +27,17 @@ class InsecureConfigError(RuntimeError):
     """Raised at startup when a managed env is configured insecurely."""
 
 
+_DEV_ENVS = {"dev", "test", "local"}
+
+
 def is_managed_env() -> bool:
-    return os.environ.get("KATHA_ENV", "dev").strip().lower() in _MANAGED_ENVS
+    """Managed unless the deployer EXPLICITLY says dev/test/local. An unset
+    KATHA_ENV used to mean "dev" — so an image run without it served the
+    committed secrets and the auth stubs on a reachable host."""
+    raw = os.environ.get("KATHA_ENV")
+    if raw is None:
+        return True
+    return raw.strip().lower() not in _DEV_ENVS
 
 
 def _require_secret(name: str, *, dev_default: str | None, problems: list[str]) -> None:
@@ -107,6 +117,10 @@ def enforce(service: str) -> None:
         problems.append("KATHA_DB_URL must point at a server database (not SQLite)")
 
     if problems:
+        env = os.environ.get("KATHA_ENV")
+        hint = ("" if env is not None else
+                "\n  (KATHA_ENV is not set, which counts as a managed environment; "
+                "set KATHA_ENV=dev for a local run)")
         raise InsecureConfigError(
-            f"refusing to start {service} in KATHA_ENV="
-            f"{os.environ.get('KATHA_ENV')} — fix:\n  - " + "\n  - ".join(problems))
+            f"refusing to start {service} in KATHA_ENV={env} — fix:\n  - "
+            + "\n  - ".join(problems) + hint)

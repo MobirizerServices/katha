@@ -20,13 +20,10 @@ async def send_email_task(ctx, *, to: str, subject: str, body_html: str) -> None
     """Deliver a transactional email (invoices, receipts). Wraps the same
     comms.send_email the request path uses; the SMTP call happens here instead
     of blocking the purchase response."""
-    from katha_infra import SharedStore
-    from katha_infra.db import Database
     from katha_domain.timeutil import now_iso
     from katha_infra import comms
 
-    shared = SharedStore(Database())
-    comms.send_email(shared, to=to, subject=subject, body_html=body_html, now=now_iso())
+    comms.send_email(ctx["shared"], to=to, subject=subject, body_html=body_html, now=now_iso())
 
 
 async def send_push_task(ctx, *, token: str, title: str, body: str) -> None:
@@ -36,8 +33,17 @@ async def send_push_task(ctx, *, token: str, title: str, body: str) -> None:
     ctx["log"] = f"push→{token[:8]}… {title}"
 
 
+async def on_startup(ctx) -> None:
+    """One database engine (and its loop thread) per worker process — building a
+    fresh Database per task leaked an engine and a thread on every email."""
+    from katha_infra import SharedStore
+    from katha_infra.db import Database
+    ctx["shared"] = SharedStore(Database())
+
+
 class WorkerSettings:
     functions = [send_email_task, send_push_task]
+    on_startup = on_startup
     redis_settings = _redis_settings()
     max_jobs = int(os.environ.get("KATHA_WORKER_CONCURRENCY", "10"))
     job_timeout = 30

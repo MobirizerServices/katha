@@ -13,6 +13,7 @@ const API = "http://127.0.0.1:8899";
 const WEB = "http://localhost:5199";
 
 const backendEnv = [
+  "KATHA_ENV=dev",
   "KATHA_PERSIST=1",
   `KATHA_DB_URL=sqlite+aiosqlite:////tmp/katha_e2e_${process.pid}.db`,
   "KATHA_ADMIN_AUTH=oidc",

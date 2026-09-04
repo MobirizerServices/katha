@@ -44,13 +44,12 @@ app.add_middleware(
 
 # Fail-closed: in a managed env (KATHA_ENV=qa|staging|prod) refuse to start on a
 # missing/dev-default secret, a dev auth mode, or a SQLite URL. No-op in dev/test.
-try:
-    from katha_infra import enforce_production_config
-    from katha_infra import observability
-    observability.init("core-api")
-    enforce_production_config("core-api")
-except ImportError:
-    pass  # infra not on path (pure in-memory dev run) — nothing to enforce
+# Never wrapped in try/except: a missing infra package must not silently
+# skip the guard.
+from katha_infra import enforce_production_config, observability  # noqa: E402
+
+observability.init("core-api")
+enforce_production_config("core-api")
 
 app.include_router(auth_router.router)
 app.include_router(catalog_router.router)

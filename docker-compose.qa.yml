@@ -28,6 +28,7 @@ x-backend-env: &backend-env
 
 services:
   postgres:
+    restart: unless-stopped
     image: postgres:16
     environment:
       POSTGRES_DB: katha
@@ -40,6 +41,7 @@ services:
       retries: 5
 
   redis:
+    restart: unless-stopped
     image: redis:7
     command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
     healthcheck:
@@ -48,17 +50,21 @@ services:
       retries: 5
 
   backend:                          # core-api (public)
+    restart: unless-stopped
     build: { context: ., dockerfile: backend/Dockerfile }
     environment:
       <<: *backend-env
       KATHA_ASGI_APP: app.main:app
       KATHA_RUN_MIGRATIONS: "1"     # this service runs `alembic upgrade head` once
-    volumes: ["media:/srv/media"]
+    # The HLS catalog lives on the host (tools/ingest_media.py writes ./media);
+    # a named volume here was never populated, so every playback 404'd.
+    volumes: ["./media:/srv/media"]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
 
   admin-backend:                    # admin-api
+    restart: unless-stopped
     build: { context: ., dockerfile: backend/Dockerfile }
     environment:
       <<: *backend-env
@@ -78,14 +84,17 @@ services:
       backend: { condition: service_started }
 
   worker:                           # arq async tasks (email, push)
+    restart: unless-stopped
     build: { context: ., dockerfile: backend/Dockerfile }
     working_dir: /app/services/worker
     entrypoint: ["arq", "settings.WorkerSettings"]
     environment: *backend-env
+    healthcheck: { disable: true }     # inherits the image's HTTP check, but runs arq
     depends_on:
       redis: { condition: service_healthy }
 
   web-site:
+    restart: unless-stopped
     build:
       context: ./web/site
       args:
@@ -94,6 +103,7 @@ services:
     depends_on: [backend]
 
   web-admin:
+    restart: unless-stopped
     build:
       context: ./web/admin
       args:
@@ -101,17 +111,17 @@ services:
         # VITE_ADMIN_API_BASE is deliberately unset: same-origin /admin/v1
 
   nginx:
+    restart: unless-stopped
     image: nginx:1.27-alpine
     ports: ["80:80", "443:443"]
     volumes:
       - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./deploy/nginx/admin-allow.conf:/etc/nginx/admin-allow.conf:ro
       - ./deploy/certs:/etc/nginx/certs:ro
-      - media:/srv/media:ro
+      - ./media:/srv/media:ro
       - certbot-www:/var/www/certbot
     depends_on: [backend, admin-backend, web-site, web-admin]
 
 volumes:
   pgdata:
-  media:
   certbot-www:
