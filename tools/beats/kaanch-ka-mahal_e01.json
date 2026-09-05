@@ -1,0 +1,115 @@
+{
+  "slug": "kaanch-ka-mahal",
+  "episode": 1,
+  "title": "One face too many",
+  "language": "hi",
+  "logline": "Meera, newly married, finds a stranger standing beside her husband in every wedding photograph. Then he walks in.",
+  "look": "Indian family drama, Lucknow haveli interior, warm tungsten and window light, carved teak furniture, jaali screens, dust motes in a shaft of light, shallow depth of field, cinematic 35mm, muted ochre and deep green palette, no on-screen text, no logos, no artwork on walls",
+  "characters": {
+    "meera": {
+      "name": "Meera",
+      "ref_prompt": "Photorealistic portrait of a 27-year-old North Indian woman, warm brown skin, expressive dark eyes, long dark hair partly covered by a soft red-and-gold wedding dupatta, minimal gold jewellery, mangalsutra, deep red bridal saree. Calm, observant, a little out of place. Natural window light from camera left, warm interior of a traditional Lucknow haveli behind her, shallow depth of field. Neutral expression, looking slightly off camera. Full head and shoulders, vertical 9:16 framing."
+    },
+    "sushila": {
+      "name": "Sushila",
+      "ref_prompt": "Photorealistic portrait of a 58-year-old North Indian woman, silver-streaked hair pulled into a tight low bun, plain starched cotton saree in muted olive, thin gold bangles, no smile, eyes that give nothing away. Authority without warmth. Dim warm interior light of an old haveli corridor, shallow depth of field. Full head and shoulders, vertical 9:16 framing."
+    },
+    "arun": {
+      "name": "Arun",
+      "ref_prompt": "Photorealistic portrait of a 34-year-old North Indian man, close-cropped beard, tired knowing eyes, plain dark kurta, standing in a doorway with bright daylight behind him so his face is half in shadow. Composed, unhurried, faintly amused. Shallow depth of field. Full head and shoulders, vertical 9:16 framing."
+    }
+  },
+  "shots": [
+    {
+      "id": "s01",
+      "beat": 1,
+      "characters": ["meera"],
+      "frame_prompt": "Wide vertical shot of Meera standing just inside the doorway of a grand but silent haveli drawing room, still in her red bridal saree and dupatta, a small suitcase at her feet. Carved teak sofas under white dust sheets, a heavy chandelier unlit, tall shuttered windows throwing hard bars of afternoon light across a marble floor. She is small in the frame. Nobody else present.",
+      "motion": "Very slow push-in towards Meera as she takes in the empty room. She turns her head slowly, taking in the height of the ceiling. Dust drifts in the shaft of light. Subtle handheld float.",
+      "audio": "Ambient room tone of a large empty house, a distant ceiling fan, faint street sounds from outside. No dialogue, no music.",
+      "duration": 8
+    },
+    {
+      "id": "s02",
+      "beat": 2,
+      "characters": ["meera"],
+      "frame_prompt": "Medium vertical shot of Meera sitting alone on the edge of a carved teak sofa in the haveli drawing room, a heavy maroon velvet wedding album resting closed on her lap, her hands flat on its cover. Warm window light from camera left. She is alone.",
+      "motion": "She opens the heavy album cover; it falls open with weight. Her eyes move down to the first page. Small, private movements. Camera holds, slight breathing motion.",
+      "audio": "The creak of a heavy album cover, thick paper settling, room tone. No dialogue, no music.",
+      "duration": 8
+    },
+    {
+      "id": "s03",
+      "beat": 2,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of an open traditional Indian wedding album on a woman's lap. Thick card pages with square photographs held under a plastic film: a garlanded bride and groom at a mandap, marigold garlands, warm flash-lit colours from a wedding photographer. A woman's hand with mehndi and red-and-gold bangles rests at the edge of the page. Warm window light.",
+      "motion": "The hand turns one thick page; the plastic film catches the light. Camera drifts slowly across the photographs.",
+      "audio": "Thick paper turning, plastic film crackle, quiet room tone. No dialogue, no music.",
+      "duration": 8
+    },
+    {
+      "id": "s04",
+      "beat": 3,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of one square wedding group photograph in an album: a row of Indian wedding guests in formal clothes. At the centre the groom in a cream sherwani. Standing immediately beside the groom is a 34-year-old man with a close-cropped beard in a plain dark kurta, and unlike everyone else in the photograph he is not looking at the camera lens, he is looking directly out of the picture at the viewer. Warm flash-lit wedding photograph, slight grain.",
+      "motion": "Slow push-in on the photograph until the bearded man's face fills more of the frame. Everything else stays still.",
+      "audio": "Room tone thinning out, a low sustained unsettling tone rising very slightly. No dialogue.",
+      "duration": 8
+    },
+    {
+      "id": "s05",
+      "beat": 3,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera's face looking down at the album, lit warmly from the window at camera left, the rest of the room dark behind her. Her expression is still, absorbed, on the edge of unease.",
+      "motion": "Her eyes flick across the photograph, stop, and hold. A single slow blink. She does not move otherwise. The smallest tightening around the eyes.",
+      "audio": "Room tone, her quiet breathing catching once. No dialogue, no music.",
+      "duration": 8
+    },
+    {
+      "id": "s06",
+      "beat": 4,
+      "characters": ["sushila"],
+      "frame_prompt": "Wide vertical shot of the haveli drawing room from behind Meera's shoulder as she sits with the album. In the deep background, an internal doorway to a dim corridor. Sushila, a 58-year-old woman in a muted olive cotton saree with a tight silver-streaked bun, stands in that doorway.",
+      "motion": "A doorbell rings off screen. Sushila crosses the frame from the corridor doorway towards the front door without looking at Meera, unhurried, and exits frame. Meera's head turns to follow her. Camera static.",
+      "audio": "An old mechanical doorbell rings twice, echoing in a large house. Slippers on marble. No dialogue, no music.",
+      "duration": 8
+    },
+    {
+      "id": "s07",
+      "beat": 5,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of an older black-and-white family photograph on the next page of the album: the same 34-year-old bearded man, younger here, in a plain shirt, holding a baby in his arms and smiling slightly. The photograph is creased and has aged to sepia. A woman's hand with red-and-gold bangles at the page edge.",
+      "motion": "The page settles flat; the camera pushes slowly in on the man's face in the old photograph.",
+      "audio": "Thick paper settling, room tone, the low tone continuing. In the far background a heavy front door being unbolted. No dialogue.",
+      "duration": 8
+    },
+    {
+      "id": "s08",
+      "beat": 6,
+      "characters": ["meera"],
+      "frame_prompt": "Vertical over-the-shoulder shot from behind and above Meera, seated with the open album, looking towards the far end of the drawing room where a bright doorway has just opened, daylight flooding in. A man's silhouette stands in that bright doorway, features not yet readable.",
+      "motion": "The silhouette in the doorway takes one step into the room. Meera's shoulders tense; she begins to lift her head. Camera holds, very slight push-in.",
+      "audio": "A man's warm unhurried voice speaks one line in Hindi: \"तो तुम हो नई बहू.\" Footsteps on marble. No music.",
+      "dialogue": {
+        "speaker": "arun",
+        "hi": "तो तुम हो नई बहू.",
+        "en": "So you're the new bahu."
+      },
+      "duration": 8
+    },
+    {
+      "id": "s09",
+      "beat": 6,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera's face as she looks up from the album towards camera, warm window light on her, the bright doorway blown out behind her. Recognition and disbelief arriving at the same moment.",
+      "motion": "She lifts her eyes to look up. Her face changes as she recognises him: the smallest widening of the eyes, lips parting. She does not speak. Camera pushes in slowly and holds on her eyes, then cuts to black.",
+      "audio": "Room tone falling away to near silence, a single low sub-bass hit as she recognises him. No dialogue.",
+      "duration": 8
+    }
+  ],
+  "end_card": {
+    "line_hi": "कबीर का कोई भाई नहीं है।",
+    "line_en": "Kabir has no brother.",
+    "seconds": 4
+  }
+}
