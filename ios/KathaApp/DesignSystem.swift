@@ -26,15 +26,38 @@ public enum Katha {
     /// energy) for titles; the wordmark is a literary serif italic; section
     /// labels run in small caps (a glyph feature — accessibility labels and
     /// UI-test string matching keep the original text).
+    ///
+    /// Every size here is a *design* size, quoted at the default (Large) content
+    /// size, and every one of them scales with Dynamic Type: the display face
+    /// through `Font.custom(_:size:relativeTo:)`, the system faces through the
+    /// `.kathaFont(_:)` modifier below (SwiftUI has no `system(size:relativeTo:)`,
+    /// so the modifier reads `\.dynamicTypeSize` and re-resolves the point size
+    /// itself — which is also what makes it re-render when the setting changes).
     public enum Font {
         /// Anton (OFL, bundled) — the same face the site and the key art use.
-        public static func display(_ size: CGFloat) -> SwiftUI.Font {
-            .custom("Anton-Regular", size: size)
+        /// Scales on the large-title curve, which is gentle enough that a
+        /// 42 pt billboard title stays inside its card at accessibility sizes.
+        public static func display(_ size: CGFloat,
+                                   relativeTo style: SwiftUI.Font.TextStyle = .largeTitle) -> SwiftUI.Font {
+            .custom("Anton-Regular", size: size, relativeTo: style)
         }
-        public static let wordmark: SwiftUI.Font =
-            .system(size: 24, weight: .bold, design: .serif).italic()
-        public static func label(_ size: CGFloat = 13) -> SwiftUI.Font {
-            .system(size: size, weight: .semibold).smallCaps()
+
+        /// The text style whose Dynamic Type curve a given design size rides.
+        /// Picking it from the size means no call site has to name one, and a
+        /// 40 pt balance grows far less violently than an 11 pt caption — the
+        /// same proportions Apple's own styles use.
+        static func textStyle(for size: CGFloat) -> SwiftUI.Font.TextStyle {
+            switch size {
+            case 34...: return .largeTitle
+            case 26..<34: return .title
+            case 21..<26: return .title2
+            case 19..<21: return .title3
+            case 16..<19: return .body
+            case 14..<16: return .subheadline
+            case 12..<14: return .footnote
+            case 11..<12: return .caption
+            default: return .caption2
+            }
         }
     }
 
@@ -60,6 +83,126 @@ public enum Katha {
     public enum Motion {
         public static let spring = Animation.spring(response: 0.38, dampingFraction: 0.82)
         public static let snappy = Animation.spring(response: 0.26, dampingFraction: 0.86)
+    }
+}
+
+// MARK: - Dynamic Type
+
+extension Katha {
+    /// The largest multiple of a design size we will ever draw. Accessibility
+    /// sizes would otherwise take a 42 pt billboard title past 100 pt and push
+    /// every neighbouring element off screen; 1.8× keeps the type legible AND
+    /// the layout intact, which is the point of supporting the setting at all.
+    static let maxTypeScale: CGFloat = 1.8
+
+    /// A design point size resolved for the current content size category.
+    static func scaled(_ size: CGFloat,
+                       relativeTo style: SwiftUI.Font.TextStyle,
+                       typeSize: DynamicTypeSize) -> CGFloat {
+        let traits = UITraitCollection(preferredContentSizeCategory: contentSize(typeSize))
+        let value = UIFontMetrics(forTextStyle: uiTextStyle(style))
+            .scaledValue(for: size, compatibleWith: traits)
+        return min(value, size * maxTypeScale)
+    }
+
+    static func contentSize(_ size: DynamicTypeSize) -> UIContentSizeCategory {
+        switch size {
+        case .xSmall: return .extraSmall
+        case .small: return .small
+        case .medium: return .medium
+        case .large: return .large
+        case .xLarge: return .extraLarge
+        case .xxLarge: return .extraExtraLarge
+        case .xxxLarge: return .extraExtraExtraLarge
+        case .accessibility1: return .accessibilityMedium
+        case .accessibility2: return .accessibilityLarge
+        case .accessibility3: return .accessibilityExtraLarge
+        case .accessibility4: return .accessibilityExtraExtraLarge
+        case .accessibility5: return .accessibilityExtraExtraExtraLarge
+        @unknown default: return .large
+        }
+    }
+
+    static func uiTextStyle(_ style: SwiftUI.Font.TextStyle) -> UIFont.TextStyle {
+        switch style {
+        case .largeTitle: return .largeTitle
+        case .title: return .title1
+        case .title2: return .title2
+        case .title3: return .title3
+        case .headline: return .headline
+        case .subheadline: return .subheadline
+        case .body: return .body
+        case .callout: return .callout
+        case .footnote: return .footnote
+        case .caption: return .caption1
+        case .caption2: return .caption2
+        @unknown default: return .body
+        }
+    }
+}
+
+/// A system font at a design point size that follows Dynamic Type. Reading
+/// `\.dynamicTypeSize` here is deliberate: it is what invalidates the view when
+/// the reader changes the setting, which a plain `Font` value cannot do.
+struct KathaScaledFont: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var typeSize
+    let size: CGFloat
+    let weight: Font.Weight
+    let design: Font.Design
+    let style: Font.TextStyle
+    let monospacedDigit: Bool
+    let smallCaps: Bool
+
+    func body(content: Content) -> some View {
+        var font = Font.system(size: Katha.scaled(size, relativeTo: style, typeSize: typeSize),
+                               weight: weight, design: design)
+        if monospacedDigit { font = font.monospacedDigit() }
+        if smallCaps { font = font.smallCaps() }
+        return content.font(font)
+    }
+}
+
+/// A fixed frame whose numbers grow with the text they wrap — the row heights,
+/// icon tiles and pills that would otherwise clip their own labels.
+struct KathaScaledFrame: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var typeSize
+    let width: CGFloat?
+    let height: CGFloat?
+    let alignment: Alignment
+    let style: Font.TextStyle
+
+    func body(content: Content) -> some View {
+        content.frame(width: width.map { Katha.scaled($0, relativeTo: style, typeSize: typeSize) },
+                      height: height.map { Katha.scaled($0, relativeTo: style, typeSize: typeSize) },
+                      alignment: alignment)
+    }
+}
+
+extension View {
+    /// The house replacement for `.font(.system(size:…))`: same design size,
+    /// but it scales. `relativeTo` defaults to the curve that suits the size.
+    func kathaFont(_ size: CGFloat,
+                   weight: Font.Weight = .regular,
+                   design: Font.Design = .default,
+                   relativeTo style: Font.TextStyle? = nil,
+                   monospacedDigit: Bool = false,
+                   smallCaps: Bool = false) -> some View {
+        modifier(KathaScaledFont(size: size, weight: weight, design: design,
+                                 style: style ?? Katha.Font.textStyle(for: size),
+                                 monospacedDigit: monospacedDigit, smallCaps: smallCaps))
+    }
+
+    /// Section labels: small caps, semibold, scaling.
+    func kathaLabel(_ size: CGFloat = 13) -> some View {
+        kathaFont(size, weight: .semibold, smallCaps: true)
+    }
+
+    /// A frame whose fixed numbers ride the Dynamic Type curve.
+    func kathaFrame(width: CGFloat? = nil, height: CGFloat? = nil,
+                    alignment: Alignment = .center,
+                    relativeTo style: Font.TextStyle = .body) -> some View {
+        modifier(KathaScaledFrame(width: width, height: height,
+                                  alignment: alignment, style: style))
     }
 }
 
@@ -191,7 +334,7 @@ struct KathaPrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 16, weight: .semibold))
+                .kathaFont(16, weight: .semibold)
                 .foregroundStyle(Katha.Color.text)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -247,12 +390,36 @@ struct CoinBadge: View {
         HStack(spacing: 4) {
             Circle().fill(Katha.Color.coin).frame(width: 14, height: 14)
             Text("\(coins)")
-                .font(.system(size: 14, weight: .semibold))
+                .kathaFont(14, weight: .semibold)
                 .foregroundStyle(Katha.Color.text)
         }
     }
 }
 
+
+/// The poster wall used by Browse, My list and a person's credits: three even
+/// columns on every phone. An adaptive grid sized to the 122 pt rail poster fit
+/// only two on a 402 pt screen and left ~50 pt gutters between them.
+enum PosterGrid {
+    static let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
+}
+
+/// A horizontal scroller's content should look cut off, not broken: the last
+/// chip fades into the page ground instead of being sliced mid-word.
+private struct TrailingFade: ViewModifier {
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .trailing) {
+            LinearGradient(colors: [Katha.Color.bg.opacity(0), Katha.Color.bg],
+                           startPoint: .leading, endPoint: .trailing)
+                .frame(width: 40)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+extension View {
+    func trailingFade() -> some View { modifier(TrailingFade()) }
+}
 
 /// Left-aligned wrapping layout (mockup 1.3's chip rows): each child keeps its
 /// natural size and flows onto the next line when the row is full.

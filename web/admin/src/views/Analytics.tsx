@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { Analytics as AnalyticsData, AnalyticsWindow } from "../api/client";
-import { Chip, Empty, Funnel, Metric, PageHeader, Sev, Skeleton, Spark, fmtN } from "../ui";
+import { Chip, Empty, Funnel, IsoTime, Metric, PageHeader, Sev, Skeleton, Spark,
+         fmtN } from "../ui";
 
 type Win = "today" | "7d" | "30d";
 
@@ -35,7 +36,8 @@ export function Analytics() {
     <>
       <PageHeader
         title="Analytics"
-        subtitle={`Canonical metrics from the ledger and event stream · generated ${an.generated_at}`}
+        subtitle={<>Canonical metrics from the ledger and event stream · generated{" "}
+          <IsoTime iso={an.generated_at} /></>}
         actions={
           <span className="wins" role="tablist" aria-label="Time window">
             {(["today", "7d", "30d"] as Win[]).map((w) => (
@@ -72,8 +74,11 @@ export function Analytics() {
             <div className="splitbar" aria-label="Revenue split">
               <span style={{ width: `${iapPct}%` }} />
             </div>
+            <div className="splitends">
+              <span>App Store {iapPct}%</span>
+              <span>Web (UPI) {100 - iapPct}%</span>
+            </div>
             <p className="tiny muted">
-              App Store {iapPct}% · Web (UPI) {100 - iapPct}% —{" "}
               {fmtN(cur.coins_web)} coins sold on the web this period.
             </p>
             <h4 style={{ marginTop: 12 }}>Refunds</h4>

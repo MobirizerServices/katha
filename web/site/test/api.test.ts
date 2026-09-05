@@ -239,3 +239,54 @@ describe("webOrder payment id", () => {
     expect(JSON.parse(callArgs(1)[1].body as string)).toEqual({ sku: "coins_popular_in", email: "" });
   });
 });
+
+describe("series + contentRating — the catalog service owns the rating", () => {
+  it("GETs /v1/series/{slug} without a bearer and passes the revalidate hint", async () => {
+    localStorage.setItem(TOKEN_KEY, "member-tok");
+    fetchMock.mockResolvedValueOnce(okJson({ slug: "ceo-sahab", content_rating: "U/A 16+" }));
+    const s = await api.series("ceo-sahab", 300);
+    expect(s.content_rating).toBe("U/A 16+");
+    const [url, init] = callArgs(0);
+    expect(url).toBe(`${BASE}/v1/series/ceo-sahab`);
+    expect(headerOf(init, "Authorization")).toBeUndefined();
+    expect((init as { next?: { revalidate: number } }).next).toEqual({ revalidate: 300 });
+  });
+
+  it("refuses a server-side call when no absolute origin is configured", async () => {
+    // jsdom always has a window; simulate the build worker's Node global.
+    const w = globalThis.window;
+    // @ts-expect-error deliberately removing the browser global
+    delete globalThis.window;
+    vi.stubEnv("NEXT_PUBLIC_API_BASE", "");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("NODE_ENV", "production");
+    vi.resetModules();
+    const mod = await import("@/lib/api");
+    await expect(mod.api.series("x")).rejects.toBeInstanceOf(mod.ApiError);
+    expect(fetchMock).not.toHaveBeenCalled();                 // never a relative fetch
+    expect(await mod.api.contentRating("x", "U/A 13+")).toBe("U/A 13+");
+    globalThis.window = w;
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("sends no cache hint when none is asked for", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ slug: "x", content_rating: "U/A 7+" }));
+    await api.series("x");
+    expect((callArgs(0)[1] as { next?: unknown }).next).toBeUndefined();
+  });
+
+  it("contentRating prefers the server, and falls back to the seed value", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ slug: "x", content_rating: "U/A 16+" }));
+    expect(await api.contentRating("x", "U/A 13+")).toBe("U/A 16+");
+
+    fetchMock.mockResolvedValueOnce(okJson({ slug: "x", content_rating: "" }));
+    expect(await api.contentRating("x", "U/A 13+")).toBe("U/A 13+");   // empty is not an answer
+
+    fetchMock.mockResolvedValueOnce(errResp(503, "down"));
+    expect(await api.contentRating("x", "U/A 13+")).toBe("U/A 13+");
+
+    fetchMock.mockRejectedValueOnce(new TypeError("network"));
+    expect(await api.contentRating("x", "A")).toBe("A");
+  });
+});

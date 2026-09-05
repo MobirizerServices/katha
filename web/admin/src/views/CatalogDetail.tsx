@@ -16,6 +16,19 @@ function toBadge(status: string): SeriesStatus {
   return map[status] ?? "live";
 }
 
+/** Server messages quote ISO stamps ("already sent at 2026-09-04T16:44:44+00:00");
+ *  operators read local clock time. */
+export function humanise(msg: string): string {
+  return msg.replace(/\d{4}-\d{2}-\d{2}T[\d:]+(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g,
+    (iso) => {
+      const t = Date.parse(iso);
+      return Number.isNaN(t)
+        ? iso
+        : new Date(t).toLocaleString("en-IN",
+            { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    });
+}
+
 export function CatalogDetail() {
   const { slug = "" } = useParams();
   const { role, online, showToast } = useStore();
@@ -83,7 +96,10 @@ export function CatalogDetail() {
   async function sendDrop() {
     const res = await mutate.notifyDrop(slug, dropEp);
     if ("offline" in res) return showToast("Offline — nothing sent", "error");
-    if (res.httpStatus === 409) return showToast(`Not sent again: ${res.error}`, "error");
+    if (res.httpStatus === 409) {
+      // the server answers with an ISO stamp; operators read clock time (ADM-12)
+      return showToast(`Not sent again: ${humanise(String(res.error ?? ""))}`, "error");
+    }
     if (res.error) return showToast(`Not sent: ${res.error}`, "error");
     showToast(`Episode ${dropEp} drop pushed to ${res.devices} device(s) — see Outbox`);
     setDropOpen(false);

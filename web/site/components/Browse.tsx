@@ -30,9 +30,11 @@ export default function Browse({ series }: { series: Series[] }) {
     <>
       <div className="wrap" style={{ paddingTop: 30 }}>
         <h1 style={{ fontSize: 24, margin: "0 0 6px" }}>Browse</h1>
-        <p style={{ color: "var(--text2)", margin: 0 }}>
-          {shown.length} series · first {FREE_EPISODES} episodes of each are free
-        </p>
+        {shown.length > 0 && (
+          <p style={{ color: "var(--text2)", margin: 0 }}>
+            {shown.length} series · first {FREE_EPISODES} episodes of each are free
+          </p>
+        )}
       </div>
 
       <div className="chips" role="group" aria-label="Language">

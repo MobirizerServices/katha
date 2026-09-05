@@ -44,6 +44,26 @@ final class ScreenshotTour: XCTestCase {
         app.buttons.containing(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
     }
 
+    /// The player chrome auto-hides after ~4 idle seconds; a tap while it is
+    /// hidden only brings it back (it does not pause), so this is safe to call
+    /// before any capture that is supposed to show the controls.
+    private func revealChrome(_ app: XCUIApplication) {
+        guard !app.sliders.firstMatch.exists else { return }
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        _ = app.sliders.firstMatch.waitForExistence(timeout: 5)
+    }
+
+    /// Wait for the player, re-revealing the chrome if the idle timer hid the
+    /// episode label before the wait started.
+    private func waitPlayer(_ app: XCUIApplication, _ label: String,
+                            _ timeout: TimeInterval = 25) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if app.staticTexts[label].waitForExistence(timeout: 5) { return }
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        }
+    }
+
     func test01_TourOnboarding() {
         let app = launchApp(onboarded: false)
         // Wait for SwiftUI's first paint (the device is slower than the
@@ -105,9 +125,11 @@ final class ScreenshotTour: XCTestCase {
 
     func test03_TourPlayerAndDrawer() {
         let app = launchApp(extra: ["KATHA_AUTOPLAY": "kaanch-ka-mahal:1"])
-        wait(app, text: "E1 · One face too many", 20)
+        waitPlayer(app, "E1 · One face too many")
         sleep(2)                                             // let a frame decode
+        revealChrome(app)
         snap("3.1-player-free")
+        revealChrome(app)
         app.buttons["E1"].firstMatch.tap()
         wait(app, text: "Episodes", 8)
         snap("3.2-episode-drawer")
@@ -124,11 +146,13 @@ final class ScreenshotTour: XCTestCase {
         snap("3.3b-paywall-funded")
         _ = app.buttons["Unlock episode"].waitForExistence(timeout: 8)   // the sheet re-lays out after the buy
         app.buttons["Unlock episode"].tap()
-        wait(app, text: "E11 · The signature", 15)
+        waitPlayer(app, "E11 · The signature")
         sleep(2)
+        revealChrome(app)
         snap("3.1b-player-unlocked-E11")
 
         // back out to the wallet (history now shows purchase + unlock)
+        revealChrome(app)
         app.navigationBars.buttons.firstMatch.tap()
         app.tabBars.buttons["Profile"].tap()
         _ = app.staticTexts["You're browsing as a guest"].waitForExistence(timeout: 10)
@@ -167,6 +191,8 @@ final class ScreenshotTour: XCTestCase {
         wait(app, text: "Set a parental PIN", 8)
         snap("4.3-parental-pin-setup")
         for digit in ["1", "2", "3", "4"] { app.buttons[digit].tap() }
+        _ = app.staticTexts["Confirm the new PIN"].waitForExistence(timeout: 8)
+        for digit in ["1", "2", "3", "4"] { app.buttons[digit].tap() }
         _ = app.buttons["Change parental lock"].waitForExistence(timeout: 8)
 
         button(app, containing: "Help & grievance").tap()
@@ -189,6 +215,9 @@ final class ScreenshotTour: XCTestCase {
         setup.buttons["Set parental lock"].tap()
         _ = setup.staticTexts["Set a parental PIN"].waitForExistence(timeout: 8)
         for digit in ["1", "2", "3", "4"] { setup.buttons[digit].tap() }
+        _ = setup.staticTexts["Confirm the new PIN"].waitForExistence(timeout: 8)
+        for digit in ["1", "2", "3", "4"] { setup.buttons[digit].tap() }
+        _ = setup.buttons["Change parental lock"].waitForExistence(timeout: 8)
 
         let gated = launchApp(reset: false, extra: ["KATHA_AUTOPLAY": "dilli-6-ka-raaz:1"])
         wait(gated, text: "Parental lock", 20)
@@ -201,8 +230,9 @@ final class ScreenshotTour: XCTestCase {
 
         // 3.6: the in-app drop banner via the self-scheduled drip nudge
         let drop = launchApp(extra: ["KATHA_AUTOPLAY": "kaanch-ka-mahal:1"])
-        wait(drop, text: "E1 · One face too many", 20)
+        waitPlayer(drop, "E1 · One face too many")
         sleep(3)                                             // accrue progress
+        revealChrome(drop)
         drop.navigationBars.buttons.firstMatch.tap()         // back → progress reported
         let nudged = launchApp(reset: false, extra: ["KATHA_NUDGE_SECONDS": "4"])
         _ = nudged.buttons["Watch now"].waitForExistence(timeout: 25)
@@ -213,8 +243,9 @@ final class ScreenshotTour: XCTestCase {
         // Watch a little so the "Because you watched" rail has a seed, then
         // relaunch — the feed personalizes on load, not on back-navigation.
         let seeded = launchApp(extra: ["KATHA_AUTOPLAY": "kaanch-ka-mahal:1"])
-        wait(seeded, text: "E1 · One face too many", 20)
+        waitPlayer(seeded, "E1 · One face too many")
         sleep(3)
+        revealChrome(seeded)
         seeded.navigationBars.buttons.firstMatch.tap()
         sleep(1)                                     // progress report flushes
 
@@ -234,8 +265,14 @@ final class ScreenshotTour: XCTestCase {
         sleep(1)
         snap("4.8-invoices")
 
-        // Help → the in-app grievance form.
+        // 4.1d: the root after popping a pushed screen — the large title must
+        // come back rather than staying collapsed to the small inline one.
         app.navigationBars.buttons.firstMatch.tap()
+        _ = app.staticTexts["You're browsing as a guest"].waitForExistence(timeout: 10)
+        sleep(1)
+        snap("4.1d-profile-after-pop")
+
+        // Help → the in-app grievance form.
         button(app, containing: "Help & grievance").tap()
         wait(app, text: "File a grievance", 10)
         app.swipeUp()
@@ -291,8 +328,9 @@ final class ScreenshotTour: XCTestCase {
 
         // --- 4.5 Continue watching list + 4.4 reminder bell ---
         let cw = launchApp(extra: ["KATHA_AUTOPLAY": "kaanch-ka-mahal:1"])
-        wait(cw, text: "E1 · One face too many", 20)
+        waitPlayer(cw, "E1 · One face too many")
         sleep(3)
+        revealChrome(cw)
         cw.navigationBars.buttons.firstMatch.tap()
         wait(cw, text: "Daily check-in", 15)
         if !cw.buttons["continue.seeAll"].waitForExistence(timeout: 8) {
@@ -317,7 +355,7 @@ final class ScreenshotTour: XCTestCase {
         sleep(1)
         snap("2.4c-series-episodes-scrolled")
         cw.tabBars.buttons["My list"].tap()
-        wait(cw, text: "Reminder on", 10)
+        _ = cw.buttons["Reminder on"].waitForExistence(timeout: 10)
         sleep(1)
         snap("4.4b-my-list-reminder-on")
 
@@ -388,7 +426,8 @@ final class ScreenshotTour: XCTestCase {
         _ = app.buttons["Sign out"].waitForExistence(timeout: 8)
         sleep(1)
         snap("4.1c-profile-hindi")
-        // The Profile rows are not localised (hard-coded "Settings"), so match either.
+        // Profile is localised now; match either so the tour survives a rerun
+        // that starts from English.
         app.buttons.containing(NSPredicate(
             format: "label CONTAINS 'Settings' OR label CONTAINS 'सेटिंग्स'")).firstMatch.tap()
         _ = app.switches["डेटा सेवर"].waitForExistence(timeout: 8)
@@ -468,8 +507,8 @@ final class ScreenshotTour: XCTestCase {
 
         // --- 3.4 Player track picker, captions on, 2× pill ---
         let p = launchApp(extra: ["KATHA_AUTOPLAY": "kaanch-ka-mahal:1"])
-        wait(p, text: "E1 · One face too many", 20)
-        _ = p.sliders.firstMatch.waitForExistence(timeout: 8)
+        waitPlayer(p, "E1 · One face too many")
+        revealChrome(p)
         p.buttons["player.cc"].tap()
         wait(p, text: "Subtitles", 8)
         sleep(1)
@@ -481,6 +520,7 @@ final class ScreenshotTour: XCTestCase {
         }
         p.buttons["Done"].tap()
         sleep(3)
+        revealChrome(p)
         snap("3.1c-player-captions-on")
         // The 2× pill only shows while the finger is down; XCUITest's press
         // blocks the (main-thread-only) API, so it cannot be captured here.
@@ -489,11 +529,19 @@ final class ScreenshotTour: XCTestCase {
         _ = p.buttons["Liked"].waitForExistence(timeout: 6)
         snap("3.1d-player-liked")
         p.swipeUp()
-        wait(p, text: "E2 · The seventh plate", 15)
+        waitPlayer(p, "E2 · The seventh plate")
         sleep(2)
+        revealChrome(p)
         snap("3.1e-player-E2-after-swipe")
         // Idle: the controls auto-hide after a few seconds.
-        sleep(6)
+        sleep(8)
         snap("3.1f-player-controls-hidden")
+        // 3.1g: scrub to the last seconds so the end card draws — it has to be
+        // opaque and narrow, with the rail and scrubber out of its way.
+        revealChrome(p)
+        p.sliders.firstMatch.adjust(toNormalizedSliderPosition: 0.995)
+        _ = p.buttons["Play next episode"].waitForExistence(timeout: 25)
+        sleep(1)
+        snap("3.1g-player-end-card")
     }
 }

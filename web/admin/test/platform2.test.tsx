@@ -56,6 +56,8 @@ function stub(routes: Stub) {
 }
 
 const SIGNALS: Stub = {
+  // the sidebar badge/Finance counter poll the inbox with every signal read
+  "/approvals?": () => [],
   "/health/full": () => ({ status: "ok", checks: {}, at: "" }),
   "/auth/me": () => ({ mode: "headers", authenticated: true }),
 };
@@ -701,7 +703,7 @@ describe("comms: Outbox view + drop pushes", () => {
     expect(screen.getByText("failed")).toBeInTheDocument();
     expect(screen.getByText("relay refused")).toBeInTheDocument();
     fireEvent.click(screen.getByText(/invoice KATHA-INV/));
-    await screen.findByText("<div>invoice</div>");
+    await screen.findByText("invoice");   // ADM-27: tags stripped for the preview
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "push" } });
     await waitFor(() => expect(screen.getByLabelText("Kind")).toHaveValue("push"));
   });

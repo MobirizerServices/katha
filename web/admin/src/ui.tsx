@@ -81,11 +81,14 @@ export function Modal({
   children,
   footer,
   onClose,
+  wide,
 }: {
   title: string;
   children: ReactNode;
   footer: ReactNode;
   onClose: () => void;
+  /** 820px instead of 520px — for dialogs that carry a table. */
+  wide?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -99,8 +102,8 @@ export function Modal({
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title}
-           tabIndex={-1} ref={ref}>
+      <div className={wide ? "modal wide" : "modal"} role="dialog" aria-modal="true"
+           aria-label={title} tabIndex={-1} ref={ref}>
         <h2>{title}</h2>
         <div className="mb">{children}</div>
         <div className="mf">{footer}</div>
@@ -185,7 +188,19 @@ export function Spark({ points, width = 120, height = 28 }:
     ctx.fillStyle = "rgba(246,84,44,1)";
     ctx.fill();
   }, [points, width, height]);
-  return <canvas ref={ref} style={{ width, height }} aria-hidden="true" />;
+  // A line with no scale is decoration: say what the low, high and latest
+  // values are so the shape can actually be read (ADM-29).
+  const lo = points.length ? Math.min(...points) : 0;
+  const hi = points.length ? Math.max(...points) : 0;
+  const last = points.length ? points[points.length - 1] : 0;
+  return (
+    <span className="spark">
+      <canvas ref={ref} style={{ width, height }} aria-hidden="true" />
+      <span className="cap">
+        {fmtN(lo)}–{fmtN(hi)} · now {fmtN(last)}
+      </span>
+    </span>
+  );
 }
 
 

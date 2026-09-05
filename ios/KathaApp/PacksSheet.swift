@@ -27,14 +27,14 @@ struct PacksSheet: View {
     @State private var packs: [CoinPack] = []
     @State private var restored = false
     @State private var stillConfirming = false
+    /// The packs need about half a sheet; a forced `.large` left 40 % of it
+    /// empty. The terminal states are taller, so they take the sheet up with
+    /// them rather than hiding their own Done button below the fold.
+    @State private var detent: PresentationDetent = .medium
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
-                Capsule().fill(Katha.Color.raised)
-                    .frame(width: 36, height: 5)
-                    .frame(maxWidth: .infinity)
-
                 header
 
                 switch phase {
@@ -55,7 +55,8 @@ struct PacksSheet: View {
             .animation(reduceMotion ? nil : Katha.Motion.spring, value: phase)
         }
         .background(Katha.Color.surface)
-        .presentationDetents([.large])
+        .presentationDetents([.medium, .large], selection: $detent)
+        .presentationDragIndicator(.visible)
         .presentationBackground(Katha.Color.surface)
         .presentationCornerRadius(24)
         // While Apple confirms, the sheet stays put (PDD §10.3).
@@ -65,6 +66,12 @@ struct PacksSheet: View {
             if packs.isEmpty {
                 packs = ((try? await model.api.packs(storefront: "IN")) ?? [])
                     .filter { !$0.sku.hasPrefix("coins_web") }   // web-store SKUs never sell via Apple IAP
+            }
+        }
+        .onChange(of: phase) { _, new in
+            switch new {
+            case .pending, .credited: detent = .large
+            default: break
             }
         }
         .task(id: isConfirming) {
@@ -93,19 +100,19 @@ struct PacksSheet: View {
                 HStack(spacing: 5) {
                     Circle().fill(Katha.Color.coin).frame(width: 12, height: 12)
                     Text("You have \(model.wallet.total)")
-                        .font(.system(size: 13, weight: .semibold))
+                        .kathaFont(13, weight: .semibold)
                         .foregroundStyle(Katha.Color.text)
                         .contentTransition(.numericText())
                         .animation(Katha.Motion.spring, value: model.wallet.total)
                 }
                 .padding(.horizontal, 10)
-                .frame(height: 28)
+                .kathaFrame(height: 28)
                 .background(Katha.Color.raised)
                 .clipShape(Capsule())
             }
             if let context {
                 Text(context)
-                    .font(.system(size: 14))
+                    .kathaFont(14)
                     .foregroundStyle(Katha.Color.text2)
             }
         }
@@ -127,7 +134,7 @@ struct PacksSheet: View {
             }
             if isConfirming {
                 Text(stillConfirming ? model.t("packs.stillConfirming") : model.t("packs.confirming"))
-                    .font(.system(size: 13))
+                    .kathaFont(13)
                     .foregroundStyle(Katha.Color.text2)
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
@@ -143,19 +150,19 @@ struct PacksSheet: View {
             ZStack {
                 Circle().fill(Katha.Color.coin.opacity(0.16)).frame(width: 72, height: 72)
                 Image(systemName: "bell.badge.fill")
-                    .font(.system(size: 30))
+                    .kathaFont(30)
                     .foregroundStyle(Katha.Color.coin)
                     .symbolEffect(.pulse, options: reduceMotion ? .nonRepeating : .repeating)
             }
             Text(model.t("packs.confirming"))
-                .font(.system(size: 15, weight: .semibold))
+                .kathaFont(15, weight: .semibold)
                 .foregroundStyle(Katha.Color.text)
                 .multilineTextAlignment(.center)
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "bell")
                     .foregroundStyle(Katha.Color.coin)
                 Text(model.t("packs.pending.banner"))
-                    .font(.system(size: 13))
+                    .kathaFont(13)
                     .foregroundStyle(Katha.Color.text)
             }
             .padding(Katha.Spacing.md)
@@ -163,7 +170,7 @@ struct PacksSheet: View {
             .background(Katha.Color.raised)
             .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
             Text(model.t("packs.pending.notCharged"))
-                .font(.system(size: 13))
+                .kathaFont(13)
                 .foregroundStyle(Katha.Color.text2)
             KathaPrimaryButton(title: model.t("packs.done")) { dismiss() }
         }
@@ -174,11 +181,11 @@ struct PacksSheet: View {
     private func creditedState(_ coins: Int) -> some View {
         VStack(spacing: Katha.Spacing.md) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 44))
+                .kathaFont(44)
                 .foregroundStyle(Katha.Color.success)
                 .symbolEffect(.bounce, value: phase)
             Text("+\(coins.formatted()) \(model.t("packs.credited"))")
-                .font(.system(size: 18, weight: .bold))
+                .kathaFont(18, weight: .bold)
                 .foregroundStyle(Katha.Color.text)
             KathaPrimaryButton(title: model.t("packs.done")) { dismiss() }
         }
@@ -188,7 +195,7 @@ struct PacksSheet: View {
     private func failedBanner(_ reason: String, sku: String) -> some View {
         HStack(spacing: 10) {
             Text(reason)
-                .font(.system(size: 13))
+                .kathaFont(13)
                 .foregroundStyle(Katha.Color.text)
             Spacer()
             Button(model.t("packs.retry")) {
@@ -198,7 +205,7 @@ struct PacksSheet: View {
                     phase = .list
                 }
             }
-            .font(.system(size: 13, weight: .semibold))
+            .kathaFont(13, weight: .semibold)
             .foregroundStyle(Katha.Color.accent)
         }
         .padding(Katha.Spacing.md)
@@ -213,7 +220,7 @@ struct PacksSheet: View {
     private var footer: some View {
         VStack(spacing: Katha.Spacing.sm) {
             Text(model.t("packs.footer"))
-                .font(.system(size: 11))
+                .kathaFont(11)
                 .foregroundStyle(Katha.Color.text2)
                 .multilineTextAlignment(.center)
             HStack(spacing: 6) {
@@ -226,7 +233,7 @@ struct PacksSheet: View {
                 Text("·")
                 Link(model.t("packs.terms"), destination: URL(string: "https://katha.example/legal")!)
             }
-            .font(.system(size: 12))
+            .kathaFont(12)
             .foregroundStyle(Katha.Color.text2)
         }
         .frame(maxWidth: .infinity)

@@ -77,6 +77,10 @@ function NewSeriesDialog({ onClose, onCreated }:
           <input type="number" value={f.episode_count} aria-label="Episode count"
                  onChange={(e) => setF({ ...f, episode_count: Number(e.target.value) })} />
         </label>
+      </div>
+      {/* two rows of two: four fields wrapped 3+1 and left "Free episodes"
+          spanning the whole modal on its own (ADM-26) */}
+      <div className="frow">
         <label>
           Coins/episode
           <input type="number" value={f.coin_price} aria-label="Coin price"
@@ -264,9 +268,16 @@ export function Catalog() {
                 </td>
                 <td>
                   <Link to={`/catalog/${s.slug}`} className="serieslink">
-                    <img className="covermini" alt=""
-                         src={`${MEDIA_BASE}/media/${s.slug}/cover_9x16.jpg`}
-                         onError={(e) => ((e.target as HTMLImageElement).style.visibility = "hidden")} />
+                    {/* A draft with nothing transcoded has no artwork on disk:
+                        asking for it logs ERR_BLOCKED_BY_ORB on every render
+                        (ADM-31). liveCount is the list's media signal. */}
+                    {s.liveCount > 0 ? (
+                      <img className="covermini" alt=""
+                           src={`${MEDIA_BASE}/media/${s.slug}/cover_9x16.jpg`}
+                           onError={(e) => ((e.target as HTMLImageElement).style.visibility = "hidden")} />
+                    ) : (
+                      <span className="covermini" aria-hidden />
+                    )}
                     <span>
                       <b>{s.title}</b>
                       <small className="muted"> {s.genres.join(" · ")} · {s.slug}</small>

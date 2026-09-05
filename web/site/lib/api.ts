@@ -7,6 +7,18 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE
   ?? (process.env.NODE_ENV === "production" ? "" : "http://localhost:8799");
 const TOKEN_KEY = "katha.token.v1";
 
+/** Origin for the few calls made on the SERVER (static generation / RSC).
+ * In production BASE is "" — the edge serves /v1 on the site's own origin, and
+ * a browser resolves that relatively. Node cannot: a relative URL there is not
+ * a URL at all. So server-side calls need an explicit origin, and when none is
+ * configured they are not attempted (callers fall back to bundled values). */
+export const SERVER_BASE =
+  process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_SITE_ORIGIN
+  || (process.env.NODE_ENV === "production" ? "" : "http://localhost:8799");
+
+/** True in Node (static generation, RSC), false in the browser. */
+const onServer = () => typeof window === "undefined";
+
 export function getToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
@@ -17,11 +29,11 @@ export function clearToken() {
   try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
 }
 
-async function call<T>(path: string, opts: RequestInit = {}, auth = true): Promise<T> {
+async function call<T>(path: string, opts: RequestInit = {}, auth = true, base = BASE): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json", ...(opts.headers as any) };
   const tok = getToken();
   if (auth && tok) headers["Authorization"] = `Bearer ${tok}`;
-  const r = await fetch(`${BASE}${path}`, { ...opts, headers });
+  const r = await fetch(`${base}${path}`, { ...opts, headers });
   if (!r.ok) {
     const body = await r.text();
     throw new ApiError(r.status, body);
@@ -56,6 +68,18 @@ export interface SeriesSummaryDTO {
   content_rating: string;
   cover_url: string;
   cover_wide_url: string;
+}
+
+/** One series as /v1/series/{slug} describes it. The catalog service — not the
+ * bundled seed — owns `content_rating`: the back office can re-rate a title
+ * after the seed was baked, and the parental gate must follow the live value. */
+export interface SeriesDetailDTO {
+  slug: string;
+  title: string;
+  genres: string[];
+  episode_count: number;
+  primary_language: string;
+  content_rating: string;
 }
 
 export interface SearchPersonDTO { name: string; role: string; series: SeriesSummaryDTO[] }
@@ -108,6 +132,17 @@ export type PlaybackDTO =
     };
 
 export interface UnlockDTO { wallet: WalletDTO; spent_bonus: number; spent_bought: number; episode_ids: string[] }
+
+function fetchSeries(slug: string, revalidate?: number): Promise<SeriesDetailDTO> {
+  const base = onServer() ? SERVER_BASE : BASE;
+  if (onServer() && !base) {
+    // Nothing to resolve a relative URL against: refuse rather than hang the
+    // build on a URL Node cannot parse.
+    return Promise.reject(new ApiError(0, "no server-side API origin configured"));
+  }
+  const init = (revalidate === undefined ? {} : { next: { revalidate } }) as RequestInit;
+  return call<SeriesDetailDTO>(`/v1/series/${slug}`, init, false, base);
+}
 
 export const api = {
   base: BASE,
@@ -163,6 +198,22 @@ export const api = {
     const qs = new URLSearchParams({ q });
     if (lang) qs.set("lang", lang);
     return call<SearchDTO>(`/v1/search?${qs}`, {}, false);
+  },
+
+  /** One series from the catalog service; no auth. `revalidate` (seconds) is
+   * honoured by the Next server cache when this runs during a render. */
+  series: fetchSeries,
+
+  /** The live content rating for a series, falling back to the baked-in seed
+   * value when the catalog service can't be reached (a page must still render;
+   * the parental gate treats "couldn't ask" separately — see Player). */
+  async contentRating(slug: string, fallback: string, revalidate?: number): Promise<string> {
+    try {
+      const s = await fetchSeries(slug, revalidate);
+      return s.content_rating || fallback;
+    } catch {
+      return fallback;
+    }
   },
 
   myList(): Promise<MyListDTO> {

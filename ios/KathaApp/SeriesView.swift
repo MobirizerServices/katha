@@ -36,6 +36,10 @@ struct SeriesView: View {
         }
         .background(Katha.Color.bg)
         .navigationBarTitleDisplayMode(.inline)
+        // Without a bar background the CTA and the pricing line slid under the
+        // status bar and behind the glass toolbar buttons on the way up.
+        .toolbarBackground(Katha.Color.bg, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .zoomDestination(id: slug)
         .overlay(alignment: .bottom) {
             if let toast {
@@ -56,8 +60,8 @@ struct SeriesView: View {
                     Task { await model.toggleMyList(slug: slug) }
                 } label: {
                     Image(systemName: model.myListSlugs.contains(slug) ? "bookmark.fill" : "bookmark")
-                        .accessibilityLabel(model.myListSlugs.contains(slug)
-                                            ? "Remove from My list" : "Save to My list")
+                        .accessibilityLabel(model.t(model.myListSlugs.contains(slug)
+                                                    ? "series.unsave" : "series.save"))
                         .foregroundStyle(model.myListSlugs.contains(slug)
                                          ? Katha.Color.accent : Katha.Color.text)
                         .symbolEffect(.bounce, value: model.myListSlugs.contains(slug))
@@ -100,33 +104,34 @@ struct SeriesView: View {
                     if let g = d.genres.first { chip(g) }
                     if !d.contentRating.isEmpty {
                         Text(d.contentRating)
-                            .font(.system(size: 11, weight: .bold))
+                            .kathaFont(11, weight: .bold)
                             .foregroundStyle(Katha.Color.text)
                             .padding(.horizontal, 7)
-                            .frame(height: 20)
+                            .kathaFrame(height: 20)
                             .overlay(RoundedRectangle(cornerRadius: 5)
                                 .strokeBorder(Katha.Color.text2, lineWidth: 1))
                     }
-                    chip("\(d.episodeCount) episodes")
+                    chip(model.t("home.episodes", d.episodeCount))
                 }
 
                 Text(d.synopsis)
-                    .font(.system(size: 15))
+                    .kathaFont(15)
                     .foregroundStyle(Katha.Color.text2)
 
-                Text("Free · \(d.freeEpisodeCount) episodes, then \(d.episodeCoinPrice) coins\(model.rupeeRate.map { " (≈ ₹\(rupees(d.episodeCoinPrice, rate: $0)))" } ?? "") each")
-                    .font(.system(size: 13))
+                Text(model.t("series.pricing", d.freeEpisodeCount, d.episodeCoinPrice,
+                             model.rupeeRate.map { " (≈ ₹\(rupees(d.episodeCoinPrice, rate: $0)))" } ?? ""))
+                    .kathaFont(13)
                     .foregroundStyle(Katha.Color.text2)
 
                 // The screen's one job: into the story in a single tap.
                 if let cp = continuePoint {
                     NavigationLink(value: EpisodeRoute(slug: slug, number: cp.number)) {
-                        primaryCTA("Continue E\(cp.number)")
+                        primaryCTA(model.t("series.continue", cp.number))
                     }
                     .buttonStyle(PressableStyle())
                 } else {
                     NavigationLink(value: EpisodeRoute(slug: slug, number: 1)) {
-                        primaryCTA("Play episode 1")
+                        primaryCTA(model.t("series.play1"))
                     }
                     .buttonStyle(PressableStyle())
                 }
@@ -142,7 +147,7 @@ struct SeriesView: View {
             Image(systemName: "play.fill")
             Text(title)
         }
-        .font(.system(size: 16, weight: .semibold))
+        .kathaFont(16, weight: .semibold)
         .foregroundStyle(Katha.Color.text)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
@@ -153,10 +158,10 @@ struct SeriesView: View {
 
     private func chip(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .semibold))
+            .kathaFont(11, weight: .semibold)
             .foregroundStyle(Katha.Color.text2)
             .padding(.horizontal, 8)
-            .frame(height: 20)
+            .kathaFrame(height: 20)
             .background(Katha.Color.surface)
             .clipShape(Capsule())
     }
@@ -172,29 +177,31 @@ struct SeriesView: View {
                             .fill(ep.number == currentEp
                                   ? Katha.Color.accent.opacity(0.18) : Katha.Color.surface)
                         Text("\(ep.number)")
-                            .font(.system(size: 14, weight: .semibold))
+                            .kathaFont(14, weight: .semibold)
                             .foregroundStyle(ep.isFree || ep.number == currentEp
                                              ? Katha.Color.text : Katha.Color.text2)
                         if ep.number == currentEp {
                             Image(systemName: "play.fill")
-                                .font(.system(size: 8))
+                                .kathaFont(8)
                                 .foregroundStyle(Katha.Color.accent)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity,
                                        alignment: .bottomTrailing)
                                 .padding(4)
                         } else if !ep.isFree {
                             Image(systemName: "lock.fill")
-                                .font(.system(size: 9))
+                                .kathaFont(9)
                                 .foregroundStyle(Katha.Color.coin)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                                 .padding(4)
                         }
                     }
-                    .frame(height: 48)
+                    .kathaFrame(height: 48)
                     .overlay(RoundedRectangle(cornerRadius: Katha.Radius.sm, style: .continuous)
                         .strokeBorder(ep.number == currentEp ? Katha.Color.accent : .clear,
                                       lineWidth: 1))
-                    .accessibilityLabel("Episode \(ep.number)\(ep.isFree ? ", free" : ", locked")\(ep.number == currentEp ? ", continue here" : "")")
+                    .accessibilityLabel(model.t("series.episode", ep.number)
+                        + model.t(ep.isFree ? "series.episode.free" : "series.episode.locked")
+                        + (ep.number == currentEp ? model.t("series.episode.here") : ""))
                 }
                 .buttonStyle(PressableStyle())
             }
@@ -213,7 +220,16 @@ struct SeriesView: View {
 /// The new-episode reminder bell for one series (My list 4.4 "Reminder on",
 /// and the series toolbar). State lives in AppModel.reminderSlugs.
 struct ReminderBell: View {
+    enum Style {
+        /// Bell glyph only — the series toolbar.
+        case glyph
+        /// Bell + label in a capsule — My list, where the caption under the
+        /// poster is itself the control and has to look like one.
+        case capsule
+    }
+
     let slug: String
+    var style: Style = .glyph
     var onToggled: ((String) -> Void)? = nil
     @Environment(AppModel.self) private var model
 
@@ -228,14 +244,36 @@ struct ReminderBell: View {
                 onToggled?(model.t(turningOn ? "reminder.toast.on" : "reminder.toast.off"))
             }
         } label: {
-            Image(systemName: isOn ? "bell.fill" : "bell")
-                .foregroundStyle(isOn ? Katha.Color.coin : Katha.Color.text)
-                .symbolEffect(.bounce, value: isOn)
-                .accessibilityLabel(model.t(isOn ? "reminder.on" : "reminder.off"))
-                .accessibilityHint("New-episode reminder for this series")
+            switch style {
+            case .glyph:
+                bell
+            case .capsule:
+                HStack(spacing: 4) {
+                    bell
+                    Text(model.t(isOn ? "reminder.on" : "reminder.off"))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .kathaFont(12, weight: .semibold)
+                .padding(.horizontal, 9)
+                .kathaFrame(height: 26)
+                .background(isOn ? Katha.Color.coin.opacity(0.16) : Katha.Color.surface)
+                .overlay(Capsule().strokeBorder(isOn ? Katha.Color.coin.opacity(0.5)
+                                                     : Katha.Color.raised, lineWidth: 1))
+                .clipShape(Capsule())
+            }
         }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel(model.t(isOn ? "reminder.on" : "reminder.off"))
+        .accessibilityHint(model.t("series.reminderHint"))
         .accessibilityIdentifier("reminder.\(slug)")
         .accessibilityValue(isOn ? "on" : "off")
+    }
+
+    private var bell: some View {
+        Image(systemName: isOn ? "bell.fill" : "bell")
+            .foregroundStyle(isOn ? Katha.Color.coin : Katha.Color.text)
+            .symbolEffect(.bounce, value: isOn)
     }
 }
 

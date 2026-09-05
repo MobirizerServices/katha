@@ -22,6 +22,11 @@ export function Approvals() {
   useEffect(() => {
     void api.policy().then((p) => setThreshold(p.dual_approval_threshold));
   }, []);
+  // The inbox is the one view that must never show a stale "Inbox zero": read
+  // the queue on every entry, not only after a decision (ADM-03).
+  useEffect(() => {
+    void reloadApprovals();
+  }, [reloadApprovals]);
   useEffect(() => {
     if (tab === "history") void api.listApprovals("all").then(setHistory);
   }, [tab, approvals.length]);

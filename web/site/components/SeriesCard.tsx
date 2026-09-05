@@ -36,8 +36,9 @@ export default function SeriesCard({
             backgroundPosition: "center",
           } as CSSProperties}
         >
+          {/* No title overlay: the placeholder key art has the title painted
+              into it, and the meta line below repeats it a third time. */}
           {badge && <span className="badge">{badge}</span>}
-          <span className="t">{title}</span>
         </div>
       </Link>
       <div className="m">

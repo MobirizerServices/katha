@@ -133,7 +133,14 @@ export function Programming() {
                   <td>
                     {r.release_at ? (
                       <>
-                        <span className="mono">{r.release_at}</span>
+                        {/* the calendar above says "08:00 pm" local — the column
+                            must not answer with a raw UTC ISO stamp (ADM-12) */}
+                        <span className="mono" title={r.release_at}>
+                          {new Date(r.release_at).toLocaleString("en-IN", {
+                            day: "numeric", month: "short", year: "numeric",
+                            hour: "2-digit", minute: "2-digit",
+                          })}
+                        </span>
                         <div className="tiny muted">
                           by {r.scheduled_by} · <IsoTime iso={r.scheduled_at} />
                         </div>

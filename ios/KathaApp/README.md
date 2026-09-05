@@ -10,7 +10,10 @@ verification, which covers the pure `KathaKit` package on macOS.
 
 ## Files
 - `KathaApp.swift` — `@main` app, `AppModel` (env), `RootTabView`.
-- `DesignSystem.swift` — Katha color/radius/spacing tokens + shared components.
+- `DesignSystem.swift` — Katha color/radius/spacing tokens, the Dynamic Type
+  layer (`.kathaFont(_:)` / `.kathaLabel(_:)` / `.kathaFrame(…)` — design sizes
+  that scale; screens must not call `.font(.system(size:))`, which does not) and
+  the shared components.
 - `FeedView.swift` — Discover feed of series posters.
 - `SeriesView.swift` — series detail + episode grid (free/locked).
 - `PlayerView.swift` — vertical player; gates via playback, shows paywall.
@@ -21,8 +24,11 @@ verification, which covers the pure `KathaKit` package on macOS.
 - `ContinueWatchingView.swift` — 4.5 full continue-watching list ("E7 · 1 min left").
 - `HelpAssistantView.swift` — 4.6 chat-style help over the FAQ (local intent
   matcher, English/Hindi, "Talk to a person" → grievance form). No network AI.
-- `Strings.swift` — app-language table (en/hi) for tabs, Settings, paywall,
-  assistant; applied through `AppModel.t(_:)` and `.environment(\.locale)`.
+- `Strings.swift` — app-language table (en/hi) for every screen's chrome: tabs,
+  Home, Browse, Search, Series, My list, Wallet, Profile, Help, the player and
+  its sheets, Settings, paywall and packs. Applied through `AppModel.t(_:)`
+  (and `t(_:_:)` for the keys carrying `%d` / `%@` placeholders) plus
+  `.environment(\.locale)`.
 - `DiscoverViews.swift` — Browse, Search (`/v1/search`: Series + People,
   `PersonView`), My list (reminder bell).
 - `ProfileViews.swift` — Profile, Settings (app language, muted previews,

@@ -44,7 +44,7 @@ describe("Finance board", () => {
     });
     renderWithStore(<Finance />);
     await screen.findByText("KATHA-INV-2627-000001");
-    expect(screen.getByText("Revenue equivalent · 30d")).toBeInTheDocument();
+    expect(screen.getByText("Revenue · 30d")).toBeInTheDocument();   // ADM-33: short label
     expect(screen.getByText("6.67%")).toBeInTheDocument();          // over 2% → danger
     expect(screen.getByText("≈ ₹154")).toBeInTheDocument();
     expect(screen.getByText(/77 coins dormant/)).toBeInTheDocument();

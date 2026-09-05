@@ -14,6 +14,8 @@ import {
   getSeries,
   allSlugs,
   fmt,
+  clock,
+  countLabel,
   jsonLdString,
   type Series,
 } from "@/lib/catalog";
@@ -67,10 +69,9 @@ describe("isFreeEpisode — first 10 free", () => {
 });
 
 describe("series model", () => {
-  it("loads all 14 Katha-original series with ranks", () => {
+  it("loads all 14 Katha-original series", () => {
     expect(SERIES).toHaveLength(14);
-    expect(SERIES[0].rank).toBe(1);
-    expect(SERIES[13].rank).toBe(14);
+    expect(SERIES.map((s) => s.slug)).toContain("nalugu-ghantalu");
   });
 
   it("maps episodes with free/paid flags and applies presentation overlay", () => {
@@ -82,14 +83,22 @@ describe("series model", () => {
     expect(s.rating).toMatch(/U\/A/);
   });
 
-  it("takes rating and language from the seed, not the presentation overlay", () => {
-    // kaanch-ka-mahal has no PRESENTATION entry: colors fall back, but the
-    // rating/language come from the catalog itself (it is U/A 13+, not 16+).
+  it("takes rating and language from the seed, and key art from the slug", () => {
     const s = getSeries("kaanch-ka-mahal")!;
     expect(s).toBeDefined();
     expect(s.language).toBe("Hindi");
     expect(s.rating).toBe("U/A 13+");
-    expect(s.c1).toBe("#1D1A2F");
+    expect(s.c1).toBe("#3A1F1A");
+    expect(s.c2).toBe("#C2553D");
+  });
+
+  it("every seed slug has its own key art — none falls back to one shared gradient", () => {
+    // The old PRESENTATION map was keyed by slugs that no longer exist, so all
+    // 14 titles rendered the same purple. Every slug must be covered, and the
+    // gradients must not collapse to a single pair.
+    const pairs = new Set(SERIES.map((s) => `${s.c1}/${s.c2}`));
+    expect(pairs.size).toBeGreaterThanOrEqual(10);
+    expect(SERIES.every((s) => s.c1 !== "#1D1A2F")).toBe(true);
   });
 
   it("getSeries returns undefined for an unknown slug", () => {
@@ -116,7 +125,6 @@ describe("bundle + locked pricing", () => {
     rating: "U/A 16+",
     c1: "#000",
     c2: "#fff",
-    rank: 1,
     episodes: [],
   });
 
@@ -151,6 +159,27 @@ describe("fmt", () => {
     expect(fmt(1300)).toBe("1,300");
     expect(fmt(16000)).toBe("16,000");
     expect(fmt(0)).toBe("0");
+  });
+});
+
+describe("countLabel + clock", () => {
+  it("agrees the noun with its number", () => {
+    expect(countLabel(0, "person", "people")).toBe("0 people");
+    expect(countLabel(1, "person", "people")).toBe("1 person");
+    expect(countLabel(2, "person", "people")).toBe("2 people");
+    expect(countLabel(1200, "series", "series")).toBe("1,200 series");
+  });
+
+  it("renders a playback position as a clock, and an unknown one as 0:00", () => {
+    expect(clock(0)).toBe("0:00");
+    expect(clock(7.4)).toBe("0:07");
+    expect(clock(23)).toBe("0:23");
+    expect(clock(64)).toBe("1:04");
+    expect(clock(301.08)).toBe("5:01");
+    expect(clock(3723)).toBe("1:02:03");
+    expect(clock(NaN)).toBe("0:00");
+    expect(clock(Infinity)).toBe("0:00");
+    expect(clock(-5)).toBe("0:00");
   });
 });
 

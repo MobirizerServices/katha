@@ -15,8 +15,9 @@ import { clearPin, isPinSet, isValidPin, setPin, verifyPin } from "@/lib/parenta
 export default function Profile() {
   const w = useWallet();
   const [me, setMe] = useState<ProfileDTO | null>(null);
-  const [busy, setBusy] = useState<"devices" | "delete" | "lang" | null>(null);
+  const [busy, setBusy] = useState<"devices" | "delete" | "lang" | "name" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
 
   useEffect(() => {
     if (!w.ready || !w.signed) return;
@@ -56,6 +57,21 @@ export default function Profile() {
       w.toast("Signed out everywhere else — this browser stays signed in");
     } catch {
       w.toast("Couldn't reach the server — nothing was changed");
+    }
+    setBusy(null);
+  };
+
+  /** The one thing a member can call themselves. Server-owned like the rest of
+   * the profile: the echoed record is what the page then shows. */
+  const saveName = async () => {
+    const next = (nameDraft ?? "").trim().slice(0, 40);
+    setBusy("name");
+    try {
+      setMe(await api.updateMe({ display_name: next }));
+      setNameDraft(null);
+      w.toast(next ? "Name saved" : "Name cleared");
+    } catch {
+      w.toast("Couldn't save your name — try again");
     }
     setBusy(null);
   };
@@ -130,6 +146,33 @@ export default function Profile() {
 
         <section className="panel" aria-label="Account">
           <h3>Account</h3>
+          <form
+            className="setrow"
+            aria-label="Change your display name"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveName();
+            }}
+          >
+            <div className="d">
+              <label className="fld" htmlFor="displayname">
+                Display name
+              </label>
+              <input
+                id="displayname"
+                className="namefield"
+                type="text"
+                maxLength={40}
+                autoComplete="nickname"
+                placeholder="What should we call you?"
+                value={nameDraft ?? me?.display_name ?? w.name}
+                onChange={(e) => setNameDraft(e.target.value)}
+              />
+            </div>
+            <button className="btn s sm" type="submit" disabled={busy !== null || nameDraft === null}>
+              {busy === "name" ? "Saving…" : "Save"}
+            </button>
+          </form>
           <div className="setrow">
             <div className="d">Phone<span>{phone ? maskPhone(phone) : "—"}</span></div>
           </div>

@@ -49,12 +49,12 @@ struct SplashView: View {
                     .scaleEffect(markIn ? 1 : 0.8)
                     .opacity(markIn ? 1 : 0)
                 Text("Katha")
-                    .font(.system(size: 44, weight: .heavy))
+                    .kathaFont(44, weight: .heavy)
                     .foregroundStyle(Katha.Color.text)
                     .opacity(wordIn ? 1 : 0)
                     .offset(y: wordIn ? 0 : 12)
                 Text("कथा")
-                    .font(.system(size: 18))
+                    .kathaFont(18)
                     .foregroundStyle(Katha.Color.text2)
                     .opacity(devIn ? 1 : 0)
             }
@@ -67,7 +67,7 @@ struct SplashView: View {
             VStack {
                 Spacer()
                 Text("Stories in 2 minutes.")
-                    .font(.system(size: 15))
+                    .kathaFont(15)
                     .foregroundStyle(Katha.Color.text2)
                     .padding(.bottom, 48)
                     .opacity(taglineIn ? 1 : 0)
@@ -144,10 +144,10 @@ struct LanguagePickerView: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
                 Text("Which languages do you watch in?")
-                    .font(.system(size: 28, weight: .bold))
+                    .kathaFont(28, weight: .bold)
                     .foregroundStyle(Katha.Color.text)
                 Text("Pick one or more. You can change this anytime.")
-                    .font(.system(size: 13))
+                    .kathaFont(13)
                     .foregroundStyle(Katha.Color.text2)
             }
             .padding(.horizontal, Katha.Spacing.lg)
@@ -162,10 +162,10 @@ struct LanguagePickerView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(opt.native)
-                                    .font(.system(size: 17))
+                                    .kathaFont(17)
                                     .foregroundStyle(Katha.Color.text)
                                 Text(opt.name)
-                                    .font(.system(size: 13))
+                                    .kathaFont(13)
                                     .foregroundStyle(Katha.Color.text2)
                             }
                             Spacer()
@@ -179,23 +179,23 @@ struct LanguagePickerView: View {
                             }
                         }
                         .padding(.horizontal, Katha.Spacing.lg)
-                        .frame(height: 56)
+                        .kathaFrame(height: 56)
                     }
                     Divider().overlay(Katha.Color.raised)
                 }
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("বাংলা · मराठी")
-                            .font(.system(size: 17))
+                            .kathaFont(17)
                             .foregroundStyle(Katha.Color.text2)
                         Text("Coming soon")
-                            .font(.system(size: 13))
+                            .kathaFont(13)
                             .foregroundStyle(Katha.Color.text2)
                     }
                     Spacer()
                 }
                 .padding(.horizontal, Katha.Spacing.lg)
-                .frame(height: 56)
+                .kathaFrame(height: 56)
                 .opacity(0.5)
             }
             .padding(.top, Katha.Spacing.xl)
@@ -221,10 +221,10 @@ struct InterestsView: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
                 Text("What do you like watching?")
-                    .font(.system(size: 28, weight: .bold))
+                    .kathaFont(28, weight: .bold)
                     .foregroundStyle(Katha.Color.text)
                 Text("Pick a few. Your feed starts here.")
-                    .font(.system(size: 13))
+                    .kathaFont(13)
                     .foregroundStyle(Katha.Color.text2)
             }
             .padding(.horizontal, Katha.Spacing.lg)
@@ -237,9 +237,9 @@ struct InterestsView: View {
             VStack(spacing: 6) {
                 KathaPrimaryButton(title: "Continue", enabled: !picked.isEmpty) { onDone() }
                 Button("Skip for now") { onDone() }
-                    .font(.system(size: 15))
+                    .kathaFont(15)
                     .foregroundStyle(Katha.Color.text2)
-                    .frame(height: 44)
+                    .kathaFrame(height: 44)
             }
             .padding(.horizontal, Katha.Spacing.lg)
             .padding(.bottom, 32)
@@ -260,12 +260,12 @@ struct FlowChips: View {
                     if on { picked.remove(chip) } else { picked.insert(chip) }
                 } label: {
                     Text(chip)
-                        .font(.system(size: 13))
+                        .kathaFont(13)
                         .lineLimit(1)
                         .fixedSize()                     // chips hug their label — never truncate
                         .foregroundStyle(on ? Katha.Color.text : Katha.Color.text2)
                         .padding(.horizontal, 12)
-                        .frame(height: 32)
+                        .kathaFrame(height: 32)
                         .background(on ? Katha.Color.accent.opacity(0.14) : Katha.Color.surface)
                         .overlay(
                             Capsule().strokeBorder(on ? Katha.Color.accent : Katha.Color.raised,

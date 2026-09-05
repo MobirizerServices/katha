@@ -145,16 +145,17 @@ export function Config() {
                       onClick={() => { setRampKey(f.key); setRampPct(f.pct ?? 100); }}>
                 Ramp…
               </button>
+              {/* `tog` is the design system's switch (Components → Form
+                  fields); the old `sw` class had no CSS at all. */}
               <button
+                type="button"
                 role="switch"
                 aria-checked={f.enabled}
                 aria-label={`${f.key} ${f.enabled ? "on" : "off"}`}
-                className={f.enabled ? "sw on" : "sw"}
+                className="tog"
                 disabled={!mayFlag}
                 onClick={() => void flip(f.key, f.guarded)}
-              >
-                <i />
-              </button>
+              />
             </li>
           ))}
         </ul>

@@ -23,6 +23,12 @@ describe("nav", () => {
     for (const kb of kbs) expect(kb).toMatch(/^g [a-z]$/);
   });
 
+  // ADM-17: the Components page promises "every module is reachable by g +
+  // letter" — that promise only holds if every item actually carries a chord.
+  it("every module has a chord", () => {
+    expect(ALL_NAV_ITEMS.filter((i) => !i.kb)).toEqual([]);
+  });
+
   it("each item's path matches /<view>", () => {
     for (const it of ALL_NAV_ITEMS) {
       expect(it.path).toBe(`/${it.view}`);

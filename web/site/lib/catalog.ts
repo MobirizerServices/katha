@@ -54,22 +54,45 @@ export interface Series {
   tropes: string[];
   episodeCount: number;
   language: string; // display language
-  rating: string;
+  rating: string;   // seed rating; the live rating comes from /v1/series/{slug}
   c1: string; // poster gradient start
   c2: string; // poster gradient end
-  rank: number;
   episodes: Episode[];
 }
 
-// Presentation overlay: gradient key-art colors, display language, and rating
-// per seed slug. Keeps the seed JSON pure metadata while giving the UI real art.
-const PRESENTATION: Record<string, { c1: string; c2: string; language: string; rating: string }> = {
-  "his-one-and-only-love": { c1: "#3B1F2B", c2: "#C2553D", language: "Hindi", rating: "U/A 16+" },
-  "i-wish-it-were-you": { c1: "#2E1F3F", c2: "#D66E9D", language: "Tamil", rating: "U/A 13+" },
-  "step-back-im-the-hidden-king": { c1: "#0F2A3D", c2: "#3E7C9A", language: "Hindi", rating: "U/A 13+" },
-  "tempest-the-last-mecha": { c1: "#142033", c2: "#4A78A8", language: "Telugu", rating: "U/A 13+" },
-  "lady-diamonds-lost-heiress-returns": { c1: "#4A1620", c2: "#E0576A", language: "Hindi", rating: "U/A 16+" },
-  "deny-me-dragon-king": { c1: "#0F3A3D", c2: "#3FA796", language: "Telugu", rating: "U/A 16+" },
+type Gradient = { c1: string; c2: string };
+
+// Presentation overlay: gradient key-art colors per seed slug, on the ember
+// palette (lamplight darks warmed by sindoor / marigold). Keeps the seed JSON
+// pure metadata while giving the UI real art behind the placeholder covers.
+const PRESENTATION: Record<string, Gradient> = {
+  "kaanch-ka-mahal": { c1: "#3A1F1A", c2: "#C2553D" },
+  "ceo-sahab": { c1: "#2E1721", c2: "#D0687C" },
+  "dilli-6-ka-raaz": { c1: "#1B1512", c2: "#7A4A2A" },
+  "saat-pheron-ka-sauda": { c1: "#33191A", c2: "#D2734F" },
+  "raja-ki-beti": { c1: "#2B2110", c2: "#C79A3A" },
+  "neend-se-pehle": { c1: "#141010", c2: "#5B3A33" },
+  "kabir-ka-kanoon": { c1: "#241412", c2: "#9E3B2B" },
+  "nizam-ka-sauda": { c1: "#1E1710", c2: "#8A6230" },
+  "kadhal-kanakku": { c1: "#2D1A20", c2: "#D77A6A" },
+  "vetri-vaasal": { c1: "#1C2116", c2: "#7E9A3E" },
+  "sunday-sambar": { c1: "#33240F", c2: "#E0A63A" },
+  "prema-pariksha": { c1: "#2B1B24", c2: "#C86E8C" },
+  "rajahmundry-rani": { c1: "#301B14", c2: "#B96A38" },
+  "nalugu-ghantalu": { c1: "#171512", c2: "#6B5330" },
+};
+
+// A new seed row must never land on one generic gradient again (the bug the
+// slug map above drifted into), so genre carries the art when a slug is new.
+const GENRE_ART: Record<string, Gradient> = {
+  "Family Drama": { c1: "#3A1F1A", c2: "#C2553D" },
+  Romance: { c1: "#2E1721", c2: "#D0687C" },
+  "Thriller/Crime": { c1: "#1B1512", c2: "#7A4A2A" },
+  "Fantasy/Mythology": { c1: "#2B2110", c2: "#C79A3A" },
+  Horror: { c1: "#141010", c2: "#5B3A33" },
+  Revenge: { c1: "#241412", c2: "#9E3B2B" },
+  Sports: { c1: "#1C2116", c2: "#7E9A3E" },
+  Comedy: { c1: "#33240F", c2: "#E0A63A" },
 };
 
 const LANG_NAMES: Record<string, string> = { hi: "Hindi", ta: "Tamil", te: "Telugu" };
@@ -123,22 +146,22 @@ export function maskPhone(phone: string): string {
   return out.reverse().join("");
 }
 
-const FALLBACK_PRES = { c1: "#1D1A2F", c2: "#6C4AB6", language: "Hindi", rating: "U/A 16+" };
+const FALLBACK_PRES = { c1: "#2A1A16", c2: "#8A4A2F", language: "Hindi", rating: "U/A 16+" };
 
-export const SERIES: Series[] = seed.series.map((s: any, i: number): Series => {
-  const pres = PRESENTATION[s.slug] || FALLBACK_PRES;
+export const SERIES: Series[] = seed.series.map((s: any): Series => {
+  const genres: string[] = s.genres || [];
+  const pres = PRESENTATION[s.slug] ?? GENRE_ART[genres[0]] ?? FALLBACK_PRES;
   return {
     slug: s.slug,
     title: s.title,
     synopsis: s.synopsis,
-    genres: s.genres || [],
+    genres,
     tropes: s.tropes || [],
     episodeCount: s.episode_count,
-    language: LANG_NAMES[s.primary_language] ?? pres.language,
-    rating: s.content_rating ?? pres.rating,
+    language: LANG_NAMES[s.primary_language] ?? FALLBACK_PRES.language,
+    rating: s.content_rating ?? FALLBACK_PRES.rating,
     c1: pres.c1,
     c2: pres.c2,
-    rank: i + 1,
     episodes: (s.episodes || []).map((e: any) => ({
       number: e.number,
       title: e.title,
@@ -177,6 +200,22 @@ export function fullLockedCost(series: Series): number {
 /** Thousands-separated number, e.g. 1300 -> "1,300". */
 export function fmt(n: number): string {
   return n.toLocaleString("en-IN");
+}
+
+/** "1 person" / "2 people" — a counted noun that agrees with its number. */
+export function countLabel(n: number, one: string, many: string): string {
+  return `${fmt(n)} ${n === 1 ? one : many}`;
+}
+
+/** A playback position as a clock: 23 -> "0:23", 3723 -> "1:02:03". A
+ * not-yet-known duration (NaN/Infinity, as before loadedmetadata) reads "0:00". */
+export function clock(seconds: number): string {
+  const t = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
+  const s = t % 60;
+  const m = Math.floor(t / 60) % 60;
+  const h = Math.floor(t / 3600);
+  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+  return `${h > 0 ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
 }
 
 /** Cover art served by core-api's /media route (CDN in production). */

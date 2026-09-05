@@ -4,8 +4,11 @@ import { ROLE_NAMES, ROLE_ORDER, canView, type Role } from "./auth/roles";
 import { useStore } from "./store";
 
 export function Sidebar() {
-  const { role, setRole, approvals, identity, logout } = useStore();
+  const { role, setRole, approvals, identity, logout, online } = useStore();
   const oidc = identity?.mode === "oidc" && identity.authenticated;
+  // Offline we do not know who is signed in — inventing "Riya Menon · Admin"
+  // (and offering a role preview) is a lie the operator can act on (ADM-16).
+  const unknown = identity === null && !online;
 
   const counts: Record<string, { n: number; cls?: string }> = {
     approvals: { n: approvals.length, cls: "w" },
@@ -31,7 +34,7 @@ export function Sidebar() {
                 {it.label}
                 {cnt && cnt.n ? (
                   <span className={`cnt ${cnt.cls ?? ""}`}>{cnt.n}</span>
-                ) : it.kb ? (
+                ) : it.kb && allowed ? (   // a locked item's chord goes nowhere (ADM-35)
                   <span className="cnt" style={{ background: "transparent", color: "#6b6b75" }}>
                     {it.kb}
                   </span>
@@ -76,10 +79,16 @@ export function Sidebar() {
         </div>
       ) : (
         <div className="me">
-          <div className="av">R</div>
-          <div>
-            <div style={{ color: "#fff", fontWeight: 600 }}>Riya Menon</div>
-            <div className="tiny">{ROLE_NAMES[role]} · dev auth</div>
+          <div className="av">{unknown ? "?" : "R"}</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: "#fff", fontWeight: 600 }}>
+              {unknown ? "Operator unknown" : "Riya Menon"}
+            </div>
+            <div className="tiny">
+              {unknown
+                ? "offline — the server has not said who you are"
+                : `${ROLE_NAMES[role]} · dev auth`}
+            </div>
           </div>
           <select
             aria-label="Preview as role"

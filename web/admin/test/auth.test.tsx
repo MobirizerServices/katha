@@ -25,6 +25,8 @@ function stubServer(routes: Stub) {
 }
 
 const SIGNALS: Stub = {
+  // the sidebar badge/Finance counter poll the inbox with every signal read
+  "/approvals?": () => [],
   "/health/full": () => ({ status: "ok", checks: {}, at: "" }),
   "/attention": () => ({ items: [] }),
 };

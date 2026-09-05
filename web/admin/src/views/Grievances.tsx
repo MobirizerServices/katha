@@ -6,6 +6,11 @@ import { useStore } from "../store";
 import { canAct } from "../auth/roles";
 
 const FILTERS = ["all", "new", "ack", "resolved"] as const;
+// Sibling queues label their tabs "Pending / History / Open / Reviewed"; the
+// raw status codes read like a database dump (ADM-32).
+const FILTER_LABEL: Record<(typeof FILTERS)[number], string> = {
+  all: "All", new: "New", ack: "Acknowledged", resolved: "Resolved",
+};
 
 export function Grievances() {
   const { role, online, showToast, refreshSignals } = useStore();
@@ -55,7 +60,9 @@ export function Grievances() {
         {FILTERS.map((f) => (
           <button key={f} role="tab" aria-selected={filter === f}
                   className={filter === f ? "tab on" : "tab"} onClick={() => setFilter(f)}>
-            {f === "all" ? `All${rows ? ` (${rows.length})` : ""}` : f}
+            {f === "all"
+              ? `${FILTER_LABEL.all}${rows ? ` (${rows.length})` : ""}`
+              : `${FILTER_LABEL[f]}${rows ? ` (${rows.filter((g) => g.status === f).length})` : ""}`}
           </button>
         ))}
       </div>
@@ -64,7 +71,8 @@ export function Grievances() {
         <Skeleton rows={4} />
       ) : shown.length === 0 ? (
         <Empty
-          title={filter === "all" ? "No grievances" : `Nothing ${filter}`}
+          title={filter === "all" ? "No grievances"
+                                  : `Nothing ${FILTER_LABEL[filter].toLowerCase()}`}
           hint="New complaints appear here the moment a user files one from Help."
         />
       ) : (

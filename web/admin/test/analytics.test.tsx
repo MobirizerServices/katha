@@ -30,7 +30,8 @@ describe("Analytics — the full business board", () => {
     expect(screen.getByText("1,029 coins")).toBeInTheDocument();
     expect(screen.getByText(/77 coins dormant/)).toBeInTheDocument();
     expect(screen.getByText("2026-08-30")).toBeInTheDocument();      // day table
-    expect(screen.getByText(/generated 2026-09-01T18:00:00/)).toBeInTheDocument();
+    // ADM-12: the stamp is humanised, the ISO form stays on hover
+    expect(screen.getByTitle("2026-09-01T18:00:00+00:00")).toBeInTheDocument();
   });
 
   it("the window switcher changes the period", async () => {

@@ -44,6 +44,8 @@ function stub(routes: Stub, failRest = true) {
 }
 
 const SIGNALS: Stub = {
+  // the sidebar badge/Finance counter poll the inbox with every signal read
+  "/approvals?": () => [],
   "/health/full": () => ({ status: "ok", checks: {}, at: "" }),
   "/auth/me": () => ({ mode: "headers", authenticated: true }),
   "/attention": () => ({ items: [] }),
@@ -375,8 +377,8 @@ describe("Access, Grievances, Approvals, Audit — refusal branches", () => {
 
   it("approvals: self-approve guard, decided rows, age chips", async () => {
     stub({
+      // more specific needles first: SIGNALS carries a catch-all "/approvals?"
       "/approvals/ap2/approve": () => ({ status: "applied" }),
-      ...SIGNALS,
       "/approvals?status=pending": () => [
         { id: "ap1", kind: "Coin adjustment", status: "pending",
           detail: "+900 · u1", requestedBy: "riya", when: "2026-08-30T00:00:00+00:00",
@@ -392,6 +394,7 @@ describe("Access, Grievances, Approvals, Audit — refusal branches", () => {
           detail: "+700 · u0", requestedBy: "sam", when: "2026-08-29T00:00:00+00:00",
           needs: "Finance", amount: 700, userId: "u0", balanceBefore: null,
           balanceAfter: null, requesterToday: 0, approvedBy: "farah" }],
+      ...SIGNALS,
     });
     renderWithStore(<Approvals />);
     await screen.findByText(/\+900 · u1/);
@@ -587,6 +590,8 @@ describe("the last branch cluster", () => {
       "/health/full": () => ({ status, checks: { db: status }, at: "" }),
       "/auth/me": () => ({ mode: "headers", authenticated: true }),
       "/attention": () => ({ items: [] }),
+      "/approvals?": () => [],
+      "/metrics/ui": () => ({ ok: true }),   // the view ping now waits for identity
       "/access/matrix": () => null,
     });
     renderWithStore(<App />, { route: "/access" });

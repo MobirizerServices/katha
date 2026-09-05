@@ -21,8 +21,8 @@ export default function SiteFooter() {
             <Link href="/search">Search</Link>
             <Link href="/#how">How coins work</Link>
             <Link href="/coins">Get coins</Link>
-            <a href="#">Careers</a>
-            <a href="#">Press</a>
+            <span className="pending">Careers — not hiring yet</span>
+            <span className="pending">Press — press@katha.example</span>
           </div>
           <div>
             <h4>Work with us</h4>
@@ -33,18 +33,24 @@ export default function SiteFooter() {
           </div>
           <div>
             <h4>Legal</h4>
-            <a href="#">Terms of Use</a>
-            <a href="#">Privacy Notice (DPDP)</a>
-            <a href="#">Refund &amp; Cancellation Policy</a>
-            <a href="#">Content ratings &amp; parental controls</a>
-            <a href="#">Report content</a>
+            {/* None of these documents is published yet. A link to "#" reads as
+                live and goes nowhere, so each stays plain text until the page
+                behind it exists; the two that DO have a destination link to it. */}
+            <span className="pending">Terms of Use</span>
+            <span className="pending">Privacy Notice (DPDP)</span>
+            <span className="pending">Refund &amp; Cancellation Policy</span>
+            <Link href="/#faq">Content ratings &amp; parental controls</Link>
+            <span className="pending">Report content — grievance@katha.example</span>
+            <p className="pendingnote">
+              These policies are drafted but not published; the pages go live with the app.
+            </p>
           </div>
           <div>
             <h4>Help and grievances</h4>
             <div className="griev">
               <b>Support:</b> help@katha.example · in-app chat, 9 am–9 pm IST
               <br />
-              <b>Grievance officer:</b> Name (to be appointed)
+              <b>Grievance officer:</b> to be appointed before launch
               <br />
               grievance@katha.example
               <br />
@@ -55,8 +61,9 @@ export default function SiteFooter() {
         </div>
         <div className="fbot">
           <span>
-            © 2026 Katha Media Private Limited (placeholder). All series, characters and people shown are
-            fictional. Prices include GST. Refunds on unused, unspent web coins within 7 days.
+            © 2026 Katha. Company name and registration are placeholders until incorporation completes.
+            All series, characters and people shown are fictional. Prices include GST. Refunds on unused,
+            unspent web coins within 7 days.
           </span>
           <span>English · हिन्दी · தமிழ் · తెలుగు</span>
         </div>

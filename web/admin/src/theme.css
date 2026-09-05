@@ -171,6 +171,9 @@ aside.side {
   color: #fff;
   border-radius: 999px;
   padding: 1px 7px;
+  /* a two-line label must not squeeze "g r" into two lines of its own */
+  white-space: nowrap;
+  flex: none;
 }
 .navi .cnt.w {
   background: var(--warn);
@@ -529,23 +532,33 @@ main {
   padding: 14px 16px;
   min-width: 0;
 }
-.kpi .l {
+/* The views emit .lbl / .val / .delta (ui.tsx Metric + the hand-rolled cards);
+   these are those cards' type scale — label small and muted, value large and
+   tabular, delta small with an up/down colour. */
+.kpi .lbl {
   font-size: 12px;
   color: var(--text2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.kpi .v {
+.kpi .val {
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-top: 4px;
   font-variant-numeric: tabular-nums;
 }
-.kpi .dl {
+.kpi .delta {
+  display: inline-block;
   font-size: 12px;
   margin-top: 4px;
+  color: var(--ok);
+}
+.kpi .delta.down {
+  color: var(--danger);
+}
+.kpi .delta.muted {
   color: var(--text2);
 }
 .up {
@@ -594,9 +607,12 @@ main {
 }
 
 /* ============ tables ============ */
+/* Horizontal scroll when a table is wider than its panel; vertically the table
+   runs to its full length — a silent max-height hid rows behind an invisible
+   (macOS overlay) scrollbar. */
 .tablewrap {
-  overflow: auto;
-  max-height: 640px;
+  overflow-x: auto;
+  scrollbar-gutter: stable;
   border-radius: 0 0 var(--r) var(--r);
 }
 table.t {
@@ -779,6 +795,11 @@ table.t tbody tr.link:hover td {
   max-height: 90vh;
   overflow: auto;
 }
+/* Wide variant for modals that carry a table (the user ledger): 520px cut the
+   Balance column and pushed Refund out of sight. */
+.modal.wide {
+  width: 820px;
+}
 .modal h2 {
   font-size: 17px;
   margin: 0;
@@ -820,7 +841,9 @@ table.t tbody tr.link:hover td {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 140;
+  /* below .modal (120) so a toast never covers the dialog's own footer, above
+     the scrim (100) so it is still readable while a modal is open */
+  z-index: 110;
   align-items: center;
 }
 .toast {
@@ -895,9 +918,62 @@ table.t tbody tr.link:hover td {
   .app {
     grid-template-columns: 1fr;
   }
+  /* Narrow screens get a horizontal nav strip pinned to the top instead of an
+     830px-tall stack that pushes the page title below the fold. */
   aside.side {
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 30;
     height: auto;
+    max-height: none;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 6px;
+    padding: 8px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  aside.side > div:not(.me):not(.brand) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+  }
+  .brand {
+    padding: 0 8px 0 0;
+    flex: none;
+  }
+  .brand .env {
+    display: none;
+  }
+  .grp {
+    padding: 0 4px;
+    white-space: nowrap;
+  }
+  .navi {
+    width: auto;
+    white-space: nowrap;
+    padding: 6px 10px;
+  }
+  .navi .cnt {
+    margin-left: 4px;
+  }
+  aside.side > .me {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 0;
+    border-top: 0;
+    border-left: 1px solid var(--side3);
+    padding: 0 0 0 12px;
+    flex: none;
+    white-space: nowrap;
+  }
+  .me select {
+    max-width: 150px;
   }
   .content {
     padding: 16px;
@@ -1180,3 +1256,197 @@ table.table td small { font-size: 12px; }
 .mtx td { white-space: nowrap; }
 @media (max-width: 1100px) { .cal { grid-template-columns: repeat(2, 1fr); }
   .swatches { grid-template-columns: 1fr 1fr; } }
+
+/* ============ UI-audit fixes: controls, rows and columns ============
+   Everything below closes a gap between what the views emit and what the
+   design system styles — no view had to be rewritten to get the dark theme. */
+
+/* --- form controls outside .fld / .frow (ADM-01, ADM-08, ADM-18) ---------
+   Modal bodies and the .acct detail blocks write plain <label><input>. They
+   now read exactly like a .fld: label above, full-width control below. */
+.modal .mb > label,
+.acct > label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text2);
+}
+.modal .mb input,
+.modal .mb select,
+.modal .mb textarea,
+.acct input,
+.acct select,
+.acct textarea,
+.filters > input,
+.row > input,
+.row > select {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+}
+.modal .mb input:focus,
+.modal .mb select:focus,
+.modal .mb textarea:focus,
+.acct input:focus,
+.acct select:focus,
+.acct textarea:focus,
+.filters > input:focus,
+.row > input:focus,
+.row > select:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.modal .mb textarea,
+.acct textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+.modal .mb input[type="checkbox"],
+.acct input[type="checkbox"] {
+  width: auto;
+}
+/* Filter bars sit in a row, so their inputs size to content, not to 100%. */
+.filters > input {
+  height: 34px;
+  width: auto;
+  min-width: 260px;
+  padding: 0 10px;
+}
+.row > select { width: auto; }
+.row > input::placeholder,
+.filters > input::placeholder { color: var(--text3); }
+
+/* --- list rows that were bare <ul><li> (ADM-06, ADM-16, ADM-20) ---------- */
+.approvals,
+.attn,
+.pipe,
+.flags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.aprow,
+.attn > li,
+.flags > li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line2);
+}
+.attn > li > .attnrow { flex: 1; min-width: 0; }
+.aprow:last-child,
+.attn > li:last-child,
+.flags > li:last-child { border-bottom: 0; }
+.approvals > li:hover,
+.attn > li:hover,
+.flags > li:hover { background: var(--surface2); }
+/* nested note threads inside a grievance row keep their own rhythm */
+.aprow .tl li { padding: 4px 0; border-bottom: 0; }
+.pipe > li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--line2);
+}
+.pipe > li:last-child { border-bottom: 0; }
+.pipe > li b { font-variant-numeric: tabular-nums; }
+/* Approvals/Moderation/Writers/Grievances render their lists on the page, not
+   inside a panel — give them the panel's own surface so rows read as rows. */
+.approvals {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.panel > .approvals,
+.panel > .attn,
+.panel > .flags,
+.panel > .pipe {
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+/* --- Overview's two-column body (.cols) --------------------------------- */
+.cols {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1100px) { .cols { grid-template-columns: 1fr; } }
+
+/* --- catalog series cell (ADM-10) --------------------------------------- */
+.serieslink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  min-width: 0;
+}
+.serieslink > span { min-width: 0; }
+.covermini { display: inline-block; flex: none; }
+/* expanded episode table lives in its own full-width row under the series */
+table.table tr.epsrow > td { padding: 0 12px 12px; background: var(--surface2); }
+/* content rating chip */
+.rt {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text2);
+}
+
+/* --- misc column/typography fixes --------------------------------------- */
+.toast.err { color: #ffd9d2; }                       /* ADM-09 */
+.search > span:nth-child(2) {                        /* ADM-19 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.search .kbd { flex: none; }
+.tabs { flex-wrap: wrap; }                           /* ADM-24 */
+.tabs .tab { white-space: nowrap; }
+.audit td:nth-child(2) { white-space: nowrap; }      /* ADM-22 */
+/* A sparkline with its own scale caption underneath — beside the line it
+   overflowed the KPI card at six-across (ADM-29). */
+.spark {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+  max-width: 100%;
+}
+.spark .cap {
+  font-size: 11px;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.kpi { overflow: hidden; }
+.splitends {                                         /* ADM-29 */
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 4px;
+}
+/* Users at tablet width: the wallet must not sit 1,900px under the lookup. */
+@media (max-width: 1100px) {
+  .split.detailfirst > .panel:last-child { order: -1; }
+}

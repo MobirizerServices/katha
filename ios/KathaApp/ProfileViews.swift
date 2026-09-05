@@ -9,6 +9,11 @@ import KathaKit
 struct ProfileView: View {
     @Environment(AppModel.self) private var model
     @State private var showLogin = false
+    /// The row metrics: 52 pt rows around 15 pt labels clip the moment the
+    /// reader turns text up, so both grow on the Dynamic Type curve.
+    @ScaledMetric(relativeTo: .body) private var rowHeight: CGFloat = 52
+    @ScaledMetric(relativeTo: .body) private var iconTile: CGFloat = 30
+    @ScaledMetric(relativeTo: .title2) private var avatar: CGFloat = 52
 
     var body: some View {
         ScrollView {
@@ -16,72 +21,90 @@ struct ProfileView: View {
                 identityCard
 
                 VStack(spacing: 0) {
-                    row("creditcard.fill", "Wallet",
-                        value: "\(model.wallet.total) coins") { WalletView() }
-                    row("bookmark.fill", "My list",
+                    row("creditcard.fill", model.t("wallet.title"),
+                        value: model.t("profile.coins", model.wallet.total)) { WalletView() }
+                    row("bookmark.fill", model.t("tab.mylist"),
                         value: "\(model.myListSeries.count)") { MyListView() }
-                    row("doc.text.fill", "Invoices") { InvoicesView() }
-                    row("gearshape.fill", "Settings") { SettingsView() }
-                    row("questionmark.circle.fill", "Help & grievance") { HelpView() }
-                    actionRow("lightbulb.fill", "Replay tips") { model.coachReplayToken += 1 }
+                    row("doc.text.fill", model.t("profile.invoices")) { InvoicesView() }
+                    row("gearshape.fill", model.t("settings.title")) { SettingsView() }
+                    row("questionmark.circle.fill", model.t("settings.help")) { HelpView() }
+                    actionRow("lightbulb.fill", model.t("profile.replayTips")) {
+                        model.coachReplayToken += 1
+                    }
                 }
                 .background(Katha.Color.surface)
                 .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
 
                 if model.isSignedIn {
-                    Button("Sign out") { Task { await model.signOut() } }
-                        .font(.system(size: 15))
+                    Button(model.t("profile.signOut")) { Task { await model.signOut() } }
+                        .kathaFont(15)
                         .foregroundStyle(Katha.Color.danger)
                         .frame(maxWidth: .infinity)
                 }
 
-                Text("Version 1.0.0 (dev)")
-                    .font(.system(size: 11))
+                Text(model.t("profile.version", Self.versionString))
+                    .kathaFont(11)
                     .foregroundStyle(Katha.Color.text2)
                     .frame(maxWidth: .infinity)
             }
             .padding(Katha.Spacing.lg)
         }
         .background(Katha.Color.bg)
-        .navigationTitle("Profile")
+        .navigationTitle(model.t("profile.title"))
+        // Popping back from Settings otherwise left the root wearing the small
+        // inline title it had collapsed to on the way out.
+        .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(Katha.Color.bg, for: .navigationBar)
         .sheet(isPresented: $showLogin) { LoginSheet().environment(model) }
+    }
+
+    /// The real bundle version — "(dev)" is a DEBUG marker, not part of the
+    /// number, so a Release build no longer claims to be a dev build.
+    private static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        let build = info?["CFBundleVersion"] as? String
+        #if DEBUG
+        return build.map { "\(short) (\($0), dev)" } ?? "\(short) (dev)"
+        #else
+        return build.map { "\(short) (\($0))" } ?? short
+        #endif
     }
 
     /// Members see their identity; guests see exactly what an account protects.
     private var identityCard: some View {
         HStack(spacing: Katha.Spacing.md) {
             ZStack {
-                Circle().fill(Katha.Color.accent.opacity(0.2)).frame(width: 52, height: 52)
+                Circle().fill(Katha.Color.accent.opacity(0.2)).frame(width: avatar, height: avatar)
                 Text(model.isSignedIn ? String((model.profile?.displayName.first ?? "K")) : "👋")
-                    .font(.system(size: 22, weight: .bold))
+                    .kathaFont(22, weight: .bold)
                     .foregroundStyle(Katha.Color.accent)
             }
             VStack(alignment: .leading, spacing: 3) {
                 if model.isSignedIn {
                     Text(model.profile?.displayName.isEmpty == false
-                         ? model.profile!.displayName : "Katha member")
-                        .font(.system(size: 17, weight: .semibold))
+                         ? model.profile!.displayName : model.t("profile.member"))
+                        .kathaFont(17, weight: .semibold)
                         .foregroundStyle(Katha.Color.text)
                     Text(masked(model.profile?.phone))
-                        .font(.system(size: 13))
+                        .kathaFont(13)
                         .foregroundStyle(Katha.Color.text2)
                 } else {
-                    Text("You're browsing as a guest")
-                        .font(.system(size: 16, weight: .semibold))
+                    Text(model.t("profile.guest.title"))
+                        .kathaFont(16, weight: .semibold)
                         .foregroundStyle(Katha.Color.text)
-                    Text("Create an account to keep your coins and progress.")
-                        .font(.system(size: 12))
+                    Text(model.t("profile.guest.body"))
+                        .kathaFont(12)
                         .foregroundStyle(Katha.Color.text2)
                 }
             }
             Spacer()
             if !model.isSignedIn {
-                Button("Sign in") { showLogin = true }
-                    .font(.system(size: 14, weight: .semibold))
+                Button(model.t("profile.signIn")) { showLogin = true }
+                    .kathaFont(14, weight: .semibold)
                     .foregroundStyle(Katha.Color.text)
                     .padding(.horizontal, 14)
-                    .frame(height: 34)
+                    .kathaFrame(height: 34)
                     .background(Katha.Color.accent)
                     .clipShape(Capsule())
             }
@@ -92,7 +115,7 @@ struct ProfileView: View {
     }
 
     private func masked(_ phone: String?) -> String {
-        guard let phone, phone.count > 4 else { return "Signed in" }
+        guard let phone, phone.count > 4 else { return model.t("profile.signedIn") }
         return String(phone.prefix(phone.count - 4)).replacingOccurrences(
             of: "[0-9]", with: "•", options: .regularExpression) + phone.suffix(4)
     }
@@ -106,24 +129,25 @@ struct ProfileView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .fill(Katha.Color.accent.opacity(0.16))
-                        .frame(width: 30, height: 30)
+                        .frame(width: iconTile, height: iconTile)
                     Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
+                        .kathaFont(14, weight: .semibold)
                         .foregroundStyle(Katha.Color.accent)
                 }
                 Text(title)
-                    .font(.system(size: 15))
+                    .kathaFont(15)
                     .foregroundStyle(Katha.Color.text)
-                Spacer()
+                Spacer(minLength: Katha.Spacing.sm)
                 Text(value)
-                    .font(.system(size: 13))
+                    .kathaFont(13)
                     .foregroundStyle(Katha.Color.text2)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
+                    .kathaFont(12)
                     .foregroundStyle(Katha.Color.text2)
             }
             .padding(.horizontal, Katha.Spacing.lg)
-            .frame(height: 52)
+            .frame(minHeight: rowHeight)
+            .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
@@ -138,18 +162,24 @@ struct ProfileView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .fill(Katha.Color.accent.opacity(0.16))
-                        .frame(width: 30, height: 30)
+                        .frame(width: iconTile, height: iconTile)
                     Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
+                        .kathaFont(14, weight: .semibold)
                         .foregroundStyle(Katha.Color.accent)
                 }
                 Text(title)
-                    .font(.system(size: 15))
+                    .kathaFont(15)
                     .foregroundStyle(Katha.Color.text)
-                Spacer()
+                Spacer(minLength: Katha.Spacing.sm)
+                // Not a chevron: this row acts in place rather than pushing a
+                // screen, and the glyph is what says so.
+                Image(systemName: "arrow.counterclockwise")
+                    .kathaFont(12, weight: .semibold)
+                    .foregroundStyle(Katha.Color.text2)
             }
             .padding(.horizontal, Katha.Spacing.lg)
-            .frame(height: 52)
+            .frame(minHeight: rowHeight)
+            .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
@@ -201,7 +231,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(model.t("settings.previews"))
                         Text(model.t("settings.previews.caption"))
-                            .font(.system(size: 12))
+                            .kathaFont(12)
                             .foregroundStyle(Katha.Color.text2)
                     }
                 }
@@ -322,33 +352,48 @@ struct PinSetupSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: Katha.Spacing.lg) {
-            Text(title)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(Katha.Color.text)
-            Text(subtitle)
-                .font(.system(size: 13))
-                .foregroundStyle(message == nil ? Katha.Color.text2 : Katha.Color.danger)
-                .multilineTextAlignment(.center)
-            PinDots(filled: pin.count)
-            PinPad { digit in
-                guard lockedFor == 0 else { return }
-                if digit == -1 { if !pin.isEmpty { pin.removeLast() } }
-                else if pin.count < 4 {
-                    pin.append(String(digit))
-                    if pin.count == 4 { submit() }
+        ScrollView {
+            VStack(spacing: Katha.Spacing.lg) {
+                Text(title)
+                    .kathaFont(20, weight: .bold)
+                    .foregroundStyle(Katha.Color.text)
+                    .multilineTextAlignment(.center)
+                Text(subtitle)
+                    .kathaFont(13)
+                    .foregroundStyle(message == nil ? Katha.Color.text2 : Katha.Color.danger)
+                    .multilineTextAlignment(.center)
+                PinDots(filled: pin.count)
+                PinPad { digit in
+                    guard lockedFor == 0 else { return }
+                    if digit == -1 { if !pin.isEmpty { pin.removeLast() } }
+                    else if pin.count < 4 {
+                        pin.append(String(digit))
+                        if pin.count == 4 { submit() }
+                    }
                 }
+                .disabled(lockedFor > 0)
+                .opacity(lockedFor > 0 ? 0.4 : 1)
+                HStack(spacing: 24) {
+                    // A swipe-down was the only exit; a keypad sheet needs a
+                    // control that says so.
+                    Button(model.t("action.cancel")) { dismiss() }
+                        .foregroundStyle(Katha.Color.text2)
+                        .accessibilityIdentifier("pin.cancel")
+                    if step == .current {
+                        Button(model.t("pin.forgot")) { showForgot = true }
+                            .foregroundStyle(Katha.Color.accent)
+                    }
+                }
+                .kathaFont(14)
             }
-            .disabled(lockedFor > 0)
-            .opacity(lockedFor > 0 ? 0.4 : 1)
-            if step == .current {
-                Button(model.t("pin.forgot")) { showForgot = true }
-                    .font(.system(size: 14))
-                    .foregroundStyle(Katha.Color.accent)
-            }
+            .padding(Katha.Spacing.xl)
+            .frame(maxWidth: .infinity)
         }
-        .padding(Katha.Spacing.xl)
-        .presentationDetents([.large])
+        .scrollBounceBehavior(.basedOnSize)
+        // Half height, sized to the keypad — the sheet used to float in the
+        // middle of a full-screen presentation with 45 % dead space.
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
         .presentationBackground(Katha.Color.surface)
         .sheet(isPresented: $showForgot) {
             ForgotPinSheet {
@@ -419,7 +464,6 @@ struct PinSetupSheet: View {
 /// The in-player gate for rated titles.
 struct PinGateView: View {
     let onSuccess: () -> Void
-    let onCancel: () -> Void
     var onToast: ((String) -> Void)? = nil
     @Environment(AppModel.self) private var model
     @State private var pin = ""
@@ -430,13 +474,13 @@ struct PinGateView: View {
     var body: some View {
         VStack(spacing: Katha.Spacing.lg) {
             Image(systemName: "lock.shield.fill")
-                .font(.system(size: 40))
+                .kathaFont(40)
                 .foregroundStyle(Katha.Color.accent)
             Text("Parental lock")
-                .font(.system(size: 20, weight: .bold))
+                .kathaFont(20, weight: .bold)
                 .foregroundStyle(Katha.Color.text)
             Text(message ?? "This title is rated for older viewers.")
-                .font(.system(size: 13))
+                .kathaFont(13)
                 .foregroundStyle(message == nil ? Katha.Color.text2 : Katha.Color.danger)
                 .multilineTextAlignment(.center)
             PinDots(filled: pin.count)
@@ -464,13 +508,11 @@ struct PinGateView: View {
             }
             .disabled(lockedFor > 0)
             .opacity(lockedFor > 0 ? 0.4 : 1)
-            HStack(spacing: 24) {
-                Button("Go back") { onCancel() }
-                    .foregroundStyle(Katha.Color.text2)
-                Button(model.t("pin.forgot")) { showForgot = true }
-                    .foregroundStyle(Katha.Color.accent)
-            }
-            .font(.system(size: 14))
+            // No "Go back": the navigation bar's back button already does
+            // exactly that, and two controls for one action read as two doors.
+            Button(model.t("pin.forgot")) { showForgot = true }
+                .kathaFont(14)
+                .foregroundStyle(Katha.Color.accent)
         }
         .padding(Katha.Spacing.xl)
         .sheet(isPresented: $showForgot) {
@@ -516,22 +558,17 @@ struct ForgotPinSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
-            Capsule().fill(Katha.Color.raised)
-                .frame(width: 36, height: 5)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 8)
-
             Text(step == .intro ? model.t("pin.reset.title") : model.t("pin.reset.enter"))
-                .font(.system(size: 22, weight: .bold))
+                .kathaFont(22, weight: .bold)
                 .foregroundStyle(Katha.Color.text)
 
             if let phone {
                 if step == .intro {
                     Text(model.t("pin.reset.body"))
-                        .font(.system(size: 15))
+                        .kathaFont(15)
                         .foregroundStyle(Katha.Color.text2)
                     Text(masked(phone))
-                        .font(.system(size: 15, weight: .semibold))
+                        .kathaFont(15, weight: .semibold)
                         .foregroundStyle(Katha.Color.text)
                     KathaPrimaryButton(title: working ? "Sending…" : model.t("pin.reset.send"),
                                        enabled: !working) {
@@ -539,14 +576,14 @@ struct ForgotPinSheet: View {
                     }
                 } else {
                     Text("Sent by SMS to \(masked(phone)).")
-                        .font(.system(size: 14))
+                        .kathaFont(14)
                         .foregroundStyle(Katha.Color.text2)
-                    TextField("1234", text: $code)
+                    TextField(model.t("otp.placeholder"), text: $code)
                         .keyboardType(.numberPad)
-                        .font(.system(size: 28, weight: .semibold).monospacedDigit())
+                        .kathaFont(28, weight: .semibold, monospacedDigit: true)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(Katha.Color.text)
-                        .frame(height: 56)
+                        .kathaFrame(height: 56)
                         .background(Katha.Color.raised)
                         .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
                         .accessibilityIdentifier("pin.reset.code")
@@ -561,23 +598,25 @@ struct ForgotPinSheet: View {
             } else {
                 // No phone on this session: explain, and offer the sign-in.
                 Text(model.t("pin.reset.guest"))
-                    .font(.system(size: 15))
+                    .kathaFont(15)
                     .foregroundStyle(Katha.Color.text2)
                 KathaPrimaryButton(title: "Sign in with phone") { showLogin = true }
             }
 
             if let error {
-                Text(error).font(.system(size: 13)).foregroundStyle(Katha.Color.danger)
+                Text(error).kathaFont(13).foregroundStyle(Katha.Color.danger)
             }
 
-            Button("Not now") { dismiss() }
-                .font(.system(size: 15))
+            Button(model.t("action.notNow")) { dismiss() }
+                .kathaFont(15)
                 .foregroundStyle(Katha.Color.text2)
                 .frame(maxWidth: .infinity)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Katha.Spacing.xl)
+        .padding(.top, Katha.Spacing.xl)      // clear of the system grabber
         .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
         .presentationBackground(Katha.Color.surface)
         .sheet(isPresented: $showLogin) { LoginSheet().environment(model) }
     }
@@ -647,10 +686,10 @@ struct PinPad: View {
                                 else if key == -2 { Color.clear }
                                 else { Text("\(key)") }
                             }
-                            .font(.system(size: 22, weight: .medium))
+                            .kathaFont(22, weight: .medium)
                             .foregroundStyle(Katha.Color.text)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 48)
+                            .kathaFrame(height: 48)
                             .background(key == -2 ? .clear : Katha.Color.raised)
                             .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.sm))
                         }
@@ -669,14 +708,10 @@ struct HelpView: View {
     @Environment(AppModel.self) private var model
     private var faqs: [(q: String, a: String)] {
         [
-        ("How do coins work?",
-         faqCoinsAnswer(model)),
-        ("I paid but didn't get my coins",
-         "Pull to refresh your Wallet, then tap Restore purchases. If the coins still haven't landed within a few minutes, contact support — verified failed transactions are re-credited."),
-        ("Refunds and cancellations",
-         "App Store purchases are refunded by Apple under Apple's policy (reportaproblem.apple.com). Coins bought on the web are refundable within 7 days if unspent."),
-        ("Parental controls",
-         "Set a PIN in Settings → Parental lock. U/A 16+ and A-rated titles then require it before playing."),
+        (model.t("help.faq.coins.q"), faqCoinsAnswer(model)),
+        (model.t("help.faq.missing.q"), model.t("help.faq.missing.a")),
+        (model.t("help.faq.refunds.q"), model.t("help.faq.refunds.a")),
+        (model.t("help.faq.parental.q"), model.t("help.faq.parental.a")),
         ]
     }
 
@@ -691,15 +726,15 @@ struct HelpView: View {
                         ZStack {
                             Circle().fill(Katha.Color.accent.opacity(0.16)).frame(width: 44, height: 44)
                             Image(systemName: "bubble.left.and.text.bubble.right.fill")
-                                .font(.system(size: 18))
+                                .kathaFont(18)
                                 .foregroundStyle(Katha.Color.accent)
                         }
                         VStack(alignment: .leading, spacing: 2) {
                             Text(model.t("assistant.title"))
-                                .font(.system(size: 16, weight: .semibold))
+                                .kathaFont(16, weight: .semibold)
                                 .foregroundStyle(Katha.Color.text)
                             Text(model.t("assistant.card"))
-                                .font(.system(size: 12))
+                                .kathaFont(12)
                                 .foregroundStyle(Katha.Color.text2)
                         }
                     }
@@ -707,11 +742,11 @@ struct HelpView: View {
                 }
                 .accessibilityIdentifier("help.assistant")
             }
-            Section("Common questions") {
+            Section(model.t("help.common")) {
                 ForEach(faqs, id: \.q) { faq in
                     DisclosureGroup(faq.q) {
                         Text(faq.a)
-                            .font(.system(size: 13))
+                            .kathaFont(13)
                             .foregroundStyle(Katha.Color.text2)
                     }
                 }
@@ -721,13 +756,13 @@ struct HelpView: View {
             Section {
                 Link("help@katha.example", destination: URL(string: "mailto:help@katha.example")!)
                 Link("grievance@katha.example", destination: URL(string: "mailto:grievance@katha.example")!)
-            } header: { Text("Contact") } footer: {
-                Text("Complaints are acknowledged within 24 hours and resolved within 15 days, as required under the IT Rules, 2021. Support hours 9 am–9 pm IST.")
+            } header: { Text(model.t("help.contact")) } footer: {
+                Text(model.t("help.contact.footer"))
             }
         }
         .scrollContentBackground(.hidden)
         .background(Katha.Color.bg)
-        .navigationTitle("Help & grievance")
+        .navigationTitle(model.t("settings.help"))
     }
 }
 
@@ -743,16 +778,16 @@ struct GrievanceFormSection: View {
 
     var body: some View {
         Section {
-            TextField("Your email or phone", text: $gContact)
+            TextField(model.t("help.grievance.contact"), text: $gContact)
                 .textInputAutocapitalization(.never)
                 .keyboardType(.emailAddress)
-            TextField("What went wrong?", text: $gSubject)
+            TextField(model.t("help.grievance.subject"), text: $gSubject)
             if let ack = gAck {
-                Text("Filed as \(ack.id). We'll acknowledge within 24 hours and resolve within 15 days.")
-                    .font(.system(size: 13))
+                Text(model.t("help.grievance.ack", ack.id))
+                    .kathaFont(13)
                     .foregroundStyle(Katha.Color.success)
             } else {
-                Button(gBusy ? "Filing…" : "File grievance") {
+                Button(model.t(gBusy ? "help.grievance.filing" : "help.grievance.file")) {
                     gBusy = true
                     gError = false
                     Task {
@@ -768,13 +803,13 @@ struct GrievanceFormSection: View {
                           || gSubject.trimmingCharacters(in: .whitespaces).isEmpty)
                 .foregroundStyle(Katha.Color.accent)
                 if gError {
-                    Text("Couldn't file right now — email us below instead.")
-                        .font(.system(size: 13))
+                    Text(model.t("help.grievance.error"))
+                        .kathaFont(13)
                         .foregroundStyle(Katha.Color.text2)
                 }
             }
-        } header: { Text("File a grievance") } footer: {
-            Text("Goes straight to the grievance officer, no email needed.")
+        } header: { Text(model.t("help.grievance.header")) } footer: {
+            Text(model.t("help.grievance.footer"))
         }
     }
 }
@@ -789,19 +824,19 @@ struct DeleteAccountSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
-            Text("Delete your account?")
-                .font(.system(size: 22, weight: .bold))
+            Text(model.t("delete.title"))
+                .kathaFont(22, weight: .bold)
                 .foregroundStyle(Katha.Color.text)
 
             VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
-                bullet("trash", "Your coins and unlocked episodes are removed.")
-                bullet("clock", "Your phone number and watch history are deleted within 30 days.")
-                bullet("creditcard", "Purchases made through Apple follow Apple's refund policy.")
+                bullet("trash", model.t("delete.coins"))
+                bullet("clock", model.t("delete.data"))
+                bullet("creditcard", model.t("delete.apple"))
             }
 
             Toggle(isOn: $understood) {
-                Text("I understand my coins won't be refunded.")
-                    .font(.system(size: 14))
+                Text(model.t("delete.understood"))
+                    .kathaFont(14)
                     .foregroundStyle(Katha.Color.text)
             }
             .tint(Katha.Color.danger)
@@ -814,8 +849,8 @@ struct DeleteAccountSheet: View {
                     dismiss()
                 }
             } label: {
-                Text(working ? "Deleting…" : "Delete account")
-                    .font(.system(size: 16, weight: .semibold))
+                Text(model.t(working ? "delete.deleting" : "delete.confirm"))
+                    .kathaFont(16, weight: .semibold)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
@@ -824,13 +859,15 @@ struct DeleteAccountSheet: View {
             }
             .disabled(!understood || working)
 
-            Button("Keep my account") { dismiss() }
-                .font(.system(size: 15))
+            Button(model.t("delete.keep")) { dismiss() }
+                .kathaFont(15)
                 .foregroundStyle(Katha.Color.text2)
                 .frame(maxWidth: .infinity)
         }
         .padding(Katha.Spacing.xl)
-        .presentationDetents([.medium])
+        .frame(maxHeight: .infinity, alignment: .top)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
         .presentationBackground(Katha.Color.surface)
     }
 
@@ -840,7 +877,7 @@ struct DeleteAccountSheet: View {
                 .frame(width: 20)
                 .foregroundStyle(Katha.Color.text2)
             Text(text)
-                .font(.system(size: 14))
+                .kathaFont(14)
                 .foregroundStyle(Katha.Color.text2)
         }
     }
@@ -850,13 +887,10 @@ struct DeleteAccountSheet: View {
 /// FAQ copy renders the SERVER's pricing profile, never a baked-in number.
 @MainActor func faqCoinsAnswer(_ model: AppModel) -> String {
     guard let free = model.freeEpisodesDefault, let price = model.appConfig?.episodeCoinPrice else {
-        return "The first episodes of every series are free; after that each one costs coins. " +
-               "Buy packs once — coins never expire."
+        return model.t("help.faq.coins.a.plain")
     }
     let rupee = model.rupeeRate.map { " (about ₹\(rupees(price, rate: $0)))" } ?? ""
-    return "The first \(free) episodes of every series are free. After that, " +
-           "each episode costs \(price) coins\(rupee). " +
-           "Buy packs once — coins never expire."
+    return model.t("help.faq.coins.a", free, price, rupee)
 }
 
 
@@ -872,13 +906,13 @@ struct InvoicesView: View {
                 if invoices.isEmpty {
                     VStack(spacing: Katha.Spacing.sm) {
                         Image(systemName: "doc.text")
-                            .font(.system(size: 34))
+                            .kathaFont(34)
                             .foregroundStyle(Katha.Color.text2)
-                        Text("No invoices yet")
-                            .font(.system(size: 16, weight: .semibold))
+                        Text(model.t("invoices.empty.title"))
+                            .kathaFont(16, weight: .semibold)
                             .foregroundStyle(Katha.Color.text)
-                        Text("Coins bought on the Katha website (UPI) are invoiced here. App Store purchases are invoiced by Apple.")
-                            .font(.system(size: 13))
+                        Text(model.t("invoices.empty.body"))
+                            .kathaFont(13)
                             .foregroundStyle(Katha.Color.text2)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
@@ -889,19 +923,19 @@ struct InvoicesView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text(inv.id)
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .kathaFont(13, weight: .semibold)
                                     .foregroundStyle(Katha.Color.text)
                                 Spacer()
                                 Text(paise(inv.totalMinor))
-                                    .font(.system(size: 15, weight: .bold))
+                                    .kathaFont(15, weight: .bold)
                                     .foregroundStyle(Katha.Color.text)
                             }
                             Text("\(inv.coins) coins" +
                                  (inv.bonusCoins > 0 ? " + \(inv.bonusCoins) bonus" : ""))
-                                .font(.system(size: 13))
+                                .kathaFont(13)
                                 .foregroundStyle(Katha.Color.text2)
                             Text("Taxable \(paise(inv.taxableMinor)) · GST @\(inv.gstRatePct)% \(paise(inv.gstMinor)) · \(String(inv.createdAt.prefix(10)))")
-                                .font(.system(size: 12))
+                                .kathaFont(12)
                                 .foregroundStyle(Katha.Color.text2)
                         }
                         .listRowBackground(Katha.Color.surface)
@@ -913,7 +947,7 @@ struct InvoicesView: View {
             }
         }
         .background(Katha.Color.bg)
-        .navigationTitle("Invoices")
+        .navigationTitle(model.t("profile.invoices"))
         .task { invoices = (try? await model.api.myInvoices())?.invoices ?? [] }
     }
 

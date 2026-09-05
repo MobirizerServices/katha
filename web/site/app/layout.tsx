@@ -45,18 +45,23 @@ export const metadata: Metadata = {
     description: "Micro-dramas in Hindi, Tamil and Telugu. First 10 episodes free. No ads.",
   },
   appleWebApp: { capable: true, title: "Katha" },
-  other: { "apple-itunes-app": "app-id=0000000000" },
+  // No `apple-itunes-app` banner: the App Store id 0000000000 was a stand-in,
+  // and a smart banner pointing at a listing that does not exist is a lie the
+  // browser renders on our behalf. It goes back the day the app ships.
 };
 
 export const viewport: Viewport = {
   themeColor: "#0F0B09",
+  // Dark-only by design (there is no light palette): declared so form
+  // controls, scrollbars and the canvas match instead of flashing white.
+  colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${wordmark.variable}`}>
+    <html lang="en" data-scroll-behavior="smooth" className={`${display.variable} ${wordmark.variable}`}>
       <body>
         <a className="skip" href="#main">
           Skip to content

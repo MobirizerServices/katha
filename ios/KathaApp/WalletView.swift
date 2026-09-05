@@ -18,8 +18,8 @@ struct WalletView: View {
 
                 VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
                     HStack {
-                        Text("Get coins")
-                            .font(Katha.Font.label(14))
+                        Text(model.t("wallet.getCoins"))
+                            .kathaLabel(14)
                             .kerning(1.2)
                             .foregroundStyle(Katha.Color.text2)
                         Spacer()
@@ -29,10 +29,10 @@ struct WalletView: View {
                             showPacks = true
                         } label: {
                             HStack(spacing: 4) {
-                                Text("All packs")
-                                Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
+                                Text(model.t("wallet.allPacks"))
+                                Image(systemName: "chevron.right").kathaFont(10, weight: .bold)
                             }
-                            .font(.system(size: 13, weight: .semibold))
+                            .kathaFont(13, weight: .semibold)
                             .foregroundStyle(Katha.Color.accent)
                         }
                         .accessibilityIdentifier("wallet.allPacks")
@@ -42,20 +42,29 @@ struct WalletView: View {
                             Task { await buy(pack) }
                         }
                     }
-                    Text("Payment is handled by Apple. Prices include GST. Coins never expire while your account exists.")
-                        .font(.system(size: 11))
+                    Text(model.t("wallet.footer"))
+                        .kathaFont(11)
                         .foregroundStyle(Katha.Color.text2)
                 }
 
-                if !history.isEmpty {
-                    VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
-                        Text("History")
-                            .font(Katha.Font.label(14))
-                            .kerning(1.2)
+                VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
+                    Text(model.t("wallet.history"))
+                        .kathaLabel(14)
+                        .kerning(1.2)
+                        .foregroundStyle(Katha.Color.text2)
+                    // The header stays even with nothing in it: a new viewer
+                    // should learn that this is where their coins are accounted
+                    // for, not find the section missing.
+                    if history.isEmpty {
+                        Text(model.t("wallet.history.empty"))
+                            .kathaFont(13)
                             .foregroundStyle(Katha.Color.text2)
+                            .padding(.vertical, Katha.Spacing.sm)
+                    }
+                    Group {
                         ForEach(groupedHistory, id: \.day) { group in
                             Text(dayLabel(group.day))
-                                .font(.system(size: 12, weight: .semibold))
+                                .kathaFont(12, weight: .semibold)
                                 .foregroundStyle(Katha.Color.text2)
                                 .textCase(.uppercase)
                                 .kerning(0.6)
@@ -67,17 +76,17 @@ struct WalletView: View {
                     }
                 }
 
-                Button(restored ? "Purchases restored" : "Restore purchases") {
+                Button(model.t(restored ? "packs.restored" : "packs.restore")) {
                     Task { await model.restorePurchases(); await reload(); restored = true }
                 }
-                .font(.system(size: 13))
+                .kathaFont(13)
                 .foregroundStyle(Katha.Color.text2)
                 .frame(maxWidth: .infinity)
             }
             .padding(Katha.Spacing.lg)
         }
         .background(Katha.Color.bg)
-        .navigationTitle("Wallet")
+        .navigationTitle(model.t("wallet.title"))
         .toolbarBackground(Katha.Color.bg, for: .navigationBar)
         .task { await reload() }
         .refreshable { await reload() }
@@ -88,8 +97,8 @@ struct WalletView: View {
 
     private var balanceCard: some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
-            Text("Balance")
-                .font(Katha.Font.label())
+            Text(model.t("wallet.balance"))
+                .kathaLabel()
                 .kerning(1.1)
                 .foregroundStyle(Katha.Color.text2)
             HStack(spacing: Katha.Spacing.sm) {
@@ -101,22 +110,22 @@ struct WalletView: View {
                                              endPoint: .bottomTrailing))
                         .frame(width: 34, height: 34)
                     Image(systemName: "indianrupeesign")
-                        .font(.system(size: 14, weight: .bold))
+                        .kathaFont(14, weight: .bold)
                         .foregroundStyle(Katha.Color.bg)
                 }
                 Text("\(model.wallet.total)")
-                    .font(.system(size: 40, weight: .heavy).monospacedDigit())
+                    .kathaFont(40, weight: .heavy, monospacedDigit: true)
                     .foregroundStyle(Katha.Color.text)
                     .contentTransition(.numericText())
                     .animation(Katha.Motion.spring, value: model.wallet.total)
                 if let rate = model.rupeeRate {
                     Text("≈ ₹\(rupees(model.wallet.total, rate: rate))")
-                        .font(.system(size: 14))
+                        .kathaFont(14)
                         .foregroundStyle(Katha.Color.text2)
                 }
             }
-            Text("\(model.wallet.balanceBought) bought · \(model.wallet.balanceBonus) bonus — bonus is spent first. Coins never expire.")
-                .font(.system(size: 12))
+            Text(model.t("wallet.split", model.wallet.balanceBought, model.wallet.balanceBonus))
+                .kathaFont(12)
                 .foregroundStyle(Katha.Color.text2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -136,22 +145,22 @@ struct WalletView: View {
                 Circle()
                     .fill(row.net >= 0 ? Katha.Color.success.opacity(0.15)
                                        : Katha.Color.raised)
-                    .frame(width: 30, height: 30)
+                    .kathaFrame(width: 30, height: 30)
                 Text(row.net >= 0 ? "+" : "−")
-                    .font(.system(size: 15, weight: .bold))
+                    .kathaFont(15, weight: .bold)
                     .foregroundStyle(row.net >= 0 ? Katha.Color.success : Katha.Color.text2)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(label(for: row))
-                    .font(.system(size: 14, weight: .semibold))
+                    .kathaFont(14, weight: .semibold)
                     .foregroundStyle(Katha.Color.text)
                 Text(sub(for: row))
-                    .font(.system(size: 11))
+                    .kathaFont(11)
                     .foregroundStyle(Katha.Color.text2)
             }
             Spacer()
             Text(row.net > 0 ? "+\(row.net)" : "\(row.net)")
-                .font(.system(size: 14, weight: .semibold).monospacedDigit())
+                .kathaFont(14, weight: .semibold, monospacedDigit: true)
                 .foregroundStyle(row.net >= 0 ? Katha.Color.coin : Katha.Color.text)
         }
         .padding(.vertical, 6)
@@ -159,20 +168,22 @@ struct WalletView: View {
 
     private func label(for row: LedgerEntry) -> String {
         switch row.type {
-        case "purchase": return "Coin pack"
-        case "bonus": return "Bonus coins"
-        case "checkin": return "Daily check-in"
-        case "referral": return "Referral reward"
-        case "unlock": return row.referenceType == "bundle" ? "Series bundle unlock" : "Episode unlock"
-        case "refund_clawback": return "Refund"
-        case "admin_adjust": return "Support adjustment"
+        case "purchase": return model.t("wallet.row.purchase")
+        case "bonus": return model.t("wallet.row.bonus")
+        case "checkin": return model.t("wallet.row.checkin")
+        case "referral": return model.t("wallet.row.referral")
+        case "unlock":
+            return model.t(row.referenceType == "bundle" ? "wallet.row.bundle" : "wallet.row.unlock")
+        case "refund_clawback": return model.t("wallet.row.refund")
+        case "admin_adjust": return model.t("wallet.row.adjust")
         default: return row.type.capitalized
         }
     }
 
     private func sub(for row: LedgerEntry) -> String {
         switch row.type {
-        case "purchase": return row.referenceType == "web_order" ? "Web store" : "App Store"
+        case "purchase":
+            return model.t(row.referenceType == "web_order" ? "wallet.src.web" : "wallet.src.appstore")
         case "unlock": return prettyRef(row.referenceId)
         default: return row.referenceId
         }
@@ -196,8 +207,8 @@ struct WalletView: View {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         guard let date = f.date(from: day) else { return day }
-        if Calendar.current.isDateInToday(date) { return "Today" }
-        if Calendar.current.isDateInYesterday(date) { return "Yesterday" }
+        if Calendar.current.isDateInToday(date) { return model.t("wallet.today") }
+        if Calendar.current.isDateInYesterday(date) { return model.t("wallet.yesterday") }
         return date.formatted(.dateTime.day().month(.wide))
     }
 

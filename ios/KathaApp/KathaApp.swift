@@ -426,6 +426,14 @@ final class AppModel {
     /// App-language string lookup (see Strings.swift).
     func t(_ key: String) -> String { L10n.string(key, lang: uiLanguage) }
 
+    /// Same, for keys that carry positional placeholders ("%d", "%1$d", "%@").
+    /// Formatting runs in the POSIX locale so a Hindi UI still prints ASCII
+    /// digits — the catalog, the ledger and the tests all speak in those.
+    func t(_ key: String, _ args: CVarArg...) -> String {
+        String(format: L10n.string(key, lang: uiLanguage), locale: Locale(identifier: "en_US_POSIX"),
+               arguments: args)
+    }
+
     /// Account deletion (App Store requirement). Ledger is retained server-side.
     func deleteAccount() async {
         try? await api.deleteMe()
@@ -720,13 +728,13 @@ struct UpdateRequiredView: View {
             Katha.Color.bg.ignoresSafeArea()
             VStack(spacing: Katha.Spacing.md) {
                 Image(systemName: "arrow.down.circle.fill")
-                    .font(.system(size: 44))
+                    .kathaFont(44)
                     .foregroundStyle(Katha.Color.accent)
                 Text("Update Katha to continue")
-                    .font(.system(size: 20, weight: .bold))
+                    .kathaFont(20, weight: .bold)
                     .foregroundStyle(Katha.Color.text)
                 Text("This version can no longer make purchases safely. Get the latest from the App Store.")
-                    .font(.system(size: 14))
+                    .kathaFont(14)
                     .foregroundStyle(Katha.Color.text2)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)

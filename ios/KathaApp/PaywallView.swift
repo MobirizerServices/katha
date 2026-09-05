@@ -36,17 +36,13 @@ struct PaywallView: View {
         @Bindable var model = model
         ScrollView {
             VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
-                Capsule().fill(Katha.Color.raised)
-                    .frame(width: 36, height: 5)
-                    .frame(maxWidth: .infinity)
-
                 // Header: episode identity
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Unlock E\(episodeNumber)")
                         .font(Katha.Font.display(28))
                         .foregroundStyle(Katha.Color.text)
                     Text(episodeTitle)
-                        .font(.system(size: 14))
+                        .kathaFont(14)
                         .foregroundStyle(Katha.Color.text2)
                         .lineLimit(1)
                 }
@@ -56,11 +52,11 @@ struct PaywallView: View {
                     HStack(spacing: 6) {
                         Circle().fill(Katha.Color.coin).frame(width: 16, height: 16)
                         Text("\(price) coins")
-                            .font(.system(size: 17, weight: .semibold))
+                            .kathaFont(17, weight: .semibold)
                             .foregroundStyle(Katha.Color.text)
                         if let rate = model.rupeeRate {
                             Text("≈ ₹\(rupees(price, rate: rate))")
-                                .font(.system(size: 13))
+                                .kathaFont(13)
                                 .foregroundStyle(Katha.Color.text2)
                         }
                     }
@@ -68,13 +64,13 @@ struct PaywallView: View {
                     HStack(spacing: 5) {
                         Circle().fill(Katha.Color.coin).frame(width: 12, height: 12)
                         Text("You have \(balance)")
-                            .font(.system(size: 13, weight: .semibold))
+                            .kathaFont(13, weight: .semibold)
                             .foregroundStyle(Katha.Color.text)
                             .contentTransition(.numericText())
                             .animation(Katha.Motion.spring, value: balance)
                     }
                     .padding(.horizontal, 10)
-                    .frame(height: 28)
+                    .kathaFrame(height: 28)
                     .background(Katha.Color.raised)
                     .clipShape(Capsule())
                 }
@@ -101,21 +97,27 @@ struct PaywallView: View {
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Unlock all \(remainingLocked) remaining · \(bundle) coins")
-                                    .font(.system(size: 15, weight: .semibold))
+                                // Two lines by design rather than a wrap that
+                                // strands the separator at the end of line one.
+                                Text("Unlock all \(remainingLocked) remaining")
+                                    .kathaFont(15, weight: .semibold)
+                                    .foregroundStyle(Katha.Color.text)
+                                Text("\(bundle.formatted()) coins")
+                                    .kathaFont(15, weight: .semibold)
                                     .foregroundStyle(Katha.Color.text)
                                 if let rate = model.rupeeRate {
                                     Text("≈ ₹\(rupees(bundle, rate: rate)) vs ₹\(rupees(remainingLocked * price, rate: rate)) one by one")
-                                        .font(.system(size: 12))
+                                        .kathaFont(12)
                                         .foregroundStyle(Katha.Color.text2)
                                 }
                             }
                             Spacer()
                             Text("Save \(detail.bundleDiscountPct)%")
-                                .font(.system(size: 11, weight: .bold))
+                                .kathaFont(11, weight: .bold)
+                                .fixedSize()
                                 .foregroundStyle(Katha.Color.accent)
                                 .padding(.horizontal, 7)
-                                .frame(height: 20)
+                                .kathaFrame(height: 20)
                                 .background(Katha.Color.accent.opacity(0.14))
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
@@ -131,11 +133,11 @@ struct PaywallView: View {
                 // Auto-unlock (§8.4: off by default, debits only when an episode starts)
                 Toggle(isOn: $model.autoUnlock) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Auto-unlock next episodes")
-                            .font(.system(size: 15))
+                        Text(model.t("settings.autoUnlock"))
+                            .kathaFont(15)
                             .foregroundStyle(Katha.Color.text)
-                        Text("Charges only when an episode starts")
-                            .font(.system(size: 12))
+                        Text(model.t("drawer.autoUnlock.caption.short"))
+                            .kathaFont(12)
                             .foregroundStyle(Katha.Color.text2)
                     }
                 }
@@ -143,7 +145,7 @@ struct PaywallView: View {
 
                 if let errorText {
                     Text(errorText)
-                        .font(.system(size: 13))
+                        .kathaFont(13)
                         .foregroundStyle(Katha.Color.danger)
                 }
 
@@ -151,7 +153,7 @@ struct PaywallView: View {
                 if !canAfford {
                     VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
                         Text(model.t("paywall.buyOnce"))
-                            .font(.system(size: 15, weight: .bold))
+                            .kathaFont(15, weight: .bold)
                             .foregroundStyle(Katha.Color.text)
                         ForEach(packs) { pack in
                             PackRow(pack: pack, buying: buyingSku == pack.sku) {
@@ -163,16 +165,16 @@ struct PaywallView: View {
 
                 // Footer
                 HStack(spacing: 6) {
-                    Button(restored ? "Purchases restored" : "Restore purchases") {
+                    Button(model.t(restored ? "packs.restored" : "packs.restore")) {
                         Task {
                             await model.restorePurchases()
                             restored = true
                         }
                     }
                     Text("·")
-                    Button("Terms") {}
+                    Button(model.t("packs.terms")) {}
                 }
-                .font(.system(size: 12))
+                .kathaFont(12)
                 .foregroundStyle(Katha.Color.text2)
                 .frame(maxWidth: .infinity)
             }
@@ -180,6 +182,7 @@ struct PaywallView: View {
         }
         .background(Katha.Color.surface)
         .presentationDetents(canAfford ? [.medium, .large] : [.large])
+        .presentationDragIndicator(.visible)
         .presentationBackground(Katha.Color.surface)
         .presentationCornerRadius(24)
         .sheet(isPresented: $showPacks) {
@@ -285,20 +288,20 @@ struct PackRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text("\(pack.totalCoins.formatted()) coins")
-                            .font(.system(size: 15, weight: .semibold))
+                            .kathaFont(15, weight: .semibold)
                             .foregroundStyle(Katha.Color.text)
                         if let badge = meta.badge {
                             Text(badge)
-                                .font(.system(size: 10, weight: .bold))
+                                .kathaFont(10, weight: .bold)
                                 .foregroundStyle(meta.highlighted ? Katha.Color.accent : Katha.Color.coin)
                                 .padding(.horizontal, 6)
-                                .frame(height: 18)
+                                .kathaFrame(height: 18)
                                 .background((meta.highlighted ? Katha.Color.accent : Katha.Color.coin).opacity(0.15))
                                 .clipShape(Capsule())
                         }
                     }
                     Text(meta.blurb)
-                        .font(.system(size: 12))
+                        .kathaFont(12)
                         .foregroundStyle(Katha.Color.text2)
                 }
                 Spacer()
@@ -306,20 +309,20 @@ struct PackRow: View {
                     ProgressView().tint(Katha.Color.text)
                 } else {
                     Text("₹\(Int(pack.priceMajor))")
-                        .font(.system(size: 14, weight: .semibold))
+                        .kathaFont(14, weight: .semibold)
+                        .fixedSize()
                         .foregroundStyle(Katha.Color.bg)
                         .padding(.horizontal, 14)
-                        .frame(height: 32)
+                        .kathaFrame(height: 32)
                         .background(Katha.Color.text)
                         .clipShape(Capsule())
                 }
             }
             .padding(Katha.Spacing.md)
-            .background(Katha.Color.raised)
-            .overlay(
-                RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous)
-                    .strokeBorder(meta.highlighted ? Katha.Color.accent : .clear, lineWidth: 1)
-            )
+            // The badge alone carries "Popular". An accent border around a row
+            // that buys the moment it is tapped promised a selection step that
+            // does not exist; a warmer ground says the same thing honestly.
+            .background(meta.highlighted ? Katha.Color.accent.opacity(0.08) : Katha.Color.raised)
             .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
         }
         .buttonStyle(PressableStyle())

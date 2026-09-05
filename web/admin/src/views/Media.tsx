@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { api, mutate } from "../api/client";
 import type { MediaQcEpisode, MediaQcSeries } from "../api/client";
 import { Chip, Empty, IsoTime, Modal, PageHeader, Sev, Skeleton } from "../ui";
@@ -82,12 +82,40 @@ export function Media() {
             </thead>
             <tbody>
               {shown.map((s) => (
-                <tr key={s.slug}>
+                // The episode table is a sibling row spanning all six columns —
+                // nested inside the Series <td> it overflowed the page and left
+                // the series' own cells floating mid-list (ADM-05).
+                <Fragment key={s.slug}>
+                <tr>
                   <td>
                     <b>{s.title}</b>
                     <small className="muted mono"> {s.slug}</small>
-                    {open === s.slug ? (
-                      <table className="table" style={{ marginTop: 8 }}>
+                  </td>
+                  <td style={{ textAlign: "right" }} className="mono">{s.episodeCount}</td>
+                  <td style={{ textAlign: "right" }} className="mono">{s.episodes_with_media}</td>
+                  <td style={{ textAlign: "right" }}>
+                    {s.episodes_missing === 0
+                      ? <Sev level="ok">0</Sev>
+                      : <Sev level="warn">{s.episodes_missing}</Sev>}
+                  </td>
+                  <td>
+                    <span className="tiny mono">
+                      {s.qc.passed} pass · {s.qc.pending} pending ·{" "}
+                      {s.qc.failed > 0 ? <Sev level="danger">{s.qc.failed} failed</Sev> : "0 failed"}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <button className="btn s" aria-label={`Episodes of ${s.title}`}
+                            onClick={() => setOpen(open === s.slug ? "" : s.slug)}>
+                      {open === s.slug ? "Hide" : "Episodes"}
+                    </button>
+                  </td>
+                </tr>
+                {open === s.slug ? (
+                  <tr className="epsrow">
+                    <td colSpan={6}>
+                      <div className="tablewrap">
+                      <table className="table">
                         <thead><tr><th>#</th><th>Title</th><th>Media</th><th>QC</th>
                                    <th aria-label="verdict"></th></tr></thead>
                         <tbody>
@@ -126,28 +154,11 @@ export function Media() {
                           ))}
                         </tbody>
                       </table>
-                    ) : null}
-                  </td>
-                  <td style={{ textAlign: "right" }} className="mono">{s.episodeCount}</td>
-                  <td style={{ textAlign: "right" }} className="mono">{s.episodes_with_media}</td>
-                  <td style={{ textAlign: "right" }}>
-                    {s.episodes_missing === 0
-                      ? <Sev level="ok">0</Sev>
-                      : <Sev level="warn">{s.episodes_missing}</Sev>}
-                  </td>
-                  <td>
-                    <span className="tiny mono">
-                      {s.qc.passed} pass · {s.qc.pending} pending ·{" "}
-                      {s.qc.failed > 0 ? <Sev level="danger">{s.qc.failed} failed</Sev> : "0 failed"}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    <button className="btn s" aria-label={`Episodes of ${s.title}`}
-                            onClick={() => setOpen(open === s.slug ? "" : s.slug)}>
-                      {open === s.slug ? "Hide" : "Episodes"}
-                    </button>
-                  </td>
-                </tr>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor, fireEvent, act, within } from "@testing-library/react";
 import { Approvals } from "../src/views/Approvals";
 import { renderWithStore, getStore } from "./helpers";
+import { MOCK_APPROVALS } from "../src/api/mock";
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
@@ -11,8 +12,11 @@ afterEach(() => {
 });
 
 
-/** Go online via a resolving health check, and serve decide endpoints. */
+/** Go online via a resolving health check, and serve decide endpoints.
+ *  The inbox is re-read on mount and on every signal refresh (ADM-03), so the
+ *  stub keeps the queue itself: a decided request leaves the served list. */
 function stubDecisions() {
+  let queue = MOCK_APPROVALS.map((a) => ({ ...a }));
   vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
     const u = String(url);
     if (u.includes("/health/full")) {
@@ -20,13 +24,15 @@ function stubDecisions() {
         ({ status: "ok", checks: {}, at: "now" }) });
     }
     if (u.includes("/approve") || u.includes("/reject")) {
+      const id = /\/approvals\/([^/]+)\//.exec(u)?.[1];
+      queue = queue.filter((a) => a.id !== id);
       return Promise.resolve({ ok: true, json: async () => ({ status: "done" }) });
     }
     if (u.includes("/attention")) {
       return Promise.resolve({ ok: true, json: async () => ({ items: [] }) });
     }
     if (u.includes("/approvals?status=pending")) {
-      return Promise.resolve({ ok: true, json: async () => ([]) });
+      return Promise.resolve({ ok: true, json: async () => queue });
     }
     return Promise.reject(new Error("offline"));
   }));

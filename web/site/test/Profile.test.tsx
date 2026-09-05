@@ -205,3 +205,43 @@ describe("ParentalLockSettings — set, change, remove, with the iOS rules", () 
     expect(screen.getByRole("button", { name: "Set a PIN" })).toBeInTheDocument();
   });
 });
+
+describe("Profile — display name", () => {
+  it("saves the typed name through the server and shows what it echoes back", async () => {
+    const user = userEvent.setup();
+    const toast = vi.fn();
+    mockWallet = makeWallet({ signed: true, name: "", phone: "+91 98765 43221", toast });
+    apiMock.me.mockResolvedValue({ ...ME, display_name: "" });
+    apiMock.updateMe.mockResolvedValue({ ...ME, display_name: "Meera" });
+    render(<Profile />);
+    // an empty name is the "Member" placeholder, and the field is empty
+    expect(await screen.findByRole("heading", { name: "Member" })).toBeInTheDocument();
+    const field = screen.getByLabelText("Display name") as HTMLInputElement;
+    expect(field.value).toBe("");
+    const save = within(screen.getByRole("form", { name: "Change your display name" })).getByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();                       // nothing typed yet
+    await user.type(field, "  Meera  ");
+    await user.click(save);
+    await waitFor(() => expect(apiMock.updateMe).toHaveBeenCalledWith({ display_name: "Meera" }));
+    expect(toast).toHaveBeenCalledWith("Name saved");
+    expect(await screen.findByRole("heading", { name: "Meera" })).toBeInTheDocument();
+  });
+
+  it("clearing the name is allowed, and a failed save says so", async () => {
+    const user = userEvent.setup();
+    const toast = vi.fn();
+    mockWallet = makeWallet({ signed: true, name: "Asha", phone: "+91 1", toast });
+    apiMock.updateMe.mockResolvedValueOnce({ ...ME, display_name: "" });
+    render(<Profile />);
+    const field = (await screen.findByLabelText("Display name")) as HTMLInputElement;
+    expect(field.value).toBe("Asha");
+    await user.clear(field);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Name cleared"));
+
+    apiMock.updateMe.mockRejectedValueOnce(new Error("down"));
+    await user.type(screen.getByLabelText("Display name"), "Nita");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(toast).toHaveBeenLastCalledWith("Couldn't save your name — try again"));
+  });
+});

@@ -180,6 +180,8 @@ describe("Users view — drill-down tabs, refund, DPDP (#029/#031/#032)", () => 
     let refunded = false;
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       const ok = (body: unknown) => Promise.resolve({ ok: true, json: async () => body });
       if (u.includes("/wallet/refund")) { refunded = true; return ok({ status: "refunded", coins: 600, wallet: { total: 0 } }); }
       if (u.includes("/erase")) return ok({ status: "erased" });

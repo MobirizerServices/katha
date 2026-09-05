@@ -13,8 +13,13 @@ type InvoiceRow = {
 type Invoices = { rows: InvoiceRow[];
                   totals: { count: number; gross_minor: number; gst_minor: number } };
 
+/** Paise-accurate rupees with en-IN grouping — ₹1,999.00, not ₹1999.00, so a
+ *  register total reads the same way as the KPI beside it (ADM-25). */
 export function paise(minor: number): string {
-  return `₹${Math.floor(minor / 100)}.${String(minor % 100).padStart(2, "0")}`;
+  const sign = minor < 0 ? "-" : "";
+  const abs = Math.abs(minor);
+  const whole = Math.floor(abs / 100).toLocaleString("en-IN");
+  return `${sign}₹${whole}.${String(abs % 100).padStart(2, "0")}`;
 }
 
 /** The GST register: every web/UPI sale with its tax split — what finance
@@ -94,9 +99,11 @@ export function Finance() {
 
       {w && an ? (
         <div className="kpis">
-          <Metric label="Revenue equivalent · 30d" value={`₹${fmtN(w.current.revenue_rupees)}`}
+          {/* short labels: "Revenue equivalent · 30d" wrapped and made the first
+              card taller than its neighbours (ADM-33) */}
+          <Metric label="Revenue · 30d" value={`₹${fmtN(w.current.revenue_rupees)}`}
                   cur={w.current.revenue_rupees} prev={w.previous.revenue_rupees} />
-          <Metric label="Coins purchased · 30d" value={fmtN(w.current.coins_purchased)}
+          <Metric label="Coins bought · 30d" value={fmtN(w.current.coins_purchased)}
                   cur={w.current.coins_purchased} prev={w.previous.coins_purchased} />
           <Metric label="Coins refunded · 30d" value={fmtN(w.current.coins_refunded)}
                   cur={w.current.coins_refunded} prev={w.previous.coins_refunded} />

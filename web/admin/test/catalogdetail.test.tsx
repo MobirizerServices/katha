@@ -22,6 +22,8 @@ const DETAIL = {
 function stubDetailServer(calls: { status?: unknown; rating?: unknown }) {
   vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string, init?: RequestInit) => {
     const u = String(url);
+    // signal refreshes re-read the approvals inbox (ADM-03)
+    if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
     if (u.includes("/status")) {
       calls.status = JSON.parse(String(init?.body));
       return Promise.resolve({ ok: true, json: async () => ({ slug: DETAIL.slug, status: "archived" }) });

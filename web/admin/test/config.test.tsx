@@ -65,6 +65,8 @@ describe("Config view", () => {
   it("renders live packs with an edit affordance when the server answers", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/config/packs")) {
         return Promise.resolve({ ok: true, json: async () => ([
           { sku: "coins_starter_in", storefront: "IN", price_minor: 9900,
@@ -95,6 +97,8 @@ describe("Config — writes reach the server (#059/#060)", () => {
   function writeStub(calls: Record<string, unknown>) {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       const ok = (b: unknown) => Promise.resolve({ ok: true, json: async () => b });
       if (u.includes("/config/packs/")) {
         calls.pack = JSON.parse(String(init?.body));

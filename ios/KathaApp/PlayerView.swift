@@ -290,6 +290,12 @@ struct PlayerView: View {
     @State private var showDrawer = false
     @State private var showTracks = false
     @State private var chromeVisible = true
+    /// Bumped by every interaction; restarts the inactivity countdown that
+    /// hides the chrome (see `idleHideKey`).
+    @State private var activityToken = 0
+    /// The like belongs to ONE episode. There is no engagement endpoint yet, so
+    /// it is kept on the device — but keyed per (series, episode) and persisted,
+    /// instead of a view-local flag that followed the viewer into E2.
     @State private var liked = false
     /// Heart burst on double-tap; bumps so each burst replays.
     @State private var burstToken = 0
@@ -326,17 +332,19 @@ struct PlayerView: View {
             if captured {
                 recordingBlocked
             } else if needsPin {
-                PinGateView { pinPassed = true } onCancel: { dismiss() } onToast: { toast = $0 }
+                PinGateView { pinPassed = true } onToast: { toast = $0 }
             } else {
-                // Tap = play/pause (after the double-tap grace), double-tap =
-                // like, hold = 2× while held. The vertical swipe on the ZStack
-                // below still advances: a moving finger fails all three.
+                // Tap = reveal the chrome, or play/pause once it is already up
+                // (after the double-tap grace); double-tap = like; hold = 2×
+                // while held. The vertical swipe on the ZStack below still
+                // advances: a moving finger fails all three.
+                // Edge to edge: the video fills the screen the way a vertical
+                // player is meant to, rather than sitting letterboxed above a
+                // tab bar that has no business being over an episode.
                 PlayerLayerView(
                     player: engine.player,
-                    onTap: {
-                        withAnimation { chromeVisible.toggle() }
-                        engineTapPlayPause()
-                    },
+                    gravity: .resizeAspectFill,
+                    onTap: { surfaceTapped() },
                     onDoubleTap: { doubleTapped() },
                     onHold: { on in setBoost(on) }
                 )
@@ -348,10 +356,17 @@ struct PlayerView: View {
                 }
                 if engine.boosting { boostPill }
                 HeartBurst(token: burstToken)
-                if playback?.locked == true { lockedFrame }
+                // While the paywall is up the lock overlay peeked over the
+                // sheet's grabber and read as a stray control.
+                if playback?.locked == true && !showPaywall { lockedFrame }
                 if engine.failed || loadFailed { connectionLost }
                 if engine.ended { seriesEndOrNext }
-                if chromeVisible && playback?.isEntitled == true { chrome }
+                // The end card owns the screen: the rail and scrubber would
+                // otherwise sit on top of its corner.
+                if chromeVisible && playback?.isEntitled == true && !engine.ended {
+                    topScrim
+                    chrome
+                }
             }
 
             if let toast {
@@ -361,14 +376,31 @@ struct PlayerView: View {
         }
         .navigationBarBackButtonHidden(false)
         .toolbarBackground(.clear, for: .navigationBar)
+        // The player is the whole screen — the tab bar covered its bottom 90 pt
+        // (and the PIN gate's) and pushed the picture up into a black band.
+        .toolbar(.hidden, for: .tabBar)
+        // The back button belongs to the chrome: it fades with the rest so an
+        // idle player really does show a clean frame.
+        .toolbar(hidesChrome ? .hidden : .visible, for: .navigationBar)
         .statusBarHidden(!chromeVisible)
         .gesture(swipeGesture)
+        // Inactivity hides the chrome, the way every full-screen player behaves;
+        // any tap, scrub, swipe or sheet brings it straight back.
+        .task(id: idleHideKey) {
+            guard chromeVisible, playback?.isEntitled == true,
+                  engine.isPlaying, !engine.ended,
+                  !showDrawer, !showTracks, !showPaywall else { return }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation(Katha.Motion.spring) { chromeVisible = false }
+        }
         .task {
             // .task re-runs whenever the view reappears (tab switch, sheet
             // dismissal); only the FIRST run may pick the starting episode,
             // or returning mid-binge would yank the viewer back to `number`.
             guard current == 0 else { return }
             current = number
+            loadLiked(for: number)
             await loadDetail()
             startLoad(for: number)
         }
@@ -390,7 +422,7 @@ struct PlayerView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.userDidTakeScreenshotNotification)) { _ in
             if playback?.isEntitled == true && !PlayerView.allowCapture {
-                toast = "Screenshots of episodes aren't allowed"
+                toast = model.t("player.screenshot")
             }
         }
         .onChange(of: scenePhase) { _, phase in
@@ -444,10 +476,10 @@ struct PlayerView: View {
                 // bottom-left: series + episode label
                 VStack(alignment: .leading, spacing: 4) {
                     Text(detail?.title ?? "")
-                        .font(.system(size: 13, weight: .semibold))
+                        .kathaFont(13, weight: .semibold)
                         .foregroundStyle(.white.opacity(0.85))
                     Text("E\(current) · \(episodeTitle)")
-                        .font(.system(size: 16, weight: .bold))
+                        .kathaFont(16, weight: .bold)
                         .foregroundStyle(.white)
                         .lineLimit(1)
                 }
@@ -457,9 +489,9 @@ struct PlayerView: View {
                     // No fabricated counts: the label reflects only this
                     // viewer's action until a real engagement API exists.
                     railButton(icon: liked ? "heart.fill" : "heart",
-                               label: liked ? "Liked" : "Like",
+                               label: model.t(liked ? "player.liked" : "player.like"),
                                tint: liked ? Katha.Color.accent : .white) {
-                        liked.toggle()
+                        setLiked(!liked)
                         if liked { Haptics.tap() }
                     }
                     railButton(icon: "square.stack.3d.down.right", label: "E\(current)", tint: .white) {
@@ -473,8 +505,8 @@ struct PlayerView: View {
                     .accessibilityIdentifier("player.cc")
                     ShareLink(item: URL(string: "https://katha.example/e/\(slug)-\(current)")!) {
                         VStack(spacing: 3) {
-                            Image(systemName: "square.and.arrow.up").font(.system(size: 24))
-                            Text("Share").font(.system(size: 11, weight: .semibold))
+                            Image(systemName: "square.and.arrow.up").kathaFont(24)
+                            Text(model.t("player.share")).kathaFont(11, weight: .semibold)
                         }
                         .foregroundStyle(.white)
                         .shadow(radius: 4)
@@ -487,6 +519,27 @@ struct PlayerView: View {
                 .padding(.horizontal, Katha.Spacing.lg)
                 .padding(.bottom, 22)
         }
+        // White chrome sat straight on the picture; over a bright frame the
+        // title, times and rail were unreadable. Two soft scrims give them a
+        // ground without dimming the episode.
+        .background(alignment: .bottom) {
+            LinearGradient(colors: [.clear, .black.opacity(0.65)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: 260)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .allowsHitTesting(false)
+                .ignoresSafeArea()
+        }
+    }
+
+    /// A short scrim under the status bar and the glass back button.
+    private var topScrim: some View {
+        LinearGradient(colors: [.black.opacity(0.55), .clear],
+                       startPoint: .top, endPoint: .bottom)
+            .frame(height: 140)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .allowsHitTesting(false)
+            .ignoresSafeArea()
     }
 
     private var scrubber: some View {
@@ -502,9 +555,9 @@ struct PlayerView: View {
             HStack {
                 Text(clock(engine.currentSeconds))
                 Spacer()
-                Text("\(clock(max(0, engine.durationSeconds - engine.currentSeconds))) left")
+                Text(model.t("player.timeLeft", clock(max(0, engine.durationSeconds - engine.currentSeconds))))
             }
-            .font(.system(size: 11))
+            .kathaFont(11)
             .foregroundStyle(.white.opacity(0.8))
         }
     }
@@ -513,8 +566,8 @@ struct PlayerView: View {
                             action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 24)).foregroundStyle(tint)
-                Text(label).font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+                Image(systemName: icon).kathaFont(24).foregroundStyle(tint)
+                Text(label).kathaFont(11, weight: .semibold).foregroundStyle(.white)
             }
             .shadow(radius: 4)
         }
@@ -525,20 +578,21 @@ struct PlayerView: View {
     private var lockedFrame: some View {
         VStack(spacing: Katha.Spacing.lg) {
             Image(systemName: "lock.fill")
-                .font(.system(size: 40))
+                .kathaFont(40)
                 .foregroundStyle(Katha.Color.coin)
-            Text("Episode \(current) is locked")
-                .font(.system(size: 18, weight: .semibold))
+            Text(model.t("player.locked", current))
+                .kathaFont(18, weight: .semibold)
+                .multilineTextAlignment(.center)
                 .foregroundStyle(Katha.Color.text)
             // The price comes from the playback answer (or the series); with
             // neither known yet the button carries no number at all.
             let price = playback?.priceCoins ?? detail?.episodeCoinPrice
             let title: String = {
-                guard let price else { return "Unlock episode" }
+                guard let price else { return model.t("paywall.unlock") }
                 if let rate = model.rupeeRate {
-                    return "Unlock for \(price) coins  ·  ≈ ₹\(rupees(price, rate: rate))"
+                    return model.t("player.unlockForRupees", price, rupees(price, rate: rate))
                 }
-                return "Unlock for \(price) coins"
+                return model.t("player.unlockFor", price)
             }()
             KathaPrimaryButton(title: title) {
                 showPaywall = true
@@ -549,13 +603,13 @@ struct PlayerView: View {
 
     private var connectionLost: some View {
         VStack(spacing: Katha.Spacing.md) {
-            Image(systemName: "wifi.slash").font(.system(size: 36)).foregroundStyle(.white)
-            Text("Connection lost").font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
-            Button("Retry") {
+            Image(systemName: "wifi.slash").kathaFont(36).foregroundStyle(.white)
+            Text(model.t("player.offline.title")).kathaFont(17, weight: .semibold).foregroundStyle(.white)
+            Button(model.t("player.offline.retry")) {
                 loadFailed = false
                 reload()
             }
-            .font(.system(size: 15, weight: .semibold))
+            .kathaFont(15, weight: .semibold)
             .foregroundStyle(Katha.Color.accent)
         }
         .padding(24)
@@ -566,40 +620,47 @@ struct PlayerView: View {
     private var seriesEndOrNext: some View {
         VStack(spacing: Katha.Spacing.lg) {
             if let d = detail, current >= d.episodeCount {
-                Text("You finished \(d.title)")
-                    .font(.system(size: 20, weight: .bold)).foregroundStyle(.white)
-                Text("New stories drop every week.")
-                    .font(.system(size: 14)).foregroundStyle(.white.opacity(0.8))
-                Button("Back to Home") { dismiss() }
-                    .font(.system(size: 15, weight: .semibold))
+                Text(model.t("player.finished", d.title))
+                    .kathaFont(20, weight: .bold).foregroundStyle(Katha.Color.text)
+                Text(model.t("player.finished.body"))
+                    .kathaFont(14).foregroundStyle(Katha.Color.text2)
+                Button(model.t("player.backHome")) { dismiss() }
+                    .kathaFont(15, weight: .semibold)
                     .foregroundStyle(Katha.Color.accent)
             } else {
-                Text("Up next: E\(current + 1)")
-                    .font(.system(size: 18, weight: .bold)).foregroundStyle(.white)
-                KathaPrimaryButton(title: "Play next episode") {
+                Text(model.t("player.upNext", current + 1))
+                    .kathaFont(18, weight: .bold).foregroundStyle(Katha.Color.text)
+                KathaPrimaryButton(title: model.t("player.playNext")) {
                     advance(to: current + 1)
                 }
-                .padding(.horizontal, 60)
             }
         }
-        .padding(28)
-        .background(.black.opacity(0.75))
+        .multilineTextAlignment(.center)
+        .padding(24)
+        // Opaque, and no wider than the copy needs: at 75 % black the video's
+        // own text bled through the card and its full width ran under the rail.
+        .frame(maxWidth: 320)
+        .background(Katha.Color.surface)
         .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous)
+            .strokeBorder(.white.opacity(0.1), lineWidth: 1))
+        .shadow(color: .black.opacity(0.5), radius: 24, y: 8)
+        .padding(.horizontal, Katha.Spacing.xl)
     }
 
     /// "2×" chip while the long-press holds (top-centre, out of the rail's way).
     private var boostPill: some View {
         VStack {
             Text("2×")
-                .font(.system(size: 15, weight: .bold).monospacedDigit())
+                .kathaFont(15, weight: .bold, monospacedDigit: true)
                 .foregroundStyle(Katha.Color.text)
                 .padding(.horizontal, 12)
-                .frame(height: 30)
+                .kathaFrame(height: 30)
                 .background(.black.opacity(0.6))
                 .clipShape(Capsule())
                 .padding(.top, 56)
                 .accessibilityIdentifier("player.rate2x")
-                .accessibilityLabel("Playing at 2 times speed")
+                .accessibilityLabel(model.t("player.rate2x"))
             Spacer()
         }
         .transition(reduceMotion ? .opacity : .scale(scale: 0.8).combined(with: .opacity))
@@ -608,12 +669,12 @@ struct PlayerView: View {
 
     private var recordingBlocked: some View {
         VStack(spacing: Katha.Spacing.md) {
-            Image(systemName: "video.slash.fill").font(.system(size: 40))
+            Image(systemName: "video.slash.fill").kathaFont(40)
                 .foregroundStyle(Katha.Color.text2)
-            Text("Recording isn't supported")
-                .font(.system(size: 17, weight: .semibold)).foregroundStyle(Katha.Color.text)
-            Text("Playback resumes when screen recording stops.")
-                .font(.system(size: 13)).foregroundStyle(Katha.Color.text2)
+            Text(model.t("player.recording.title"))
+                .kathaFont(17, weight: .semibold).foregroundStyle(Katha.Color.text)
+            Text(model.t("player.recording.body"))
+                .kathaFont(13).foregroundStyle(Katha.Color.text2)
         }
     }
 
@@ -634,9 +695,44 @@ struct PlayerView: View {
             }
     }
 
+    // MARK: chrome visibility
+
+    /// Restarts the inactivity task whenever any of these change: showing the
+    /// chrome, a fresh interaction, a swipe to another episode, playback
+    /// stopping, or a sheet opening or closing.
+    /// True once the idle timer has hidden the controls on a playing episode.
+    /// The gate, the paywall and every error state keep their bar.
+    private var hidesChrome: Bool {
+        !chromeVisible && !captured && !needsPin && playback?.isEntitled == true
+    }
+
+    private var idleHideKey: String {
+        "\(chromeVisible)-\(activityToken)-\(current)-\(engine.isPlaying)-\(engine.ended)-\(showDrawer || showTracks || showPaywall)"
+    }
+
+    /// Bring the chrome back and restart its countdown.
+    private func showChrome() {
+        activityToken += 1
+        guard !chromeVisible else { return }
+        withAnimation(Katha.Motion.snappy) { chromeVisible = true }
+    }
+
+    /// One tap on the video: reveal hidden chrome, otherwise play/pause. The
+    /// old handler did both at once, so the only way to see a clean frame also
+    /// stopped the episode.
+    private func surfaceTapped() {
+        guard chromeVisible else {
+            showChrome()
+            return
+        }
+        activityToken += 1
+        engineTapPlayPause()
+    }
+
     /// Double-tap = like — the same action as the rail's heart, plus the burst.
     private func doubleTapped() {
         guard playback?.isEntitled == true, !captured else { return }
+        showChrome()
         like()
         burstToken += 1
     }
@@ -646,13 +742,27 @@ struct PlayerView: View {
         if on {
             guard playback?.isEntitled == true, !captured, !engine.boosting else { return }
             Haptics.tap()
+            showChrome()
         }
         withAnimation(Katha.Motion.snappy) { engine.setBoost(on) }
     }
 
     private func like() {
         if !liked { Haptics.tap() }
-        liked = true
+        setLiked(true)
+    }
+
+    // MARK: like (per episode)
+
+    private func likeKey(_ n: Int) -> String { "katha.liked.\(slug).\(n)" }
+
+    private func setLiked(_ on: Bool) {
+        liked = on
+        UserDefaults.standard.set(on, forKey: likeKey(current))
+    }
+
+    private func loadLiked(for n: Int) {
+        liked = UserDefaults.standard.bool(forKey: likeKey(n))
     }
 
     private func engineTapPlayPause() {
@@ -665,6 +775,8 @@ struct PlayerView: View {
         reportProgress(force: true)
         lastReported = 0        // the throttle window belongs to ONE episode
         current = n
+        loadLiked(for: n)       // the heart belongs to the episode, not the view
+        showChrome()
         showPaywall = false
         engine.setBoost(false)
         engine.stop()
@@ -735,7 +847,7 @@ struct PlayerView: View {
                     slug: slug, number: n, idempotencyKey: UUID().uuidString) {
                     model.wallet.reconcile(with: res.wallet)
                     guard live else { return }        // charged, but no longer on screen
-                    toast = "−\(price) coins · E\(n) unlocked"
+                    toast = model.t("player.autoUnlocked", price, n)
                     Haptics.success()
                     pb = try await model.api.playback(slug: slug, number: n)
                     guard live else { return }
@@ -844,18 +956,25 @@ struct TrackPickerSheet: View {
         }
     }
 
+    /// The audio row to tick. A stream with a single, untagged audio track
+    /// reports no selection at all, which left every row unticked and the sheet
+    /// silent about what you were listening to.
+    private var selectedAudio: String? {
+        if let lang = engine.audioLang, audioTracks.contains(where: { $0.lang == lang }) {
+            return lang
+        }
+        return audioTracks.first?.lang
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
-            Capsule().fill(Katha.Color.raised)
-                .frame(width: 36, height: 5)
-                .frame(maxWidth: .infinity)
             HStack {
                 Text(model.t("player.tracks"))
-                    .font(.system(size: 20, weight: .bold))
+                    .kathaFont(20, weight: .bold)
                     .foregroundStyle(Katha.Color.text)
                 Spacer()
                 Button(model.t("packs.done")) { dismiss() }
-                    .font(.system(size: 15, weight: .semibold))
+                    .kathaFont(15, weight: .semibold)
                     .foregroundStyle(Katha.Color.accent)
             }
 
@@ -864,7 +983,7 @@ struct TrackPickerSheet: View {
                     if !audioTracks.isEmpty {
                         section(model.t("player.audio"))
                         ForEach(audioTracks) { t in
-                            row(t.label, selected: engine.audioLang == t.lang, available: t.inStream) {
+                            row(t.label, selected: selectedAudio == t.lang, available: t.inStream) {
                                 engine.selectAudio(lang: t.lang)
                             }
                         }
@@ -876,7 +995,7 @@ struct TrackPickerSheet: View {
                     .accessibilityIdentifier("captions.off")
                     if captionTracks.isEmpty {
                         Text(model.t("player.subtitles.none"))
-                            .font(.system(size: 13))
+                            .kathaFont(13)
                             .foregroundStyle(Katha.Color.text2)
                     }
                     ForEach(captionTracks) { t in
@@ -885,20 +1004,28 @@ struct TrackPickerSheet: View {
                         }
                         .accessibilityIdentifier("captions.\(t.lang)")
                     }
-                    Text("Subtitles follow your system caption style. A language the stream doesn't carry yet is remembered and applied when it does.")
-                        .font(.system(size: 11))
+                    Text(model.t("player.subtitles.footer"))
+                        .kathaFont(11)
+                        // Without this the sentence was squeezed to one clipped
+                        // line at the sheet's bottom edge instead of wrapping.
+                        .fixedSize(horizontal: false, vertical: true)
                         .foregroundStyle(Katha.Color.text2)
+                        .padding(.bottom, Katha.Spacing.lg)
                 }
             }
+            .scrollBounceBehavior(.basedOnSize)
         }
         .padding(Katha.Spacing.xl)
         .presentationDetents([.medium, .large])
+        // The system grabber is the drag handle; the sheet no longer draws a
+        // second capsule of its own directly under it.
+        .presentationDragIndicator(.visible)
         .presentationBackground(Katha.Color.surface)
     }
 
     private func section(_ title: String) -> some View {
         Text(title)
-            .font(Katha.Font.label(14))
+            .kathaLabel(14)
             .kerning(1.2)
             .foregroundStyle(Katha.Color.text2)
     }
@@ -911,22 +1038,26 @@ struct TrackPickerSheet: View {
         } label: {
             HStack {
                 Text(label)
-                    .font(.system(size: 15, weight: selected ? .semibold : .regular))
+                    .kathaFont(15, weight: selected ? .semibold : .regular)
                     .foregroundStyle(Katha.Color.text)
                 if !available {
-                    Text("not in this stream")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Katha.Color.text2)
+                    Text(model.t(selected ? "player.track.remembered" : "player.track.notHere"))
+                        .kathaFont(10, weight: .semibold)
+                        .foregroundStyle(selected ? Katha.Color.coin : Katha.Color.text2)
+                        .padding(.horizontal, 6)
+                        .kathaFrame(height: 18)
+                        .background((selected ? Katha.Color.coin : Katha.Color.text2).opacity(0.14))
+                        .clipShape(Capsule())
                 }
-                Spacer()
+                Spacer(minLength: Katha.Spacing.sm)
                 if selected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .bold))
+                        .kathaFont(14, weight: .bold)
                         .foregroundStyle(Katha.Color.accent)
                 }
             }
             .padding(.horizontal, Katha.Spacing.md)
-            .frame(height: 46)
+            .kathaFrame(height: 46)
             .background(selected ? Katha.Color.accent.opacity(0.12) : Katha.Color.raised)
             .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
         }
@@ -947,7 +1078,7 @@ struct HeartBurst: View {
 
     var body: some View {
         Image(systemName: "heart.fill")
-            .font(.system(size: 96))
+            .kathaFont(96)
             .foregroundStyle(Katha.Color.accent)
             .shadow(color: .black.opacity(0.35), radius: 12)
             .scaleEffect(reduceMotion ? 1 : scale)
@@ -982,22 +1113,22 @@ struct EpisodeDrawer: View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
             HStack {
-                Text("Episodes")
-                    .font(.system(size: 20, weight: .bold))
+                Text(model.t("drawer.title"))
+                    .kathaFont(20, weight: .bold)
                     .foregroundStyle(Katha.Color.text)
                 Spacer()
-                Text("\(detail.episodeCount) · 1–\(detail.freeEpisodeCount) free")
-                    .font(.system(size: 12))
+                Text(model.t("drawer.count", detail.episodeCount, detail.freeEpisodeCount))
+                    .kathaFont(12)
                     .foregroundStyle(Katha.Color.text2)
             }
 
             Toggle(isOn: $model.autoUnlock) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Auto-unlock next episodes")
-                        .font(.system(size: 15))
+                    Text(model.t("settings.autoUnlock"))
+                        .kathaFont(15)
                         .foregroundStyle(Katha.Color.text)
-                    Text("Charges \(detail.episodeCoinPrice) coins only when an episode starts")
-                        .font(.system(size: 12))
+                    Text(model.t("drawer.autoUnlock.caption", detail.episodeCoinPrice))
+                        .kathaFont(12)
                         .foregroundStyle(Katha.Color.text2)
                 }
             }
@@ -1012,25 +1143,31 @@ struct EpisodeDrawer: View {
                                 RoundedRectangle(cornerRadius: Katha.Radius.sm, style: .continuous)
                                     .fill(ep.number == current ? Katha.Color.accent : Katha.Color.raised)
                                 Text("\(ep.number)")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .kathaFont(13, weight: .semibold)
                                     .foregroundStyle(Katha.Color.text)
                                 if !ep.isFree {
                                     Image(systemName: "lock.fill")
-                                        .font(.system(size: 8))
+                                        .kathaFont(8)
                                         .foregroundStyle(ep.number == current ? Katha.Color.text : Katha.Color.coin)
                                         .frame(maxWidth: .infinity, maxHeight: .infinity,
                                                alignment: .bottomTrailing)
                                         .padding(3)
                                 }
                             }
-                            .frame(height: 44)
+                            .kathaFrame(height: 44)
                         }
                     }
                 }
+                // The safe-area inset landed on the sheet, not on the scroll
+                // content, so the last row was sliced with a dead band under it.
+                .padding(.bottom, Katha.Spacing.xl)
             }
+            .scrollBounceBehavior(.basedOnSize)
         }
         .padding(Katha.Spacing.xl)
+        .padding(.bottom, -Katha.Spacing.xl)
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
         .presentationBackground(Katha.Color.surface)
     }
 }

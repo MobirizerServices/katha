@@ -43,6 +43,9 @@ describe("store — online state", () => {
 describe("store — approvals routing", () => {
   it("resolveApproval(approved) removes it and appends an approve audit row", async () => {
     renderWithStore(<div />);
+    // identity resolves before the lists load (ADM-28), so let boot settle
+    // before seeding — a late /audit answer would replace the local row
+    await waitFor(() => expect(getStore().flags.length).toBeGreaterThan(0));
     act(() => getStore().addApproval({
       id: "apr_x", kind: "Coin adjustment", detail: "d", requestedBy: "sam",
       when: "now", needs: "Finance", amount: 900, userId: "u1",
@@ -56,6 +59,7 @@ describe("store — approvals routing", () => {
 
   it("resolveApproval(rejected) appends a reject audit row", async () => {
     renderWithStore(<div />);
+    await waitFor(() => expect(getStore().flags.length).toBeGreaterThan(0));
     act(() => getStore().addApproval({
       id: "apr_y", kind: "Coin adjustment", detail: "d", requestedBy: "sam",
       when: "now", needs: "Finance", amount: 900, userId: "u1",

@@ -78,10 +78,10 @@ export default function Home() {
       {/* ---- hero ---- */}
       <section className="wrap hero" id="get">
         <div>
-          <h1 className="h">
+          <h1 className="h" style={{ textWrap: "balance" }}>
             Stories in 2 minutes.
             <br />
-            In your language. No ads.
+            In your language. No&nbsp;ads.
           </h1>
           <p className="h-hi">
             Micro-dramas in Hindi, Tamil and Telugu — 1–2 minute episodes that end on a cliffhanger.
@@ -92,15 +92,20 @@ export default function Home() {
             never an ad.
           </p>
           <div className="ctas">
-            <a className="btn store" href="#" aria-label="Download on the App Store">
-              <span style={{ fontSize: 26 }}></span>
-              <span>
-                <small>Download on the</small>App Store
-              </span>
-            </a>
-            <Link className="btn s" href="#series">
+            {/* The iPhone app is not on the App Store yet. This is a badge, not
+                a link: U+F8FF (the Apple glyph) is blank outside Apple fonts,
+                and href="#" reads as a live download that goes nowhere. */}
+            <Link className="btn p" href="#series">
               Watch a free episode
             </Link>
+            <span className="btn store" role="note" aria-label="iPhone app coming soon to the App Store">
+              <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="currentColor">
+                <path d="M16.4 12.7c0-2 1.6-3 1.7-3-.9-1.4-2.4-1.5-2.9-1.6-1.2-.1-2.4.7-3 .7s-1.6-.7-2.6-.7c-1.3 0-2.6.8-3.3 2-1.4 2.4-.4 6 1 8 .7 1 1.5 2.1 2.5 2 1 0 1.4-.6 2.6-.6s1.6.6 2.6.6 1.7-1 2.4-2c.8-1.1 1-2.2 1.1-2.3-.1 0-2.1-.8-2.1-3.1zM14.6 6.3c.5-.7.9-1.6.8-2.5-.8 0-1.8.5-2.4 1.2-.5.6-.9 1.5-.8 2.4.9.1 1.8-.4 2.4-1.1z" />
+              </svg>
+              <span>
+                <small>Coming soon to the</small>App Store
+              </span>
+            </span>
           </div>
           <div className="trust">
             <span>
@@ -152,7 +157,6 @@ export default function Home() {
                     backgroundPosition: "center",
                   } as CSSProperties}>
                   <span className="badge">Free · {FREE_EPISODES} eps</span>
-                  <span className="t">{s.title}</span>
                 </div>
                 <div className="m">
                   <b>{s.title}</b>
@@ -209,6 +213,7 @@ export default function Home() {
           </div>
 
           <div style={{ marginTop: 44 }}>
+            <div className="prwrap">
             <table className="pr" aria-label="Coin packs">
               <thead>
                 <tr>
@@ -238,6 +243,7 @@ export default function Home() {
                 ))}
               </tbody>
             </table>
+            </div>
             <p className="note">
               Prices include GST. In the app, payment is handled by Apple. On the Katha website every pack
               adds a +10% bonus and is paid by UPI — for example the ₹199 Popular pack gives 1,300 + 130 =
@@ -285,9 +291,9 @@ export default function Home() {
 
       {/* ---- faq ---- */}
       <section className="band alt" id="faq">
-        <div className="wrap" style={{ maxWidth: 860 }}>
+        <div className="wrap">
           <h2 className="sec">Questions people ask</h2>
-          <div className="faq">
+          <div className="faq" style={{ maxWidth: 860 }}>
             <details>
               <summary>How do coins work?</summary>
               <p>
@@ -401,13 +407,15 @@ export default function Home() {
         </section>
 
         <section className="band alt" id="pitch">
-          <div className="wrap" style={{ maxWidth: 860 }}>
+          <div className="wrap">
             <h2 className="sec">Tell us what you want to make</h2>
             <p className="lead2">
               Studios, brands and creators use the same form — it opens in your mail app addressed to{" "}
               <a href={`mailto:${PARTNERS_EMAIL}`}>{PARTNERS_EMAIL}</a>. We reply within three working days.
             </p>
-            <PitchForm />
+            <div style={{ maxWidth: 860 }}>
+              <PitchForm />
+            </div>
           </div>
         </section>
       </div>

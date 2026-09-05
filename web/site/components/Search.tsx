@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SeriesCard from "./SeriesCard";
 import { api, type SearchDTO, type SearchPersonDTO, type SeriesSummaryDTO } from "@/lib/api";
-import { languageName, metaLine } from "@/lib/catalog";
+import { countLabel, languageName, metaLine } from "@/lib/catalog";
 
 const DEBOUNCE_MS = 250;
 const SUGGESTIONS = ["saas-bahu", "revenge", "ceo", "palace", "college", "contract marriage", "thriller"];
@@ -58,7 +58,11 @@ export default function Search() {
         <h1 style={{ fontSize: 24, margin: "0 0 6px" }}>{term ? `Results for “${term}”` : "Search"}</h1>
         <p style={{ color: "var(--text2)", margin: "0 0 14px" }}>
           {state === "done" && result
-            ? `${result.series.length} series · ${result.people.length} people`
+            ? `${countLabel(result.series.length, "series", "series")} · ${countLabel(
+                result.people.length,
+                "person",
+                "people"
+              )}`
             : "Try a title, a genre, a mood, or an actor."}
         </p>
         <input
@@ -73,13 +77,20 @@ export default function Search() {
       </div>
 
       {state === "idle" && (
-        <div className="chips">
-          {SUGGESTIONS.map((s) => (
-            <button key={s} className="chip" onClick={() => setQ(s)}>
-              {s}
-            </button>
-          ))}
-        </div>
+        /* An empty query used to leave the chips hanging 14px above the footer
+           border, so the page read as truncated. */
+        <section className="wrap" aria-label="Trending searches" style={{ paddingTop: 26, paddingBottom: 56 }}>
+          <h2 style={{ fontSize: 15, margin: "0 0 10px", color: "var(--text2)", fontWeight: 600 }}>
+            Trending searches
+          </h2>
+          <div className="chips" style={{ padding: 0 }}>
+            {SUGGESTIONS.map((s) => (
+              <button key={s} className="chip" onClick={() => setQ(s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </section>
       )}
       {state === "loading" && <p className="wrap muted" aria-busy="true">Searching…</p>}
       {state === "error" && (

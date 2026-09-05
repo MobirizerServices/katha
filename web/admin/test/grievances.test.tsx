@@ -31,6 +31,10 @@ function stubGrievanceServer(state: { rows: (typeof G1)[] }) {
     if (u.includes("/attention")) {
       return Promise.resolve({ ok: true, json: async () => ({ items: [] }) });
     }
+    // a signal refresh now also re-reads the approvals inbox (ADM-03)
+    if (u.includes("/approvals?")) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
     return Promise.reject(new Error("offline"));
   }));
 }
@@ -85,7 +89,7 @@ describe("Grievances queue", () => {
     stubGrievanceServer(state);
     renderWithStore(<Grievances />);
     await waitFor(() => expect(screen.getByText("G-AB12")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("tab", { name: "resolved" }));
+    fireEvent.click(screen.getByRole("tab", { name: /Resolved/ }));
     expect(screen.getByText("Nothing resolved")).toBeInTheDocument();
   });
 });

@@ -85,18 +85,18 @@ struct DropBanner: View {
                     .frame(width: 18, height: 18)
                     .overlay {
                         Image(systemName: "play.fill")
-                            .font(.system(size: 9, weight: .bold))
+                            .kathaFont(9, weight: .bold)
                             .foregroundStyle(.white)
                     }
-                Text("Katha").font(.system(size: 12, weight: .semibold))
+                Text("Katha").kathaFont(12, weight: .semibold)
                     .foregroundStyle(Katha.Color.text2)
-                Text("now").font(.system(size: 12)).foregroundStyle(Katha.Color.text2)
+                Text("now").kathaFont(12).foregroundStyle(Katha.Color.text2)
                 Spacer()
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
+                        .kathaFont(11, weight: .bold)
                         .foregroundStyle(Katha.Color.text2)
                         .accessibilityLabel("Dismiss")
                 }
@@ -108,20 +108,20 @@ struct DropBanner: View {
                                                 style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(drop.title)
-                        .font(.system(size: 15, weight: .bold))
+                        .kathaFont(15, weight: .bold)
                         .foregroundStyle(Katha.Color.text)
                     Text(drop.body)
-                        .font(.system(size: 13))
+                        .kathaFont(13)
                         .foregroundStyle(Katha.Color.text2)
                         .lineLimit(2)
                 }
             }
             Button(action: watch) {
                 Text("Watch now")
-                    .font(.system(size: 13, weight: .semibold))
+                    .kathaFont(13, weight: .semibold)
                     .foregroundStyle(Katha.Color.text)
                     .padding(.horizontal, 14)
-                    .frame(height: 30)
+                    .kathaFrame(height: 30)
                     .background(Katha.Color.accent)
                     .clipShape(Capsule())
             }

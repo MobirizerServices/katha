@@ -55,6 +55,38 @@ final class KathaAppUITests: XCTestCase {
         app.buttons.containing(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
     }
 
+    /// The player's chrome auto-hides after ~4 idle seconds. A tap on the video
+    /// brings it back and, while it is hidden, does nothing else — so these
+    /// helpers can reveal it without pausing or otherwise disturbing playback.
+    private func revealChrome(_ app: XCUIApplication) {
+        guard !app.sliders.firstMatch.exists else { return }
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        _ = app.sliders.firstMatch.waitForExistence(timeout: 5)
+    }
+
+    /// The scrubber is up (with the rest of the chrome), revealing it if the
+    /// idle timer got there first.
+    private func assertChrome(_ app: XCUIApplication, _ timeout: TimeInterval = 20) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if app.sliders.firstMatch.waitForExistence(timeout: 4) { return }
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        }
+        XCTFail("player chrome never appeared")
+    }
+
+    /// The player is showing `label` in its chrome, revealing the chrome if the
+    /// idle timer hid it before the assertion ran.
+    private func assertPlaying(_ app: XCUIApplication, _ label: String,
+                               _ timeout: TimeInterval = 25) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if app.staticTexts[label].waitForExistence(timeout: 5) { return }
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        }
+        XCTFail("player never showed \(label)")
+    }
+
     // MARK: 1.1–1.3 Splash → language → interests → home
 
     func test01_OnboardingFlow() {
@@ -144,15 +176,16 @@ final class KathaAppUITests: XCTestCase {
 
     func test06_PlayerAndDrawer() {
         let app = launchApp(extra: ["KATHA_AUTOPLAY": "kaanch-ka-mahal:1"])
-        assertExists(app.staticTexts["E1 · One face too many"], 20)
-        assertExists(app.sliders.firstMatch, 8)          // scrubber (chrome visible)
+        assertPlaying(app, "E1 · One face too many")
+        assertChrome(app)                                // scrubber (chrome visible)
 
         // 3.2: the drawer opens from the right rail and can jump episodes
+        revealChrome(app)
         tapWhenReady(app.buttons["E1"].firstMatch)
         assertExists(app.switches.containing(
             NSPredicate(format: "label CONTAINS 'Auto-unlock'")).firstMatch, 8)
         tapWhenReady(app.buttons["2"].firstMatch)
-        assertExists(app.staticTexts["E2 · The seventh plate"], 15)
+        assertPlaying(app, "E2 · The seventh plate")
     }
 
     // MARK: 3.3 Paywall + 3.4 packs + the real unlock tap
@@ -172,8 +205,8 @@ final class KathaAppUITests: XCTestCase {
 
         // the money tap: Unlock episode → sheet dismisses → E11 plays
         tapWhenReady(app.buttons["Unlock episode"])
-        assertExists(app.staticTexts["E11 · The signature"], 15)
-        assertExists(app.sliders.firstMatch, 8)
+        assertPlaying(app, "E11 · The signature")
+        assertChrome(app)
     }
 
     // MARK: 3.5 Wallet & history
@@ -243,7 +276,7 @@ final class KathaAppUITests: XCTestCase {
         assertExists(app.staticTexts["Remove parental lock"], 8)
         for digit in ["9", "9", "9", "9"] { app.buttons[digit].tap() }   // wrong: refused, still locked
         assertExists(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Wrong PIN'")).firstMatch, 8)
-        app.swipeDown()                                                   // dismiss the sheet
+        tapWhenReady(app.buttons["pin.cancel"])                           // the sheet's own Cancel
         assertExists(app.buttons["Change parental lock"], 8)
 
         // relaunch KEEPING state into a U/A 16+ title → the gate asks for the PIN
@@ -251,7 +284,7 @@ final class KathaAppUITests: XCTestCase {
                               extra: ["KATHA_AUTOPLAY": "dilli-6-ka-raaz:1"])
         assertExists(gated.staticTexts["Parental lock"], 20)
         for digit in ["1", "2", "3", "4"] { gated.buttons[digit].tap() }
-        assertExists(gated.sliders.firstMatch, 15)       // player chrome = playing
+        assertChrome(gated)                              // player chrome = playing
     }
 
     // MARK: 4.6 Help & grievance + 4.7 delete account
@@ -368,9 +401,10 @@ final class KathaAppUITests: XCTestCase {
 
     func test14_ContinueWatchingList() {
         let app = launchApp(extra: ["KATHA_AUTOPLAY": "kaanch-ka-mahal:1"])
-        assertExists(app.staticTexts["E1 · One face too many"], 20)
-        assertExists(app.sliders.firstMatch, 8)
+        assertPlaying(app, "E1 · One face too many")
+        assertChrome(app)
         // Leaving the player flushes progress; Home's task then reloads the row.
+        revealChrome(app)
         app.navigationBars.buttons.firstMatch.tap()
         assertExists(app.staticTexts["Daily check-in"], 15)
         if !app.buttons["continue.seeAll"].waitForExistence(timeout: 8) {
@@ -383,7 +417,7 @@ final class KathaAppUITests: XCTestCase {
         assertExists(row, 10)
         XCTAssertTrue(row.label.contains("E1"), "row should name the episode: \(row.label)")
         row.tap()
-        assertExists(app.staticTexts["E1 · One face too many"], 20)   // → player
+        assertPlaying(app, "E1 · One face too many")                  // → player
     }
 
     // MARK: 2.3 Search: Series + People sections, person page
@@ -494,10 +528,12 @@ final class KathaAppUITests: XCTestCase {
         // My list shows the same state and can turn it off.
         tapWhenReady(app.tabBars.buttons["My list"])
         assertExists(button(app, containing: "Kaanch Ka Mahal"), 10)
-        assertExists(app.staticTexts["Reminder on"], 8)
+        // The caption under the poster IS the toggle now, so it is a button
+        // (with the bell glyph) rather than a plain grey caption.
+        assertExists(app.buttons["Reminder on"], 8)
         tapWhenReady(app.buttons["Reminder on"])
         assertExists(app.staticTexts["Reminder turned off"], 6)
-        assertExists(app.staticTexts["Remind me"], 6)
+        assertExists(app.buttons["Remind me"], 6)
     }
 
     // MARK: 4.6 Help assistant
@@ -534,10 +570,11 @@ final class KathaAppUITests: XCTestCase {
 
     func test20_PlayerTracksAndGestures() {
         let app = launchApp(extra: ["KATHA_AUTOPLAY": "kaanch-ka-mahal:1"])
-        assertExists(app.staticTexts["E1 · One face too many"], 20)
-        assertExists(app.sliders.firstMatch, 8)
+        assertPlaying(app, "E1 · One face too many")
+        assertChrome(app)
 
         // CC → the picker lists Off + the payload's caption languages.
+        revealChrome(app)
         tapWhenReady(app.buttons["player.cc"])
         assertExists(app.staticTexts["Subtitles"], 8)
         assertExists(app.buttons["captions.off"], 5)
@@ -549,7 +586,7 @@ final class KathaAppUITests: XCTestCase {
         }
         tapWhenReady(app.buttons["Done"])                        // dismiss the sheet
         XCTAssertTrue(app.staticTexts["Subtitles"].waitForNonExistence(timeout: 5))
-        assertExists(app.sliders.firstMatch, 8)
+        assertChrome(app)
 
         // Double-tap = like (same as the rail heart).
         let surface = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
@@ -558,12 +595,12 @@ final class KathaAppUITests: XCTestCase {
 
         // Long-press = 2× while held; releasing returns to normal playback.
         surface.press(forDuration: 1.2)
-        assertExists(app.sliders.firstMatch, 5)
+        assertChrome(app)
         XCTAssertFalse(app.staticTexts["2×"].exists)
 
         // The vertical swipe still advances to the next episode.
         app.swipeUp()
-        assertExists(app.staticTexts["E2 · The seventh plate"], 15)
+        assertPlaying(app, "E2 · The seventh plate")
     }
 }
 

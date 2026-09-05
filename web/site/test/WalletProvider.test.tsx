@@ -287,6 +287,13 @@ describe("sign-in modal + toast (UI)", () => {
     });
     expect(screen.getByRole("dialog", { name: "Sign in" })).toBeInTheDocument();
 
+    // The field starts EMPTY: nothing is texted to a dummy number by default.
+    const phoneBox = screen.getByPlaceholderText("+91 98765 43210") as HTMLInputElement;
+    expect(phoneBox.value).toBe("");
+    await user.click(screen.getByRole("button", { name: "Send code" }));
+    expect(otpRequest).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/mobile number/);
+    await user.type(phoneBox, "+91 98765 43210");
     await user.click(screen.getByRole("button", { name: "Send code" }));
     expect(otpRequest).toHaveBeenCalledWith("+91 98765 43210");
     const boxes = screen.getAllByLabelText(/Digit \d/);
@@ -312,6 +319,7 @@ describe("sign-in modal + toast (UI)", () => {
     otpLogin.mockRejectedValue(Object.assign(new Error("401"), { status: 401 }));
     act(() => { ctx.openSignIn(); });
     const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByPlaceholderText("+91 98765 43210"), "+91 90000 00000");
     await user.click(within(dialog).getByText("Send code"));
     for (let i = 0; i < 4; i++) await user.type(within(dialog).getByLabelText(`Digit ${i + 1}`), "9");
     await user.click(within(dialog).getByText("Verify"));
@@ -379,6 +387,7 @@ describe("failure directions & edge branches", () => {
     me.mockResolvedValue(MEMBER);
     act(() => { ctx.openSignIn("/coins"); });
     const dialog = await screen.findByRole("dialog");
+    await userEvent.type(within(dialog).getByPlaceholderText("+91 98765 43210"), "+91 90000 00000");
     await userEvent.click(within(dialog).getByText("Send code"));   // phone → otp
     const d1 = within(dialog).getByLabelText("Digit 1");
     const d2 = within(dialog).getByLabelText("Digit 2");
@@ -395,13 +404,12 @@ describe("failure directions & edge branches", () => {
     vi.unstubAllGlobals();
   });
 
-  it("a typed phone is used verbatim; an emptied phone falls back to the placeholder", async () => {
+  it("a typed phone is used verbatim; a number too short to be one is refused", async () => {
     await mountReady({ balance_bought: 0, balance_bonus: 0 });
     otpLogin.mockRejectedValue(new Error("offline"));
     act(() => { ctx.openSignIn(); });
     const dialog = await screen.findByRole("dialog");
     const phoneInput = within(dialog).getByPlaceholderText("+91 98765 43210");
-    await userEvent.clear(phoneInput);
     await userEvent.type(phoneInput, "+91 90000 11111");
     await userEvent.click(within(dialog).getByText("Send code"));
     expect(otpRequest).toHaveBeenCalledWith("+91 90000 11111");
@@ -410,12 +418,39 @@ describe("failure directions & edge branches", () => {
     await waitFor(() => expect(otpLogin).toHaveBeenCalledWith("+91 90000 11111", "7777"));
     expect(ctx.signed).toBe(false);
 
-    // emptied phone → placeholder number (close the failed attempt, start over)
+    // a half-typed number never reaches the server
     await userEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     act(() => { ctx.openSignIn(); });
     const dialog2 = await screen.findByRole("dialog");
-    await userEvent.clear(within(dialog2).getByPlaceholderText("+91 98765 43210"));
+    otpRequest.mockClear();
+    await userEvent.type(within(dialog2).getByPlaceholderText("+91 98765 43210"), "+91 900");
     await userEvent.click(within(dialog2).getByText("Send code"));
-    expect(otpRequest).toHaveBeenLastCalledWith("+91 98765 43210");
+    expect(otpRequest).not.toHaveBeenCalled();
+    expect(within(dialog2).getByRole("alert")).toHaveTextContent(/mobile number/);
+  });
+
+  it("the OTP step can resend the code and go back to change the number", async () => {
+    const user = userEvent.setup();
+    await mountReady({ balance_bought: 0, balance_bonus: 0 });
+    act(() => { ctx.openSignIn(); });
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByPlaceholderText("+91 98765 43210"), "+91 90000 22222");
+    await user.click(within(dialog).getByText("Send code"));
+    expect(otpRequest).toHaveBeenCalledTimes(1);
+
+    await user.type(within(dialog).getByLabelText("Digit 1"), "5");
+    await user.click(within(dialog).getByRole("button", { name: "Resend code" }));
+    expect(otpRequest).toHaveBeenCalledTimes(2);
+    expect(await within(dialog).findByRole("status")).toHaveTextContent("Sent again to +91 90000 22222.");
+
+    await user.click(within(dialog).getByRole("button", { name: "Change number" }));
+    const back = within(dialog).getByPlaceholderText("+91 98765 43210") as HTMLInputElement;
+    expect(back.value).toBe("+91 90000 22222");     // still there to correct
+    await user.clear(back);
+    await user.type(back, "+91 90000 33333");
+    await user.click(within(dialog).getByText("Send code"));
+    expect(otpRequest).toHaveBeenLastCalledWith("+91 90000 33333");
+    // the digits typed against the old number are gone
+    expect((within(dialog).getByLabelText("Digit 1") as HTMLInputElement).value).toBe("");
   });
 });

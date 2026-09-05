@@ -15,7 +15,7 @@ struct LoginSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var step: Step = .phone
-    @State private var phone = "+91 "
+    @State private var phone = ""
     @State private var code = ""
     @State private var working = false
     @State private var error: String?
@@ -24,11 +24,6 @@ struct LoginSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
-            Capsule().fill(Katha.Color.raised)
-                .frame(width: 36, height: 5)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 8)
-
             switch step {
             case .phone: phoneStep
             case .otp: otpStep
@@ -36,7 +31,9 @@ struct LoginSheet: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Katha.Spacing.xl)
+        .padding(.top, Katha.Spacing.xl)      // clear of the system grabber
         .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
         .presentationBackground(Katha.Color.surface)
     }
 
@@ -46,37 +43,42 @@ struct LoginSheet: View {
         VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Save your coins and your place")
-                    .font(.system(size: 22, weight: .bold))
+                    .kathaFont(22, weight: .bold)
                     .foregroundStyle(Katha.Color.text)
                 Text(context ?? "Log in to unlock episodes and keep watching on any device.")
-                    .font(.system(size: 15))
+                    .kathaFont(15)
                     .foregroundStyle(Katha.Color.text2)
             }
 
+            // "+91" is a fixed prefix, not a value: keeping it out of the
+            // field lets the placeholder say what to type in the space it left.
             HStack(spacing: 10) {
                 Image(systemName: "phone.fill")
                     .foregroundStyle(Katha.Color.accent)
-                TextField("+91 98765 43210", text: $phone)
+                Text("+91")
+                    .kathaFont(16, weight: .semibold)
+                    .foregroundStyle(Katha.Color.text2)
+                TextField(model.t("login.phone.placeholder"), text: $phone)
                     .keyboardType(.phonePad)
                     .foregroundStyle(Katha.Color.text)
             }
             .padding(.horizontal, 14)
-            .frame(height: 52)
+            .kathaFrame(height: 52)
             .background(Katha.Color.raised)
             .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
 
             KathaPrimaryButton(title: working ? "Sending…" : "Get OTP",
-                               enabled: !working && phone.trimmingCharacters(in: .whitespaces).count >= 10) {
+                               enabled: !working && digits.count >= 10) {
                 Task { await requestOtp() }
             }
 
             if let error {
-                Text(error).font(.system(size: 13)).foregroundStyle(Katha.Color.danger)
+                Text(error).kathaFont(13).foregroundStyle(Katha.Color.danger)
             }
 
             HStack {
                 Rectangle().fill(Katha.Color.raised).frame(height: 1)
-                Text("or").font(.system(size: 13)).foregroundStyle(Katha.Color.text2)
+                Text("or").kathaFont(13).foregroundStyle(Katha.Color.text2)
                 Rectangle().fill(Katha.Color.raised).frame(height: 1)
             }
 
@@ -85,7 +87,7 @@ struct LoginSheet: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "apple.logo")
-                    Text("Sign in with Apple").font(.system(size: 16, weight: .semibold))
+                    Text("Sign in with Apple").kathaFont(16, weight: .semibold)
                 }
                 .foregroundStyle(.black)
                 .frame(maxWidth: .infinity)
@@ -95,12 +97,12 @@ struct LoginSheet: View {
             }
 
             Button("Not now") { dismiss() }
-                .font(.system(size: 15))
+                .kathaFont(15)
                 .foregroundStyle(Katha.Color.text2)
                 .frame(maxWidth: .infinity)
 
             Text("By continuing you agree to the Terms and the Privacy Notice. You must be 18 or older.")
-                .font(.system(size: 11))
+                .kathaFont(11)
                 .foregroundStyle(Katha.Color.text2)
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
@@ -113,19 +115,19 @@ struct LoginSheet: View {
         VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Enter the code")
-                    .font(.system(size: 22, weight: .bold))
+                    .kathaFont(22, weight: .bold)
                     .foregroundStyle(Katha.Color.text)
-                Text("Sent by SMS to \(phone).\(devOtpHint)")
-                    .font(.system(size: 14))
+                Text("Sent by SMS to \(e164).\(devOtpHint)")
+                    .kathaFont(14)
                     .foregroundStyle(Katha.Color.text2)
             }
 
-            TextField("1234", text: $code)
+            TextField(model.t("otp.placeholder"), text: $code)
                 .keyboardType(.numberPad)
-                .font(.system(size: 28, weight: .semibold).monospacedDigit())
+                .kathaFont(28, weight: .semibold, monospacedDigit: true)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Katha.Color.text)
-                .frame(height: 56)
+                .kathaFrame(height: 56)
                 .background(Katha.Color.raised)
                 .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
                 .onChange(of: code) { _, new in
@@ -138,7 +140,7 @@ struct LoginSheet: View {
             }
 
             if let error {
-                Text(error).font(.system(size: 13)).foregroundStyle(Katha.Color.danger)
+                Text(error).kathaFont(13).foregroundStyle(Katha.Color.danger)
             }
 
             HStack {
@@ -146,17 +148,22 @@ struct LoginSheet: View {
                 Spacer()
                 Button("Use Apple instead") { Task { await appleSignIn() } }
             }
-            .font(.system(size: 14))
+            .kathaFont(14)
             .foregroundStyle(Katha.Color.text2)
         }
     }
 
     // MARK: actions
 
+    /// Just the digits the viewer typed…
+    private var digits: String { phone.filter(\.isNumber) }
+    /// …and the number the server is asked about, prefix included.
+    private var e164: String { "+91 " + digits }
+
     private func requestOtp() async {
         working = true; defer { working = false }
         do {
-            _ = try await model.api.requestOtp(phone: phone.trimmingCharacters(in: .whitespaces))
+            _ = try await model.api.requestOtp(phone: e164)
             error = nil
             step = .otp
         } catch {
@@ -166,7 +173,7 @@ struct LoginSheet: View {
 
     private func verify() async {
         working = true; defer { working = false }
-        if await model.signIn(phone: phone.trimmingCharacters(in: .whitespaces), code: code) {
+        if await model.signIn(phone: e164, code: code) {
             dismiss()
             onSignedIn?()
         } else {

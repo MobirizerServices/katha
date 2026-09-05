@@ -12,23 +12,28 @@ struct FeedView: View {
     var body: some View {
         content
             .background(Katha.Color.bg)
-            // Controls live in the REAL toolbar (reliable hit-testing on every
-            // OS); its background is hidden so the serif masthead below reads
-            // as one header band.
+            // One header band, one row: the masthead rides the toolbar's
+            // principal slot beside the controls instead of costing the feed a
+            // second full row underneath an otherwise empty bar. The ribbon is
+            // a safe-area inset, so it stays pinned under the bar as its rule.
             .toolbar {
+                ToolbarItem(placement: .principal) { masthead }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
                         languageMenu
                         NavigationLink(value: SearchRoute()) {
                             Image(systemName: "magnifyingglass")
-                                .font(.system(size: 16, weight: .semibold))
+                                .kathaFont(16, weight: .semibold)
                                 .foregroundStyle(Katha.Color.text)
-                                .accessibilityLabel("Search")
+                                .accessibilityLabel(model.t("home.search"))
                         }
                     }
                 }
             }
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Katha.Color.bg, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) { BrandRibbon() }
             .navigationDestination(for: SearchRoute.self) { _ in SearchView() }
             .navigationDestination(for: ContinueRoute.self) { _ in ContinueWatchingView() }
             .task {
@@ -40,28 +45,31 @@ struct FeedView: View {
             }
             .overlay(alignment: .bottom) {
                 if let coins = claimedToast {
-                    ToastView(text: "+\(coins) coins · day streak")
+                    ToastView(text: model.t("home.checkin.toast", coins))
                         .padding(.bottom, 30)
                         .task { try? await Task.sleep(for: .seconds(2)); claimedToast = nil }
                 }
             }
     }
 
-    /// The literary signature: serif-italic wordmark + Devanagari echo. Lives
-    /// in the content (it scrolls away) because the iOS 26 toolbar clips its
-    /// leading item into a glass circle.
+    /// The literary signature: serif-italic wordmark + Devanagari echo, sized so
+    /// it fits the toolbar's principal slot beside the trailing controls.
     private var masthead: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text("Katha")
-                .font(Katha.Font.wordmark)
+                .kathaFont(20, weight: .bold, design: .serif, relativeTo: .title3).italic()
                 .foregroundStyle(Katha.Color.text)
             Text("कथा")
-                .font(.system(size: 15, weight: .semibold))
+                .kathaFont(13, weight: .semibold)
                 .foregroundStyle(Katha.Color.text2)
         }
-        .padding(.horizontal, Katha.Spacing.lg)
+        .lineLimit(1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Katha")
+    }
+
+    private var nativeLanguageName: String {
+        ["hi": "हिन्दी", "ta": "தமிழ்", "te": "తెలుగు"][model.contentLanguage] ?? "हिन्दी"
     }
 
     private var languageMenu: some View {
@@ -76,14 +84,17 @@ struct FeedView: View {
                 }
             }
         } label: {
-            Text(["hi": "हिन्दी", "ta": "தமிழ்", "te": "తెలుగు"][model.contentLanguage] ?? "हिन्दी")
-                .font(.system(size: 13, weight: .semibold))
+            Text(nativeLanguageName)
+                .kathaFont(13, weight: .semibold)
                 .foregroundStyle(Katha.Color.text)
                 .padding(.horizontal, 10)
-                .frame(height: 28)
+                .kathaFrame(height: 28)
                 .background(Katha.Color.surface)
                 .clipShape(Capsule())
         }
+        // The value alone ("हिन्दी") says nothing about what the control does.
+        .accessibilityLabel(model.t("home.contentLanguage"))
+        .accessibilityValue(nativeLanguageName)
     }
 
     // Three states: the feed if we have it; otherwise an error-with-retry when the
@@ -96,8 +107,6 @@ struct FeedView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Katha.Spacing.lg) {
-                    masthead
-                    BrandRibbon().padding(.top, -Katha.Spacing.sm)
                     if !model.checkinClaimedToday {
                         checkinCard
                             .coachAnchor(.checkin)
@@ -127,15 +136,16 @@ struct FeedView: View {
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 34, height: 34)
                 Image(systemName: "indianrupeesign")
-                    .font(.system(size: 14, weight: .bold))
+                    .kathaFont(14, weight: .bold)
                     .foregroundStyle(Katha.Color.bg)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("Daily check-in")
-                    .font(.system(size: 15, weight: .semibold))
+                Text(model.t("home.checkin.title"))
+                    .kathaFont(15, weight: .semibold)
                     .foregroundStyle(Katha.Color.text)
-                Text(model.checkinCoins.map { "Claim today's \($0) coins" } ?? "Claim today's coins")
-                    .font(.system(size: 13))
+                Text(model.checkinCoins.map { model.t("home.checkin.body", $0) }
+                     ?? model.t("home.checkin.body.plain"))
+                    .kathaFont(13)
                     .foregroundStyle(Katha.Color.text2)
             }
             Spacer()
@@ -145,11 +155,11 @@ struct FeedView: View {
                     if claimedToast != nil { Haptics.success() }
                 }
             } label: {
-                Text("Claim")
-                    .font(.system(size: 14, weight: .semibold))
+                Text(model.t("home.checkin.claim"))
+                    .kathaFont(14, weight: .semibold)
                     .foregroundStyle(Katha.Color.text)
                     .padding(.horizontal, 16)
-                    .frame(height: 36)
+                    .kathaFrame(height: 36)
                     .background(Katha.Color.accent)
                     .clipShape(Capsule())
             }
@@ -171,16 +181,16 @@ struct FeedView: View {
         VStack(alignment: .leading, spacing: Katha.Spacing.sm) {
             HStack {
                 Text(model.t("continue.title"))
-                    .font(Katha.Font.label(14))
+                    .kathaLabel(14)
                     .kerning(1.2)
                     .foregroundStyle(Katha.Color.text2)
                 Spacer()
                 NavigationLink(value: ContinueRoute()) {
                     HStack(spacing: 3) {
                         Text(model.t("continue.seeAll"))
-                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
+                        Image(systemName: "chevron.right").kathaFont(10, weight: .bold)
                     }
-                    .font(.system(size: 13, weight: .semibold))
+                    .kathaFont(13, weight: .semibold)
                     .foregroundStyle(Katha.Color.accent)
                 }
                 .accessibilityIdentifier("continue.seeAll")
@@ -201,22 +211,27 @@ struct FeedView: View {
                                                 .foregroundStyle(Katha.Color.text)
                                                 .shadow(radius: 4)
                                         }
+                                    // A track behind the fill: a lone 4 pt sliver
+                                    // over key art reads as an artefact, not
+                                    // progress.
                                     GeometryReader { geo in
-                                        Capsule().fill(Katha.Color.accent)
-                                            .frame(width: max(8, geo.size.width * CGFloat(item.percent) / 100),
-                                                   height: 4)
+                                        ZStack(alignment: .leading) {
+                                            Capsule().fill(.black.opacity(0.45))
+                                            Capsule().fill(Katha.Color.accent)
+                                                .frame(width: max(8, geo.size.width * CGFloat(item.percent) / 100))
+                                        }
                                     }
-                                    .frame(height: 4)
+                                    .frame(height: 5)
                                     .padding(.horizontal, 6)
-                                    .padding(.bottom, 5)
+                                    .padding(.bottom, 6)
                                 }
                                 Text(model.title(forSlug: item.slug))
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .kathaFont(12, weight: .semibold)
                                     .foregroundStyle(Katha.Color.text)
                                     .lineLimit(1)
                                     .frame(width: 168, alignment: .leading)
-                                Text(ContinueWatchingView.subtitle(for: item))
-                                    .font(.system(size: 11))
+                                Text(ContinueWatchingView.subtitle(for: item, model))
+                                    .kathaFont(11)
                                     .foregroundStyle(Katha.Color.text2)
                                     .lineLimit(1)
                                     .frame(width: 168, alignment: .leading)
@@ -268,19 +283,21 @@ private struct HeroCard: View {
                         .foregroundStyle(Katha.Color.text)
                         .multilineTextAlignment(.leading)
                         .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
-                    Text("\(series.genres.first ?? "") · \(series.episodeCount) episodes\(model.freeEpisodesDefault.map { " · First \($0) free" } ?? "")")
-                        .font(.system(size: 13, weight: .medium))
+                    Text(([series.genres.first, model.t("home.episodes", series.episodeCount),
+                           model.freeEpisodesDefault.map { model.t("home.firstFree", $0) }]
+                        .compactMap { $0 }.filter { !$0.isEmpty }).joined(separator: " · "))
+                        .kathaFont(13, weight: .medium)
                         .foregroundStyle(Katha.Color.text2)
                         .lineLimit(1)
                     NavigationLink(value: EpisodeRoute(slug: series.slug, number: 1)) {
                         HStack(spacing: 6) {
                             Image(systemName: "play.fill")
-                            Text("Play E1")
+                            Text(model.t("home.playE1"))
                         }
-                        .font(.system(size: 15, weight: .semibold))
+                        .kathaFont(15, weight: .semibold)
                         .foregroundStyle(Katha.Color.text)
                         .padding(.horizontal, 20)
-                        .frame(height: 42)
+                        .kathaFrame(height: 42)
                         .background(LinearGradient(colors: [Katha.Color.accent,
                                                             Katha.Color.accentPressed],
                                                    startPoint: .top, endPoint: .bottom))
@@ -294,7 +311,7 @@ private struct HeroCard: View {
         .buttonStyle(PressableStyle())
         .zoomSource(id: series.slug)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(series.title), featured story")
+        .accessibilityLabel(model.t("home.featured", series.title))
     }
 }
 
@@ -311,11 +328,11 @@ private struct FeedRow: View {
             HStack(spacing: 6) {
                 if isPersonal {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 14, weight: .bold))
+                        .kathaFont(14, weight: .bold)
                         .foregroundStyle(Katha.Color.accent)
                 }
                 Text(row.title)
-                    .font(Katha.Font.label(14))
+                    .kathaLabel(14)
                     .kerning(1.2)
                     .foregroundStyle(isPersonal ? Katha.Color.text : Katha.Color.text2)
             }
@@ -363,27 +380,35 @@ struct CoverImage: View {
 }
 
 struct PosterCard: View {
+    @Environment(AppModel.self) private var model
     let series: SeriesSummary
+    /// nil = fill the grid cell (Browse / My list / a person's credits); the
+    /// horizontal rails keep the design's fixed 122 pt poster.
+    var width: CGFloat? = 122
+
+    /// The poster's aspect (122 × 217 in the design board).
+    private static let ratio: CGFloat = 122.0 / 217.0
 
     var body: some View {
         CoverImage(url: series.coverUrl)
-            .frame(width: 122, height: 217)
+            .aspectRatio(Self.ratio, contentMode: .fit)
+            .frame(width: width, height: width.map { $0 / Self.ratio })
             .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous)
                 .strokeBorder(.white.opacity(0.08), lineWidth: 1))
             .overlay(alignment: .topTrailing) {
                 Text(series.primaryLanguage.uppercased())
-                    .font(.system(size: 9, weight: .bold))
+                    .kathaFont(9, weight: .bold)
                     .foregroundStyle(Katha.Color.text)
                     .padding(.horizontal, 6)
-                    .frame(height: 18)
+                    .kathaFrame(height: 18)
                     .background(Katha.Color.bg.opacity(0.55))
                     .clipShape(Capsule())
                     .padding(7)
             }
             .shadow(color: .black.opacity(0.4), radius: 10, y: 5)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(series.title), \(series.episodeCount) episodes")
+            .accessibilityLabel("\(series.title), \(model.t("home.episodes", series.episodeCount))")
     }
 }
 
@@ -391,10 +416,11 @@ struct ToastView: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 14, weight: .semibold))
+            .kathaFont(14, weight: .semibold)
             .foregroundStyle(Katha.Color.text)
             .padding(.horizontal, 16)
-            .frame(height: 40)
+            .kathaFrame(height: 40)
+            .multilineTextAlignment(.center)
             .background(Katha.Color.raised)
             .clipShape(Capsule())
             .shadow(radius: 12, y: 4)
@@ -403,6 +429,7 @@ struct ToastView: View {
 
 /// Backend unreachable / load failed, with a Retry that re-runs the fetch.
 struct FeedErrorState: View {
+    @Environment(AppModel.self) private var model
     let detail: String?
     let retry: () async -> Void
     @State private var retrying = false
@@ -410,13 +437,13 @@ struct FeedErrorState: View {
     var body: some View {
         VStack(spacing: Katha.Spacing.md) {
             Image(systemName: "wifi.slash")
-                .font(.system(size: 46))
+                .kathaFont(46)
                 .foregroundStyle(Katha.Color.text2)
-            Text("Can't reach Katha")
-                .font(.system(size: 20, weight: .semibold))
+            Text(model.t("home.offline.title"))
+                .kathaFont(20, weight: .semibold)
                 .foregroundStyle(Katha.Color.text)
-            Text("Check your connection and try again.")
-                .font(.system(size: 15))
+            Text(model.t("home.offline.body"))
+                .kathaFont(15)
                 .foregroundStyle(Katha.Color.text2)
                 .multilineTextAlignment(.center)
             Button {
@@ -424,9 +451,9 @@ struct FeedErrorState: View {
             } label: {
                 HStack(spacing: 8) {
                     if retrying { ProgressView().tint(.white) }
-                    Text(retrying ? "Retrying…" : "Retry")
+                    Text(model.t(retrying ? "home.offline.retrying" : "home.offline.retry"))
                 }
-                .font(.system(size: 16, weight: .semibold))
+                .kathaFont(16, weight: .semibold)
                 .frame(maxWidth: 220)
                 .padding(.vertical, 14)
                 .background(Katha.Color.accent)

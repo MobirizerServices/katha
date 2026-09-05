@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SiteFooter from "@/components/SiteFooter";
+import { api } from "@/lib/api";
 import {
   ogImageUrl,
   getSeries,
@@ -49,6 +50,11 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
   const s = getSeries(slug);
   if (!s) notFound();
 
+  // The rating is the catalog service's, not the seed's: a title re-rated in
+  // the back office must show — and gate — at its new rating. Cached for five
+  // minutes; the baked seed value stands in if the service can't be reached.
+  const rating = await api.contentRating(s.slug, s.rating, 300);
+
   const bundle = bundleCost(s);
   const full = fullLockedCost(s);
   const ld = {
@@ -59,7 +65,7 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
     inLanguage: s.language,
     genre: s.genres,
     numberOfEpisodes: s.episodeCount,
-    contentRating: s.rating,
+    contentRating: rating,
     image: ogImageUrl(s.slug),
   };
 
@@ -81,10 +87,10 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
           } as CSSProperties}
         />
         <div className="bb">
-          <div className="kicker">#{s.rank} in India today</div>
+          <div className="kicker">First {FREE_EPISODES} episodes free</div>
           <h1>{s.title}</h1>
           <div className="meta">
-            <span className="rating">{s.rating}</span>
+            <span className="rating">{rating}</span>
             <span>{s.genres.join(" · ")}</span>
             <span className="dotsep" />
             <span>{s.episodeCount} episodes</span>
@@ -107,7 +113,9 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
         <div
           style={{
             display: "flex",
-            gap: 14,
+            // The two facts are separated by this gap alone: a literal "· "
+            // led the bundle line whenever it wrapped onto its own row.
+            gap: "6px 22px",
             flexWrap: "wrap",
             alignItems: "center",
             color: "var(--text2)",
@@ -120,7 +128,7 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
           </span>
           {s.episodeCount > FREE_EPISODES && (
             <span>
-              · Series bundle: unlock all {s.episodeCount - FREE_EPISODES} remaining for{" "}
+              Series bundle: unlock all {s.episodeCount - FREE_EPISODES} remaining for{" "}
               <b style={{ color: "var(--text)" }}>{fmt(bundle)} coins</b>{" "}
               <span style={{ color: "var(--coin)" }}>
                 (−{BUNDLE_DISCOUNT_PCT}%, was {fmt(full)})

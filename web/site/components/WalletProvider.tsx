@@ -259,10 +259,13 @@ function SignInModal({
   onVerified: (phone: string, code: string) => Promise<boolean>;
 }) {
   const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [phone, setPhone] = useState("+91 98765 43210");
+  // Empty, not pre-filled: a dummy number as the VALUE meant "Send code"
+  // texted +91 98765 43210 by default. It lives in the placeholder now.
+  const [phone, setPhone] = useState("");
   const [digits, setDigits] = useState(["", "", "", ""]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resent, setResent] = useState(false);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
   const setDigit = (i: number, v: string) => {
@@ -275,16 +278,40 @@ function SignInModal({
     if (d && i < 3) refs.current[i + 1]?.focus();
   };
 
-  const number = () => phone.trim() || "+91 98765 43210";
+  const number = () => phone.trim();
+  /** Enough digits to be a phone number at all. The server is the real judge. */
+  const looksLikePhone = (v: string) => (v.match(/\d/g) ?? []).length >= 8;
 
-  const sendCode = async () => {
-    setError(null);
+  const request = async () => {
     try {
       await api.otpRequest(number());
     } catch {
       // Delivery problems surface at verify; keep the flow moving.
     }
+  };
+
+  const sendCode = async () => {
+    if (!looksLikePhone(number())) {
+      setError("Enter your mobile number with its country code");
+      return;
+    }
+    setError(null);
+    setResent(false);
+    await request();
     setStep("otp");
+  };
+
+  const resend = async () => {
+    setError(null);
+    setResent(true);
+    await request();
+  };
+
+  const changeNumber = () => {
+    setStep("phone");
+    setDigits(["", "", "", ""]);
+    setError(null);
+    setResent(false);
   };
 
   const verify = async () => {
@@ -321,8 +348,14 @@ function SignInModal({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+91 98765 43210"
+                  autoComplete="tel"
                 />
               </label>
+              {error && (
+                <p role="alert" style={{ color: "var(--danger, #e5484d)", fontSize: 13, margin: "10px 0 0" }}>
+                  {error}
+                </p>
+              )}
               <button
                 className="btn p"
                 style={{ width: "100%", marginTop: 16 }}
@@ -368,6 +401,21 @@ function SignInModal({
               >
                 {busy ? "Checking…" : "Verify"}
               </button>
+              {/* The × discards the whole flow; a code that never arrives, or a
+                  typo in the number, needs a way out that isn't starting over. */}
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 14 }}>
+                <button className="mlink" onClick={changeNumber} disabled={busy}>
+                  Change number
+                </button>
+                <button className="mlink" onClick={resend} disabled={busy}>
+                  Resend code
+                </button>
+              </div>
+              {resent && (
+                <p role="status" style={{ color: "var(--text3)", fontSize: 12.5, margin: "10px 0 0", textAlign: "center" }}>
+                  Sent again to {phone}.
+                </p>
+              )}
             </>
           )}
         </div>

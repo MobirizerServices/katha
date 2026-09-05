@@ -4,13 +4,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
 import { api, isOnline, mutate, onOnlineChange, onUnauthorized } from "./api/client";
 import type { AttentionItem, Health, Identity, MutationResult } from "./api/client";
 import type { Approval, AuditEntry, FeatureFlag } from "./api/types";
-import { ROLE_NAMES } from "./auth/roles";
+import { ROLE_NAMES, canView } from "./auth/roles";
 import type { Role } from "./auth/roles";
 
 export const ME = "riya";
@@ -63,15 +64,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const showToast = useCallback((text: string, kind: "info" | "error" = "info") => {
     const id = toastSeq++;
-    setToasts((prev) => [...prev.slice(-2), { id, text, kind }]);
+    setToasts((prev) => {
+      // The same sentence three times says nothing new — replace the standing
+      // copy instead of stacking identical toasts over the view (ADM-15).
+      const rest = prev.filter((t) => !(t.text === text && t.kind === kind));
+      return [...rest.slice(-2), { id, text, kind }];
+    });
     window.setTimeout(
       () => setToasts((prev) => prev.filter((t) => t.id !== id)), 4200);
   }, []);
 
+  const reloadApprovals = useCallback(async (status = "pending") => {
+    setApprovals(await api.listApprovals(status));
+  }, []);
+
+  // The signals every view shares: health, the attention rail, and the pending
+  // approvals that drive the sidebar badge and Finance's counter (ADM-03).
+  // Read through a ref so the callback stays stable across a role change —
+  // roles that cannot open the inbox never ask the server for it.
+  const roleRef = useRef(role);
+  roleRef.current = role;
   const refreshSignals = useCallback(() => {
     void api.health().then(setHealth);
     void api.attention().then((a) => setAttention(a.items));
-  }, []);
+    if (canView(roleRef.current, "approvals")) void reloadApprovals();
+  }, [reloadApprovals]);
 
   // Identity is fetched at boot, after sign-out, and whenever the server
   // answers 401/403 mid-session (expired cookie, revoked role): the operator
@@ -82,6 +99,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (me?.mode === "oidc" && me.authenticated && me.role) {
       setRoleRaw(me.role as Role); // the server's answer wins — no previewing
     }
+    return me;
   }, []);
 
   const logout = useCallback(async () => {
@@ -94,25 +112,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     showToast("Signed out");
   }, [refreshIdentity, showToast]);
 
-  const reloadApprovals = useCallback(async (status = "pending") => {
-    setApprovals(await api.listApprovals(status));
-  }, []);
-
+  // Identity first: a signed-out load used to fire five list requests that all
+  // 401'd before /auth/me had answered (ADM-28). Nothing is fetched until the
+  // server says who we are — offline (identity null) still shows sample data.
   useEffect(() => {
-    void reloadApprovals();
-    void api.listAudit({}).then((a) => setAudit(a.rows));
-    void api.listFlags().then(setFlags);
-    void refreshIdentity();
-    refreshSignals();
-    const t = window.setInterval(refreshSignals, 60_000);
+    let dead = false;
+    let timer = 0;
+    void refreshIdentity().then((me) => {
+      if (dead || (me?.mode === "oidc" && !me.authenticated)) return;
+      void api.listAudit({}).then((a) => setAudit(a.rows));
+      void api.listFlags().then(setFlags);
+      refreshSignals();
+      timer = window.setInterval(refreshSignals, 60_000);
+    });
     const off = onOnlineChange(setOnlineState);
     const offAuth = onUnauthorized(() => void refreshIdentity());
     return () => {
-      window.clearInterval(t);
+      dead = true;
+      window.clearInterval(timer);
       off();
       offAuth();
     };
-  }, [refreshSignals, reloadApprovals, refreshIdentity]);
+  }, [refreshSignals, refreshIdentity]);
 
   const setRole = useCallback(
     (r: Role) => {

@@ -174,7 +174,7 @@ struct HelpAssistantView: View {
                         .accessibilityIdentifier("assistant.input")
                     Button(action: send) {
                         Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 28))
+                            .kathaFont(28)
                             .foregroundStyle(draft.trimmingCharacters(in: .whitespaces).isEmpty
                                              ? Katha.Color.text2 : Katha.Color.accent)
                     }
@@ -183,7 +183,7 @@ struct HelpAssistantView: View {
                     .accessibilityIdentifier("assistant.send")
                 }
                 .padding(.horizontal, 14)
-                .frame(height: 48)
+                .kathaFrame(height: 48)
                 .background(Katha.Color.surface)
                 .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
 
@@ -194,17 +194,17 @@ struct HelpAssistantView: View {
                         Image(systemName: "person.wave.2.fill")
                         Text(model.t("assistant.person"))
                     }
-                    .font(.system(size: 14, weight: .semibold))
+                    .kathaFont(14, weight: .semibold)
                     .foregroundStyle(Katha.Color.text)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 40)
+                    .kathaFrame(height: 40)
                     .background(Katha.Color.raised)
                     .clipShape(Capsule())
                 }
                 .buttonStyle(PressableStyle())
 
                 Text(model.t("assistant.footer"))
-                    .font(.system(size: 11))
+                    .kathaFont(11)
                     .foregroundStyle(Katha.Color.text2)
                     .multilineTextAlignment(.center)
             }
@@ -230,12 +230,12 @@ struct HelpAssistantView: View {
                 let q = model.uiLanguage == "hi" ? intent.questionHi : intent.questionEn
                 Button { ask(q, intent: intent) } label: {
                     Text(q)
-                        .font(.system(size: 13, weight: .medium))
+                        .kathaFont(13, weight: .medium)
                         .lineLimit(1)
                         .fixedSize()
                         .foregroundStyle(Katha.Color.text)
                         .padding(.horizontal, 12)
-                        .frame(height: 32)
+                        .kathaFrame(height: 32)
                         .background(Katha.Color.surface)
                         .overlay(Capsule().strokeBorder(Katha.Color.raised, lineWidth: 1))
                         .clipShape(Capsule())
@@ -250,7 +250,7 @@ struct HelpAssistantView: View {
         HStack {
             if m.role == .user { Spacer(minLength: 48) }
             Text(m.text)
-                .font(.system(size: 15))
+                .kathaFont(15)
                 .foregroundStyle(Katha.Color.text)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)

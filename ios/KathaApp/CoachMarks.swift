@@ -164,7 +164,7 @@ private struct CoachOverlay: View {
                 .position(cardCenter)
 
             Button("Skip", action: onSkip)
-                .font(.system(size: 15, weight: .semibold))
+                .kathaFont(15, weight: .semibold)
                 .foregroundStyle(.white.opacity(0.9))
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -186,7 +186,7 @@ private struct CoachOverlay: View {
                     Image(systemName: "chevron.up")
                     Image(systemName: "chevron.up").opacity(0.5)
                 }
-                .font(.system(size: 26, weight: .bold))
+                .kathaFont(26, weight: .bold)
                 .foregroundStyle(Katha.Color.accent)
                 .offset(y: bob ? -8 : 4)
                 .animation(reduceMotion ? nil :
@@ -194,15 +194,15 @@ private struct CoachOverlay: View {
                            value: bob)
             } else {
                 Image(systemName: step.icon)
-                    .font(.system(size: 30, weight: .semibold))
+                    .kathaFont(30, weight: .semibold)
                     .foregroundStyle(Katha.Color.accent)
             }
             Text(step.title)
-                .font(.system(size: 19, weight: .bold))
+                .kathaFont(19, weight: .bold)
                 .foregroundStyle(Katha.Color.text)
                 .multilineTextAlignment(.center)
             Text(step.body)
-                .font(.system(size: 14))
+                .kathaFont(14)
                 .foregroundStyle(Katha.Color.text2)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -217,7 +217,7 @@ private struct CoachOverlay: View {
             .padding(.top, 2)
 
             Text(index + 1 == total ? "Got it" : "Next")
-                .font(.system(size: 15, weight: .semibold))
+                .kathaFont(15, weight: .semibold)
                 .foregroundStyle(Katha.Color.text)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 11)

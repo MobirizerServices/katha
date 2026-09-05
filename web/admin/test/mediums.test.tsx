@@ -32,6 +32,8 @@ function stub(routes: Stub) {
   return calls;
 }
 const SIGNALS: Stub = {
+  // the sidebar badge/Finance counter poll the inbox with every signal read
+  "/approvals?": () => [],
   "/health/full": () => ({ status: "ok", checks: {}, at: "" }),
   "/auth/me": () => ({ mode: "headers", authenticated: true }),
   "/attention": () => ({ items: [] }),
@@ -109,7 +111,9 @@ describe("Approvals — the toast says what happened (W2)", () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
       if (u.includes("/health") || u.includes("/attention")) return ok({ status: "ok", checks: {}, at: "", items: [] });
-      if (u.includes("/approvals?status=pending")) return ok([]);
+      // the inbox re-reads on every signal refresh now (ADM-03): serve back
+      // whatever the queue currently holds instead of emptying it
+      if (u.includes("/approvals?status=pending")) return ok(getStore().approvals);
       if (u.includes("/reject")) return ok({ status: "rejected" });
       return Promise.reject(new Error("offline"));            // /approve: network gone
     }));

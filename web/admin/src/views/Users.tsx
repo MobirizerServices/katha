@@ -20,7 +20,7 @@ function uid(): string {
 
 function AdjustDialog({ user, onClose, onApplied }: { user: AdminUser; onClose: () => void;
                                                       onApplied: () => void }) {
-  const { role, addApproval, addAudit, showToast } = useStore();
+  const { role, addApproval, addAudit, reloadApprovals, showToast } = useStore();
   const [dir, setDir] = useState<"Credit" | "Debit">("Credit");
   const [amount, setAmount] = useState(30);
   const [reason, setReason] = useState(REASONS[0]);
@@ -68,6 +68,8 @@ function AdjustDialog({ user, onClose, onApplied }: { user: AdminUser; onClose: 
     }
     if (res.status === "pending_approval") {
       showToast("Approval requested · Finance notified · nothing written yet");
+      // the request exists on the server now: badge and inbox must say so
+      void reloadApprovals();
       onClose();
       onApplied();
       return;
@@ -246,6 +248,7 @@ function UserDialog({ user, onClose }: { user: AdminUser; onClose: () => void })
     <Modal
       title={`Ledger · ${user.id}`}
       onClose={onClose}
+      wide
       footer={<button className="btn s" onClick={onClose}>Close</button>}
     >
       <div className="tabs" role="tablist">
@@ -263,6 +266,7 @@ function UserDialog({ user, onClose }: { user: AdminUser; onClose: () => void })
         ) : rows.length === 0 ? (
           <p className="tiny">No ledger entries for this user yet.</p>
         ) : (
+          <div className="tablewrap">
           <table className="table">
             <thead>
               <tr>
@@ -297,6 +301,7 @@ function UserDialog({ user, onClose }: { user: AdminUser; onClose: () => void })
               })}
             </tbody>
           </table>
+          </div>
         )
       ) : null}
 
@@ -444,7 +449,9 @@ export function Users() {
         subtitle="Look up by phone, Apple id, device or user id. Money actions need a reason code; above 500 coins they need a second approver."
       />
 
-      <div className="split">
+      {/* detailfirst: below 1100px the wallet moves above the 50-row lookup so
+          selecting a user changes something you can see (ADM-34). */}
+      <div className="split detailfirst">
         <div className="panel">
           <header>
             <h3>Lookup</h3>
@@ -502,7 +509,11 @@ export function Users() {
                         }}>
                       <td>
                         <b>{u.name !== "—" ? u.name : u.id}</b>
-                        <small className="muted"> ({u.payer === "—" ? "guest" : u.payer}) · {u.id}</small>
+                        <small className="muted">
+                          {" "}({u.payer === "—" ? "guest" : u.payer})
+                          {/* the id is already the heading when there is no name */}
+                          {u.name !== "—" ? ` · ${u.id}` : ""}
+                        </small>
                         {u.flags.length > 0 ? (
                           <span style={{ display: "block", marginTop: 2 }}>
                             {u.flags.map((f) => (

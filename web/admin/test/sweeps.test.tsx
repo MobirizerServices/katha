@@ -21,6 +21,8 @@ describe("Audit — pagination (#066)", () => {
     const calls: string[] = [];
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       calls.push(u);
       if (u.includes("/audit")) {
         const before = u.includes("before=");
@@ -46,6 +48,8 @@ describe("Config — every editor control", () => {
   it("edits all three pack fields and cancels the guarded modal", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/config/packs")) return ok([
         { sku: "coins_starter_in", storefront: "IN", price_minor: 9900,
           currency: "INR", coins: 600, bonus: 0 }]);
@@ -93,6 +97,8 @@ describe("Grievances — offline actions stay honest", () => {
   it("ack/resolve without a server produce error toasts, not fake success", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/grievances") && !u.includes("/ack") && !u.includes("/resolve")) {
         return ok({ grievances: [{
           id: "G-OFF", user_id: "", contact: "c", channel: "app", subject: "s",
@@ -119,6 +125,8 @@ describe("Approvals — server refusal path", () => {
     await waitFor(() => expect(getStore().approvals.length).toBeGreaterThan(0));
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/approve")) {
         return Promise.resolve({ ok: false, status: 409,
           json: async () => ({ detail: "already approved" }) });
@@ -144,6 +152,8 @@ describe("remaining handler coverage", () => {
     await waitFor(() => expect(getStore().approvals.length).toBeGreaterThan(0));
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/health") || u.includes("/attention")) return ok({ status: "ok", checks: {}, at: "", items: [] });
       if (u.includes("/approvals?status=pending")) return ok([]);
       return Promise.reject(new Error("offline"));
@@ -165,6 +175,8 @@ describe("remaining handler coverage", () => {
     Object.assign(navigator, { clipboard: { writeText: write } });
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/catalog/series/kaanch-ka-mahal")) return ok({
         slug: "kaanch-ka-mahal", title: "Kaanch Ka Mahal", synopsis: "s",
         genres: ["Drama"], language: "Hindi", episodeCount: 20, freeEpisodes: 10,
@@ -194,6 +206,8 @@ describe("remaining handler coverage", () => {
   it("Grievances: renders triage notes", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/grievances")) return ok({ grievances: [{
         id: "G-N", user_id: "", contact: "c", channel: "app", subject: "s",
         body: "b", status: "ack", assignee: "sam",
@@ -211,6 +225,8 @@ describe("remaining handler coverage", () => {
   it("Users: empty search state and Load more paging", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/users?")) {
         const offset = /offset=(\d+)/.exec(u)?.[1] ?? "0";
         const mk = (id: string) => ({
@@ -247,10 +263,16 @@ describe("last handler mile", () => {
   it("Approvals bulk decide skips the self-authored request with a warning", async () => {
     renderWithStore(<Approvals />);
     await waitFor(() => expect(getStore().approvals.length).toBeGreaterThan(0));
+    let decided = false;
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
-      if (u.includes("/approve") || u.includes("/reject")) return ok({ status: "done" });
-      if (u.includes("/approvals?status=pending")) return ok([]);
+      // signal refreshes re-read the approvals inbox (ADM-03): the queue stands
+      // until a decision reaches the server, then it empties
+      if (u.includes("/approve") || u.includes("/reject")) {
+        decided = true;
+        return ok({ status: "done" });
+      }
+      if (u.includes("/approvals?")) return ok(decided ? [] : getStore().approvals);
       if (u.includes("/health") || u.includes("/attention")) return ok({ status: "ok", checks: {}, at: "", items: [] });
       return Promise.reject(new Error("offline"));
     }));
@@ -273,6 +295,8 @@ describe("last handler mile", () => {
   it("Grievances offline shows sample empty + resolve modal cancel path", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/grievances")) return ok({ grievances: [{
         id: "G-C", user_id: "", contact: "c", channel: "web", subject: "s", body: "",
         status: "ack", assignee: "sam", created_at: "2026-09-01T00:00:00+00:00",
@@ -283,7 +307,7 @@ describe("last handler mile", () => {
     }));
     renderWithStore(<Grievances />);
     await waitFor(() => expect(screen.getByText("G-C")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("tab", { name: "ack" }));
+    fireEvent.click(screen.getByRole("tab", { name: /Acknowledged/ }));
     fireEvent.click(screen.getByRole("tab", { name: /All/ }));
     fireEvent.click(screen.getByText("Resolve…"));
     const dialog = await screen.findByRole("dialog");
@@ -310,6 +334,8 @@ describe("last handler mile", () => {
   it("Users dialog tab buttons cycle every tab", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/users?")) return ok({ users: [{
         id: "tabs_u", phone: "+91", name: "—", languages: "hi",
         wallet: { bought: 0, bonus: 0, unlocked: 0, ltv: "₹0" },
@@ -337,6 +363,8 @@ describe("last handler mile", () => {
     let statusBody: { status?: string } = {};
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/status")) { statusBody = JSON.parse(String(init?.body)); return ok({}); }
       if (u.includes("/catalog/series/kaanch-ka-mahal")) return ok({
         slug: "kaanch-ka-mahal", title: "Kaanch Ka Mahal", synopsis: "s",
@@ -369,6 +397,8 @@ describe("final handler closures", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Pending/ }));
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/health") || u.includes("/attention")) return ok({ status: "ok", checks: {}, at: "", items: [] });
       return Promise.reject(new Error("offline"));
     }));
@@ -395,6 +425,8 @@ describe("final handler closures", () => {
   it("Grievances resolve modal closes on Escape", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/grievances")) return ok({ grievances: [{
         id: "G-E", user_id: "", contact: "c", channel: "app", subject: "s", body: "",
         status: "ack", assignee: "", created_at: "2026-09-01T00:00:00+00:00",
@@ -416,6 +448,8 @@ describe("final handler closures", () => {
   it("CatalogDetail modals close on Escape", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
       const u = String(url);
+      // signal refreshes re-read the approvals inbox (ADM-03)
+      if (u.includes("/approvals?")) return Promise.resolve({ ok: true, status: 200, json: async () => getStore().approvals });
       if (u.includes("/catalog/series/kaanch-ka-mahal")) return ok({
         slug: "kaanch-ka-mahal", title: "T", synopsis: "s", genres: [], language: "Hindi",
         episodeCount: 1, freeEpisodes: 1, coinPrice: 30, bundleDiscountPct: 25,

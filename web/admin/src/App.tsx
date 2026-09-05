@@ -256,7 +256,7 @@ export default function App() {
   const [palette, setPalette] = useState(false);
   const nav = useNavigate();
   const location = useLocation();
-  const { signedOut } = useStore();
+  const { signedOut, role, identity } = useStore();
 
   // ⌘K + g-shortcuts (#086/#087)
   useEffect(() => {
@@ -273,7 +273,10 @@ export default function App() {
       }
       if (typing) return;
       if (pendingG) {
-        const hit = ALL_NAV_ITEMS.find((n) => n.kb === `g ${e.key.toLowerCase()}`);
+        // A chord must not land the operator on "Finance can't open Catalog":
+        // views this role cannot see have no shortcut (ADM-35).
+        const hit = ALL_NAV_ITEMS.find(
+          (n) => n.kb === `g ${e.key.toLowerCase()}` && canView(role, n.view));
         if (hit) {
           e.preventDefault();
           nav(hit.path);
@@ -291,12 +294,15 @@ export default function App() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [nav]);
+  }, [nav, role]);
 
-  // Which views operators actually use (#112) — steers the roadmap.
+  // Which views operators actually use (#112) — steers the roadmap. Only for a
+  // session the server has acknowledged: a signed-out load must not 401 (ADM-28).
+  const authed = !!identity?.authenticated;
   useEffect(() => {
+    if (!authed) return;
     void mutate.uiPing(location.pathname.split("/")[1] || "overview");
-  }, [location.pathname]);
+  }, [location.pathname, authed]);
 
   // OIDC mode with no session: the whole panel is behind sign-in (#074).
   if (signedOut) {

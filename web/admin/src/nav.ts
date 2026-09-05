@@ -20,8 +20,8 @@ export const NAV: NavGroup[] = [
       { view: "catalog", path: "/catalog", label: "Catalog", icon: "▦", kb: "g c" },
       { view: "media", path: "/media", label: "Media & QC", icon: "⇪", kb: "g m" },
       { view: "moderation", path: "/moderation", label: "Moderation & ratings", icon: "⛨", kb: "g r" },
-      { view: "localization", path: "/localization", label: "Localization", icon: "文" },
-      { view: "writers", path: "/writers", label: "AI Writers’ Room", icon: "✎" },
+      { view: "localization", path: "/localization", label: "Localization", icon: "文", kb: "g l" },
+      { view: "writers", path: "/writers", label: "AI Writers’ Room", icon: "✎", kb: "g w" },
       { view: "programming", path: "/programming", label: "Programming", icon: "▦", kb: "g p" },
     ],
   },
@@ -44,10 +44,10 @@ export const NAV: NavGroup[] = [
   {
     title: "Platform",
     items: [
-      { view: "audit", path: "/audit", label: "Audit log", icon: "▤" },
-      { view: "outbox", path: "/outbox", label: "Outbox", icon: "✉" },
-      { view: "access", path: "/access", label: "Roles & access", icon: "⚿" },
-      { view: "components", path: "/components", label: "Components", icon: "▣" },
+      { view: "audit", path: "/audit", label: "Audit log", icon: "▤", kb: "g d" },
+      { view: "outbox", path: "/outbox", label: "Outbox", icon: "✉", kb: "g b" },
+      { view: "access", path: "/access", label: "Roles & access", icon: "⚿", kb: "g k" },
+      { view: "components", path: "/components", label: "Components", icon: "▣", kb: "g y" },
     ],
   },
 ];

@@ -55,16 +55,17 @@ struct ContinueWatchingView: View {
         }
     }
 
-    /// "E7 · 1 min left" — the episode plus what remains, from position and
-    /// duration. No duration yet (the first report hasn't landed) → "E7".
-    static func subtitle(for item: ContinueItem) -> String {
-        let remaining = max(0, item.durationMs - item.positionMs) / 1000
+    /// "E7 · 5 min left" — the episode plus what remains, rounded to whole
+    /// minutes: nobody reads a remaining time to the second, and "4 min 54 s"
+    /// only makes the line harder to scan. No duration yet (the first report
+    /// hasn't landed) → "E7".
+    @MainActor
+    static func subtitle(for item: ContinueItem, _ model: AppModel) -> String {
         guard item.durationMs > 0 else { return "E\(item.number)" }
-        let m = remaining / 60, s = remaining % 60
-        let left: String
-        if m == 0 { left = "\(s) s left" }
-        else if s == 0 { left = "\(m) min left" }
-        else { left = "\(m) min \(s) s left" }
+        let remaining = max(0, item.durationMs - item.positionMs) / 1000
+        let left = remaining < 60
+            ? model.t("continue.left.under")
+            : model.t("continue.left.minutes", Int((Double(remaining) / 60).rounded()))
         return "E\(item.number) · \(left)"
     }
 }
@@ -81,11 +82,11 @@ struct ContinueRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.sm, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title.isEmpty ? model.title(forSlug: item.slug) : item.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .kathaFont(15, weight: .semibold)
                     .foregroundStyle(Katha.Color.text)
                     .lineLimit(1)
-                Text(ContinueWatchingView.subtitle(for: item))
-                    .font(.system(size: 13))
+                Text(ContinueWatchingView.subtitle(for: item, model))
+                    .kathaFont(13)
                     .foregroundStyle(Katha.Color.text2)
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -94,18 +95,18 @@ struct ContinueRow: View {
                             .frame(width: max(6, geo.size.width * CGFloat(min(100, item.percent)) / 100))
                     }
                 }
-                .frame(height: 3)
+                .frame(height: 5)
                 .padding(.top, 4)
             }
             Spacer(minLength: 4)
             HStack(spacing: 5) {
-                Image(systemName: "play.fill").font(.system(size: 11))
-                Text("Resume")
+                Image(systemName: "play.fill").kathaFont(11)
+                Text(model.t("continue.resume"))
             }
-            .font(.system(size: 13, weight: .semibold))
+            .kathaFont(13, weight: .semibold)
             .foregroundStyle(Katha.Color.text)
             .padding(.horizontal, 12)
-            .frame(height: 32)
+            .kathaFrame(height: 32)
             .background(Katha.Color.raised)
             .clipShape(Capsule())
         }
@@ -113,8 +114,8 @@ struct ContinueRow: View {
         .background(Katha.Color.surface)
         .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.lg, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(model.title(forSlug: item.slug)), \(ContinueWatchingView.subtitle(for: item)), \(item.percent) percent watched")
-        .accessibilityHint("Resumes the episode")
+        .accessibilityLabel("\(model.title(forSlug: item.slug)), \(ContinueWatchingView.subtitle(for: item, model)), \(item.percent) percent watched")
+        .accessibilityHint(model.t("continue.resumeHint"))
     }
 }
 

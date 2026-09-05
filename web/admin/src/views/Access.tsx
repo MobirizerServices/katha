@@ -84,13 +84,18 @@ function People() {
   if (role !== "admin") return null;
   return (
     <div className="panel" style={{ marginTop: 14 }}>
-      <h3>Provisioned operators</h3>
-      <p className="muted tiny" style={{ marginTop: 2 }}>
+      <header>
+        <h3>Provisioned operators</h3>
+        <span className="muted tiny">
+          {users === null ? "" : `${users.length} account${users.length === 1 ? "" : "s"}`}
+        </span>
+      </header>
+      <p className="muted tiny" style={{ margin: 0, padding: "12px 16px 0" }}>
         Only these accounts can sign in. Roles are looked up on every request —
         revoking takes effect immediately, and every change lands in the audit log.
       </p>
       {users === null ? (
-        <div className="muted tiny">
+        <div className="muted tiny" style={{ padding: "12px 16px" }}>
           {online ? "Admins only — the server refused the list." : "Offline — the directory lives on the server."}
         </div>
       ) : (
@@ -118,20 +123,27 @@ function People() {
           </table>
         </div>
       )}
-      <div className="row" style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <input aria-label="Email to provision" placeholder="name@katha.dev"
-               value={email} onChange={(e) => setEmail(e.target.value)}
-               style={{ flex: 1 }} />
-        <select aria-label="Role to grant" value={newRole}
-                onChange={(e) => setNewRole(e.target.value)}>
-          {ROLE_ORDER.map((r) => (
-            <option key={r} value={r}>{ROLE_NAMES[r]}</option>
-          ))}
-        </select>
-        <button className="btn" disabled={!online || !email.includes("@")}
-                onClick={grant}>
-          Grant access
-        </button>
+      <div className="acct">
+        <div className="frow" style={{ alignItems: "flex-end" }}>
+          <label className="fld" style={{ flex: 2 }}>
+            Email to provision
+            <input aria-label="Email to provision" placeholder="name@katha.dev"
+                   value={email} onChange={(e) => setEmail(e.target.value)} />
+          </label>
+          <label className="fld">
+            Role
+            <select aria-label="Role to grant" value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}>
+              {ROLE_ORDER.map((r) => (
+                <option key={r} value={r}>{ROLE_NAMES[r]}</option>
+              ))}
+            </select>
+          </label>
+          <button className="btn p" disabled={!online || !email.includes("@")}
+                  onClick={grant}>
+            Grant access
+          </button>
+        </div>
       </div>
       {confirming ? (
         <Modal title="Grant full admin?" onClose={() => setConfirming(false)}

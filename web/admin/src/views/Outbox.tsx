@@ -8,6 +8,22 @@ type Row = {
   body: string; status: string; detail: string; created_at: string;
 };
 
+/** What the message actually said: HTML source in a 200px mono box tells an
+ *  operator nothing, so tags are stripped and whitespace collapsed (ADM-27).
+ *  Never rendered as markup — this stays text. */
+export function preview(body: string): string {
+  return body
+    .replace(/<(script|style)[^]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n\s*\n+/g, "\n\n")
+    .trim();
+}
+
 /** Every email + push the system produced, whatever the transport (comms are
  * outbox-first). Dev shows queued rows; production shows sent/failed truth.
  * Comms only: the invoice register lives on the Finance view. */
@@ -69,6 +85,7 @@ export function Outbox() {
                hint="Invoices, grievance replies and episode-drop pushes land here the moment they are produced." />
       ) : (
         <div className="panel">
+          <div className="tablewrap">
           <table className="table">
             <thead>
               <tr><th>#</th><th>Kind</th><th>To</th><th>Subject</th>
@@ -88,9 +105,9 @@ export function Outbox() {
                     ) : null}
                     {open === r.id ? (
                       <div className="tiny mono" style={{ marginTop: 6,
-                            whiteSpace: "pre-wrap", maxWidth: 520,
+                            whiteSpace: "pre-wrap", maxWidth: "100%",
                             maxHeight: 200, overflow: "auto" }}>
-                        {r.body}
+                        {preview(r.body)}
                       </div>
                     ) : null}
                   </td>
@@ -112,6 +129,7 @@ export function Outbox() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
       <p className="tiny muted">

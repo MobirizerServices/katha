@@ -41,6 +41,7 @@ describe("Search — debounced, server-ranked", () => {
     searchApi.mockResolvedValue(hit());
     render(<Search />);
     expect(screen.getByRole("heading", { name: "Search" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Trending searches" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "revenge" }));
     expect(screen.getByLabelText("Search")).toHaveValue("revenge");
     expect(screen.getByText("Searching…")).toBeInTheDocument();
@@ -48,7 +49,7 @@ describe("Search — debounced, server-ranked", () => {
     await waitFor(() => expect(searchApi).toHaveBeenCalledWith("revenge"));
     expect(replace).toHaveBeenCalledWith("/search?q=revenge");
     expect(await screen.findByRole("heading", { name: "Results for “revenge”" })).toBeInTheDocument();
-    expect(screen.getByText("1 series · 1 people")).toBeInTheDocument();
+    expect(screen.getByText("1 series · 1 person")).toBeInTheDocument();
   });
 
   it("renders Series and People sections; a person row expands to their series", async () => {

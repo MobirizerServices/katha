@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import React from "react";
-import { render, screen, act, waitFor } from "@testing-library/react";
+import { render, screen, act, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { WalletCtx } from "@/components/WalletProvider";
 import { getSeries } from "@/lib/catalog";
@@ -11,19 +11,21 @@ vi.mock("next/link", () => ({
     React.createElement("a", { href: typeof href === "string" ? href : "#", ...rest }, children),
 }));
 const push = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }), usePathname: () => "/watch/x/1" }));
 
 // The server's answer is the only access decision: stub it per test.
 const playback = vi.fn();
 const reminders = vi.fn();
 const addReminder = vi.fn();
 const removeReminder = vi.fn();
+const seriesDetail = vi.fn();
 vi.mock("@/lib/api", () => ({
   api: {
     playback: (...a: unknown[]) => playback(...a),
     reminders: (...a: unknown[]) => reminders(...a),
     addReminder: (...a: unknown[]) => addReminder(...a),
     removeReminder: (...a: unknown[]) => removeReminder(...a),
+    series: (...a: unknown[]) => seriesDetail(...a),
   },
 }));
 
@@ -102,6 +104,8 @@ beforeEach(() => {
   reminders.mockReset().mockResolvedValue({ slugs: [] });
   addReminder.mockReset();
   removeReminder.mockReset();
+  // The catalog service rates the series; ceo-sahab is U/A 13+ (never gated).
+  seriesDetail.mockReset().mockResolvedValue({ slug: "ceo-sahab", content_rating: "U/A 13+" });
   mockWallet = makeWallet();
   hlsState.supported = false;
   hlsState.importFails = false;
@@ -116,8 +120,8 @@ describe("Player — the server's playback answer decides", () => {
   it("asks playback first and plays a free episode with no paywall", async () => {
     playback.mockResolvedValue(playable(true));
     render(<Player series={series} n={3} />);
-    expect(playback).toHaveBeenCalledWith("ceo-sahab", 3);
     expect(await screen.findByText(/Free episode 3/)).toBeInTheDocument();
+    expect(playback).toHaveBeenCalledWith("ceo-sahab", 3);
     expect(document.querySelector("video")).not.toBeNull();
     expect(screen.queryByText(/Unlock Episode/)).not.toBeInTheDocument();
   });
@@ -128,9 +132,10 @@ describe("Player — the server's playback answer decides", () => {
     expect(await screen.findByText(/Unlocked episode/)).toBeInTheDocument();
   });
 
-  it("does not ask the server until the wallet session is ready, and shows nothing locked meanwhile", () => {
+  it("does not ask the server until the wallet session is ready, and shows nothing locked meanwhile", async () => {
     mockWallet = makeWallet({ ready: false });
     render(<Player series={series} n={11} />);
+    await waitFor(() => expect(seriesDetail).toHaveBeenCalledWith("ceo-sahab"));
     expect(playback).not.toHaveBeenCalled();
     expect(screen.queryByText("Unlock Episode 11")).not.toBeInTheDocument();
     expect(document.querySelector("video")).toBeNull();
@@ -282,7 +287,7 @@ describe("Player — paywall rendered from the server payload", () => {
     playback.mockResolvedValue(paywall({ balance: 10 }));
     render(<Player series={series} n={11} />);
     expect(await screen.findByText(/you need 20 more/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Unlock for 30" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Unlock for 30 coins" })).toBeDisabled();
   });
 
   it("hides the bundle button when only one locked episode remains", async () => {
@@ -322,6 +327,33 @@ describe("SiteHeader", () => {
     expect(screen.queryByRole("link", { name: "My list" })).not.toBeInTheDocument();
   });
 
+  it("keeps every destination reachable behind a menu button (narrow screens)", async () => {
+    const user = userEvent.setup();
+    mockWallet = makeWallet({ ready: true, signed: true, name: "Meera" });
+    render(<SiteHeader />);
+    const toggle = screen.getByRole("button", { name: "Menu" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("navigation", { name: "Primary (menu)" })).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const menu = screen.getByRole("navigation", { name: "Primary (menu)" });
+    for (const label of ["Browse", "Search", "My list", "How coins work", "Coins", "Profile"])
+      expect(within(menu).getByRole("link", { name: label })).toBeInTheDocument();
+
+    // following a link closes the sheet
+    await user.click(within(menu).getByRole("link", { name: "Coins" }));
+    expect(screen.queryByRole("navigation", { name: "Primary (menu)" })).not.toBeInTheDocument();
+
+    // a guest is not offered a list or a profile
+    mockWallet = makeWallet({ ready: true, signed: false });
+    const guest = render(<SiteHeader />);
+    await user.click(within(guest.container).getByRole("button", { name: "Menu" }));
+    const guestMenu = within(guest.container).getByRole("navigation", { name: "Primary (menu)" });
+    expect(within(guestMenu).queryByRole("link", { name: "My list" })).not.toBeInTheDocument();
+    expect(within(guestMenu).queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
+  });
+
   it("shows 0 before the wallet is ready", () => {
     mockWallet = makeWallet({ ready: false, balance: 999 });
     render(<SiteHeader />);
@@ -334,18 +366,42 @@ describe("SiteFooter", () => {
     render(<SiteFooter />);
     expect(screen.getByRole("heading", { name: "Legal" })).toBeInTheDocument();
     expect(screen.getByText(/Grievance officer/)).toBeInTheDocument();
-    expect(screen.getByText(/© 2026 Katha Media/)).toBeInTheDocument();
+    expect(screen.getByText(/© 2026 Katha\./)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Creators" })).toHaveAttribute("href", "/#creators");
     expect(screen.getByRole("link", { name: "Brands and agencies" })).toHaveAttribute("href", "/#brands");
     expect(screen.getByRole("link", { name: "Browse series" })).toHaveAttribute("href", "/browse");
   });
+
+  it("never links a policy that has no page: unpublished items are plain text", () => {
+    render(<SiteFooter />);
+    for (const dead of ["Terms of Use", "Privacy Notice (DPDP)", "Refund & Cancellation Policy", "Careers"]) {
+      expect(screen.queryByRole("link", { name: dead })).not.toBeInTheDocument();
+    }
+    expect(document.querySelectorAll('a[href="#"]')).toHaveLength(0);
+    expect(screen.getByText("Terms of Use")).toHaveClass("pending");
+    // the one legal item that does have a destination keeps being a link
+    expect(screen.getByRole("link", { name: "Content ratings & parental controls" }))
+      .toHaveAttribute("href", "/#faq");
+  });
 });
 
 describe("fallback branches", () => {
-  it("an out-of-range episode number falls back to episode 1's title", async () => {
+  it("an out-of-range episode number falls back to episode 1", async () => {
     playback.mockResolvedValue(playable(true));
-    render(<Player series={series} n={9999} />);
-    expect(screen.getAllByText(new RegExp(series.episodes[0].title))[0]).toBeInTheDocument();
+    const titled = {
+      ...series,
+      episodes: [{ ...series.episodes[0], title: "The first board meeting" }, ...series.episodes.slice(1)],
+    };
+    render(<Player series={titled} n={9999} />);
+    expect((await screen.findAllByText(/The first board meeting/))[0]).toBeInTheDocument();
+  });
+
+  it("an untitled episode is not announced twice (E13 · Episode 13)", async () => {
+    playback.mockResolvedValue(playable(true));
+    const untitled = { ...series, episodes: [{ number: 13, title: "Episode 13", isFree: false, coinPrice: 30 }] };
+    render(<Player series={untitled} n={13} />);
+    expect(await screen.findByText("E13")).toBeInTheDocument();
+    expect(screen.queryByText(/E13 · Episode 13/)).not.toBeInTheDocument();
   });
 
   it("a signed-in wallet with no name gets the M avatar", () => {

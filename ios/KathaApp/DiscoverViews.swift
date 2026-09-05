@@ -28,34 +28,36 @@ struct BrowseView: View {
                 // language chips
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        filterChip("All", isOn: lang == nil) { lang = nil }
+                        filterChip(model.t("browse.all"), isOn: lang == nil) { lang = nil }
                         ForEach([("hi", "हिन्दी"), ("ta", "தமிழ்"), ("te", "తెలుగు")], id: \.0) { code, native in
                             filterChip(native, isOn: lang == code) { lang = code }
                         }
                     }
                     .padding(.horizontal, Katha.Spacing.lg)
                 }
+                .trailingFade()
                 // genre chips
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        filterChip("Everything", isOn: genre == nil) { genre = nil }
+                        filterChip(model.t("browse.everything"), isOn: genre == nil) { genre = nil }
                         ForEach(genres, id: \.self) { g in
                             filterChip(g, isOn: genre == g) { genre = g }
                         }
                     }
                     .padding(.horizontal, Katha.Spacing.lg)
                 }
+                .trailingFade()
 
                 if failed {
                     FeedErrorState(detail: nil) { await load() }
                 } else if filtered.isEmpty && !all.isEmpty {
-                    emptyState("Nothing here yet",
-                               "Try another genre — or switch language.")
+                    emptyState(model.t("browse.empty.title"), model.t("browse.empty.body"))
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 122), spacing: 12)],
-                              spacing: Katha.Spacing.lg) {
+                    // Three even columns: `.adaptive(minimum: 122)` yielded two
+                    // undersized posters and 50 pt gutters on a 402 pt phone.
+                    LazyVGrid(columns: PosterGrid.columns, spacing: Katha.Spacing.lg) {
                         ForEach(filtered) { s in
-                            NavigationLink(value: s.slug) { PosterCard(series: s) }
+                            NavigationLink(value: s.slug) { PosterCard(series: s, width: nil) }
                                 .buttonStyle(PressableStyle())
                         }
                     }
@@ -66,7 +68,7 @@ struct BrowseView: View {
             .padding(.vertical, Katha.Spacing.lg)
         }
         .background(Katha.Color.bg)
-        .navigationTitle("Browse")
+        .navigationTitle(model.t("browse.title"))
         .toolbarBackground(Katha.Color.bg, for: .navigationBar)
         .task { if all.isEmpty { await load() } }
     }
@@ -79,10 +81,11 @@ struct BrowseView: View {
     private func filterChip(_ label: String, isOn: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 13, weight: .medium))
+                .kathaFont(13, weight: .medium)
+                .lineLimit(1)
                 .foregroundStyle(isOn ? Katha.Color.text : Katha.Color.text2)
                 .padding(.horizontal, 12)
-                .frame(height: 32)
+                .kathaFrame(height: 32)
                 .background(isOn ? Katha.Color.accent.opacity(0.14) : Katha.Color.surface)
                 .overlay(Capsule().strokeBorder(isOn ? Katha.Color.accent : .clear, lineWidth: 1))
                 .clipShape(Capsule())
@@ -107,7 +110,7 @@ struct SearchView: View {
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass").foregroundStyle(Katha.Color.text2)
-            TextField("Series, people, tropes", text: $query)
+            TextField(model.t("search.placeholder"), text: $query)
                 .foregroundStyle(Katha.Color.text)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
@@ -117,11 +120,11 @@ struct SearchView: View {
                 Button { query = "" } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(Katha.Color.text2)
                 }
-                .accessibilityLabel("Clear search")
+                .accessibilityLabel(model.t("search.clear"))
             }
         }
         .padding(.horizontal, 14)
-        .frame(height: 46)
+        .kathaFrame(height: 46)
         .background(Katha.Color.surface)
         .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.md, style: .continuous))
     }
@@ -150,11 +153,10 @@ struct SearchView: View {
                 if query.isEmpty {
                     idle
                 } else if seriesResults.isEmpty && peopleResults.isEmpty && !searching {
-                    emptyState("No results for “\(query)”",
-                               "Check the spelling — or try a genre like Romance or Thriller.")
+                    emptyState(model.t("search.empty.title", query), model.t("search.empty.body"))
                 } else {
                     if !seriesResults.isEmpty {
-                        sectionLabel("Series")
+                        sectionLabel(model.t("search.series"))
                         ForEach(seriesResults) { s in
                             NavigationLink(value: s.slug) { seriesRow(s) }
                                 .buttonStyle(PressableStyle())
@@ -162,7 +164,7 @@ struct SearchView: View {
                         }
                     }
                     if !peopleResults.isEmpty {
-                        sectionLabel("People")
+                        sectionLabel(model.t("search.people"))
                         ForEach(peopleResults) { p in
                             NavigationLink(value: p) { personRow(p) }
                                 .buttonStyle(PressableStyle())
@@ -175,7 +177,7 @@ struct SearchView: View {
             .animation(Katha.Motion.snappy, value: seriesResults.map(\.slug))
         }
         .background(Katha.Color.bg)
-        .navigationTitle("Search")
+        .navigationTitle(model.t("search.title"))
         .toolbarBackground(Katha.Color.bg, for: .navigationBar)
         .task { if all.isEmpty { all = (try? await model.api.listSeries()) ?? [] } }
         .task(id: trimmed) {
@@ -196,22 +198,20 @@ struct SearchView: View {
     private var idle: some View {
         Group {
             if !recents.isEmpty {
-                Text("Recent")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Katha.Color.text)
+                sectionLabel(model.t("search.recent"))
                 FlowLayout(spacing: 8, lineSpacing: 8) {
                     ForEach(recents, id: \.self) { r in
                         Button { query = r } label: {
                             HStack(spacing: 5) {
                                 Image(systemName: "clock")
-                                    .font(.system(size: 11))
+                                    .kathaFont(11)
                                     .foregroundStyle(Katha.Color.text2)
                                 Text(r)
-                                    .font(.system(size: 13, weight: .medium))
+                                    .kathaFont(13, weight: .medium)
                                     .foregroundStyle(Katha.Color.text)
                             }
                             .padding(.horizontal, 12)
-                            .frame(height: 32)
+                            .kathaFrame(height: 32)
                             .background(Katha.Color.surface)
                             .clipShape(Capsule())
                         }
@@ -219,17 +219,15 @@ struct SearchView: View {
                     }
                 }
             }
-            Text("Trending")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Katha.Color.text)
+            sectionLabel(model.t("search.trending"))
             ForEach(all.prefix(5)) { s in
                 NavigationLink(value: s.slug) {
                     HStack {
                         Image(systemName: "flame").foregroundStyle(Katha.Color.accent)
                         Text(s.title).foregroundStyle(Katha.Color.text)
                         Spacer()
-                        Text("\(s.episodeCount) eps")
-                            .font(.system(size: 12)).foregroundStyle(Katha.Color.text2)
+                        Text(model.t("search.eps", s.episodeCount))
+                            .kathaFont(12).foregroundStyle(Katha.Color.text2)
                     }
                     .contentShape(Rectangle())
                 }
@@ -240,7 +238,7 @@ struct SearchView: View {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(Katha.Font.label(14))
+            .kathaLabel(14)
             .kerning(1.2)
             .foregroundStyle(Katha.Color.text2)
     }
@@ -252,15 +250,17 @@ struct SearchView: View {
                 .clipShape(RoundedRectangle(cornerRadius: Katha.Radius.sm, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(s.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .kathaFont(15, weight: .semibold)
                     .foregroundStyle(Katha.Color.text)
-                Text("\(s.primaryLanguage.uppercased()) · \(s.genres.first ?? "") · \(s.episodeCount) episodes")
-                    .font(.system(size: 12))
+                Text([s.primaryLanguage.uppercased(), s.genres.first ?? "",
+                      model.t("home.episodes", s.episodeCount)]
+                        .filter { !$0.isEmpty }.joined(separator: " · "))
+                    .kathaFont(12)
                     .foregroundStyle(Katha.Color.text2)
             }
             Spacer()
             Image(systemName: "chevron.right")
-                .font(.system(size: 12)).foregroundStyle(Katha.Color.text2)
+                .kathaFont(12).foregroundStyle(Katha.Color.text2)
         }
         .contentShape(Rectangle())          // the Spacer must be tappable too
     }
@@ -271,20 +271,20 @@ struct SearchView: View {
             ZStack {
                 Circle().fill(Katha.Color.accent.opacity(0.16)).frame(width: 44, height: 44)
                 Text(String(p.name.prefix(1)))
-                    .font(.system(size: 18, weight: .bold))
+                    .kathaFont(18, weight: .bold)
                     .foregroundStyle(Katha.Color.accent)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(p.name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .kathaFont(15, weight: .semibold)
                     .foregroundStyle(Katha.Color.text)
-                Text("\(p.role.isEmpty ? "Cast" : p.role) · \(p.series.count) series")
-                    .font(.system(size: 12))
+                Text("\(p.role.isEmpty ? model.t("person.cast") : p.role) · \(model.t("person.series", p.series.count))")
+                    .kathaFont(12)
                     .foregroundStyle(Katha.Color.text2)
             }
             Spacer()
             Image(systemName: "chevron.right")
-                .font(.system(size: 12)).foregroundStyle(Katha.Color.text2)
+                .kathaFont(12).foregroundStyle(Katha.Color.text2)
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
@@ -301,33 +301,33 @@ struct SearchView: View {
 
 /// A person from search: name, role, and the series they appear in.
 struct PersonView: View {
+    @Environment(AppModel.self) private var model
     let person: SearchPerson
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Katha.Spacing.lg) {
+                // The name is the (inline) navigation title; repeating it as a
+                // heading right underneath said it twice, so the header keeps
+                // the monogram and the role line only.
                 HStack(spacing: Katha.Spacing.md) {
                     ZStack {
-                        Circle().fill(Katha.Color.accent.opacity(0.16)).frame(width: 64, height: 64)
+                        Circle().fill(Katha.Color.accent.opacity(0.16))
+                            .kathaFrame(width: 64, height: 64)
                         Text(String(person.name.prefix(1)))
-                            .font(.system(size: 26, weight: .bold))
+                            .kathaFont(26, weight: .bold)
                             .foregroundStyle(Katha.Color.accent)
                     }
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(person.name)
-                            .font(Katha.Font.display(26))
-                            .foregroundStyle(Katha.Color.text)
-                        Text("\(person.role.isEmpty ? "Cast" : person.role) · \(person.series.count) series")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Katha.Color.text2)
-                    }
+                    Text("\(person.role.isEmpty ? model.t("person.cast") : person.role) · \(model.t("person.series", person.series.count))")
+                        .kathaFont(15)
+                        .foregroundStyle(Katha.Color.text2)
                 }
                 .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(person.name), \(person.role.isEmpty ? model.t("person.cast") : person.role)")
 
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 122), spacing: 12)],
-                          spacing: Katha.Spacing.lg) {
+                LazyVGrid(columns: PosterGrid.columns, spacing: Katha.Spacing.lg) {
                     ForEach(person.series) { s in
-                        NavigationLink(value: s.slug) { PosterCard(series: s) }
+                        NavigationLink(value: s.slug) { PosterCard(series: s, width: nil) }
                             .buttonStyle(PressableStyle())
                     }
                 }
@@ -350,37 +350,27 @@ struct MyListView: View {
     var body: some View {
         ScrollView {
             if model.myListSeries.isEmpty {
-                emptyState("Nothing saved yet",
-                           "Tap the bookmark on any series and it lands here.",
+                emptyState(model.t("mylist.empty.title"), model.t("mylist.empty.body"),
                            icon: "bookmark")
                     .padding(.top, 120)
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 122), spacing: 12)],
-                          spacing: Katha.Spacing.lg) {
+                LazyVGrid(columns: PosterGrid.columns, spacing: Katha.Spacing.lg) {
                     ForEach(model.myListSeries) { s in
                         VStack(alignment: .leading, spacing: 6) {
-                            NavigationLink(value: s.slug) { PosterCard(series: s) }
+                            NavigationLink(value: s.slug) { PosterCard(series: s, width: nil) }
                                 .buttonStyle(PressableStyle())
-                                // The bell sits on the poster (4.4 "Reminder on").
-                                .overlay(alignment: .topLeading) {
-                                    ReminderBell(slug: s.slug) { toast = $0 }
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .padding(6)
-                                        .background(Katha.Color.bg.opacity(0.6))
-                                        .clipShape(Circle())
-                                        .padding(7)
-                                }
-                            Text(model.t(model.reminderSlugs.contains(s.slug) ? "reminder.on" : "reminder.off"))
-                                .font(.system(size: 12))
-                                .foregroundStyle(model.reminderSlugs.contains(s.slug)
-                                                 ? Katha.Color.coin : Katha.Color.text2)
+                            // One control, and it looks like one: the caption
+                            // under the poster IS the reminder toggle, so it is
+                            // drawn as a capsule button with the bell glyph
+                            // rather than plain grey text.
+                            ReminderBell(slug: s.slug, style: .capsule) { toast = $0 }
                         }
                             .contextMenu {
                                 Button(role: .destructive) {
                                     Haptics.tap()
                                     Task { await model.toggleMyList(slug: s.slug) }
                                 } label: {
-                                    Label("Remove from My list", systemImage: "bookmark.slash")
+                                    Label(model.t("mylist.remove"), systemImage: "bookmark.slash")
                                 }
                             }
                     }
@@ -407,17 +397,17 @@ struct MyListView: View {
 
 // MARK: - shared empty state
 
-func emptyState(_ title: String, _ subtitle: String,
+@MainActor func emptyState(_ title: String, _ subtitle: String,
                 icon: String = "theatermasks") -> some View {
     VStack(spacing: 8) {
         Image(systemName: icon)
-            .font(.system(size: 34))
+            .kathaFont(34)
             .foregroundStyle(Katha.Color.text2)
         Text(title)
-            .font(.system(size: 17, weight: .semibold))
+            .kathaFont(17, weight: .semibold)
             .foregroundStyle(Katha.Color.text)
         Text(subtitle)
-            .font(.system(size: 14))
+            .kathaFont(14)
             .foregroundStyle(Katha.Color.text2)
             .multilineTextAlignment(.center)
     }
