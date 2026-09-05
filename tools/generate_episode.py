@@ -72,8 +72,14 @@ VOICES = {
     "nisha":    "FGY2WhTYpPnrIDTdsKH5",   # Laura   — female, distinct from Meera
     "default":  "pNInz6obpgDQGcFmaJgB",
 }
-LIPSYNC_MODEL = "fal-ai/latentsync"
-LIPSYNC_USD = 0.20          # flat, for clips well under 40s
+# Lip-sync backends: (endpoint, billing unit, rate, extra body fields).
+# latentsync is the cheap one and the softest; Sync Labs' lipsync-2 is the
+# quality option and barely dearer at these clip lengths.
+LIPSYNC_BACKENDS = {
+    "latentsync": ("fal-ai/latentsync",      "clip", 0.20,  {}),
+    "sync2":      ("fal-ai/sync-lipsync/v2", "sec",  0.050, {"model": "lipsync-2"}),
+    "sync2-pro":  ("fal-ai/sync-lipsync/v2", "sec",  0.083, {"model": "lipsync-2-pro"}),
+}
 VOICE_LEAD_S = 0.9          # beat of room tone before a line starts
 
 
@@ -378,34 +384,40 @@ def pad_voice(voice: Path, seconds: int, dest: Path, lead: float = VOICE_LEAD_S)
     return dest
 
 
-def lipsync(clip: Path, voice: Path, dest: Path) -> Path:
+def lipsync(clip: Path, voice: Path, dest: Path, backend: str = "sync2") -> Path:
     """Move the character's mouth to the generated line.
 
     Without this the actor stares while a voice plays over the top, which is what
-    made the first pilot read as a slideshow. Never fatal: if the model fails or
-    finds no face, the shot falls back to the un-synced take."""
+    made the first pilot read as a slideshow — the video models keep the mouth
+    shut however plainly the motion prompt says "she speaks". Never fatal: if the
+    model fails or finds no face, the shot falls back to the un-synced take.
+
+    The model only repaints the face it can find, so a wide shot yields a mouth a
+    few pixels across and the sync reads as mush. Frame dialogue tight."""
     if dest.exists():
         print(f"    · {dest.name} (cached)")
         return dest
+    endpoint, _, _, extra = LIPSYNC_BACKENDS[backend]
     hdr = {"Authorization": f"Key {env('FAL_KEY')}"}
 
     def call() -> None:
         body = {"video_url": fal_upload(clip, "video/mp4"),
-                "audio_url": fal_upload(voice, "audio/mpeg")}
-        sub = jpost(f"https://queue.fal.run/{LIPSYNC_MODEL}", body, hdr, timeout=180)
+                "audio_url": fal_upload(voice, "audio/mpeg"), **extra}
+        sub = jpost(f"https://queue.fal.run/{endpoint}", body, hdr, timeout=180)
         rid = sub["request_id"]
+        base = "/".join(endpoint.split("/")[:2])
         waited = 0
         while True:
             time.sleep(10)
             waited += 10
-            st = jget(f"https://queue.fal.run/{LIPSYNC_MODEL}/requests/{rid}/status", hdr)
+            st = jget(f"https://queue.fal.run/{base}/requests/{rid}/status", hdr)
             if st.get("status") == "COMPLETED":
                 break
             if st.get("status") == "FAILED":
                 raise RuntimeError(f"lipsync FAILED: {str(st)[:250]}")
             if waited > 900:
                 raise RuntimeError("lipsync timed out")
-        res = jget(f"https://queue.fal.run/{LIPSYNC_MODEL}/requests/{rid}", hdr)
+        res = jget(f"https://queue.fal.run/{base}/requests/{rid}", hdr)
         url = (res.get("video") or {}).get("url")
         if not url:
             raise RuntimeError(f"lipsync gave no url: {str(res)[:250]}")
@@ -561,6 +573,8 @@ def main() -> None:
     ap.add_argument("--image", choices=list(IMAGE_BACKENDS), default="openai")
     ap.add_argument("--stage", choices=["cast", "frames", "shots", "assemble", "all"], default="all")
     ap.add_argument("--only", help="comma-separated shot ids, e.g. s04,s08")
+    ap.add_argument("--lipsync", choices=list(LIPSYNC_BACKENDS), default="sync2",
+                    help="lip-sync model (default sync2: sharper than latentsync)")
     ap.add_argument("--no-lipsync", action="store_true",
                     help="skip the lip-sync pass (cheaper; mouths stay still)")
     ap.add_argument("--dry-run", action="store_true")
@@ -592,8 +606,12 @@ def main() -> None:
     print(f"  {len(shots)} shots · {total}s video + {beats['end_card']['seconds']}s end card")
     print(f"  video: {model} ({'native audio' if native_audio else 'silent + ElevenLabs'})")
     print(f"  image: {args.image}")
-    print(f"  dialogue: {n_lines} lines, {n_sync} lip-synced")
-    print(f"  estimate: ~${total * usd + n_img * 0.04 + n_sync * LIPSYNC_USD:.2f}\n")
+    print(f"  dialogue: {n_lines} lines, {n_sync} lip-synced via {args.lipsync}")
+    _, unit, rate, _ = LIPSYNC_BACKENDS[args.lipsync]
+    sync_secs = sum(secs(x) for x in shots if x.get("dialogue"))
+    sync_usd = 0.0 if not n_sync else (n_sync * rate if unit == "clip" else sync_secs * rate)
+    print(f"  estimate: ~${total * usd + n_img * 0.04 + sync_usd:.2f}"
+          f" (lip-sync {args.lipsync}: ${sync_usd:.2f})\n")
     if args.dry_run:
         for s in shots:
             who = ",".join(s["characters"]) or "insert"
@@ -655,7 +673,8 @@ def main() -> None:
                 vo = pad_voice(raw, secs(s), work / "voice" / f"{s['id']}_pad.mp3")
                 padded = True
                 if not args.no_lipsync:
-                    clip = lipsync(clip, vo, work / "shots" / f"{s['id']}_ls.mp4")
+                    clip = lipsync(clip, vo, work / "shots" / f"{s['id']}_ls.mp4",
+                                   args.lipsync)
             clip = lay_audio(clip, amb, vo, work / "cut" / f"{s['id']}_snd.mp4",
                              voice_predelayed=padded)
         final_clips.append(normalise(clip, work / "cut" / f"{s['id']}.mp4"))
