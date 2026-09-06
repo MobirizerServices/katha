@@ -24,6 +24,7 @@ The output is `{slug}_e{NN}.mp4`, exactly what tools/ingest_media.py consumes.
 
 Backends (--video / --image), chosen by which account is funded:
     video: fal-hailuo (default, cheapest) | fal-kling | fal-wan | veo
+           | kenburns (free, offline: animates the still, no video model)
     image: openai (default) | fal-flux | gemini
     lipsync: sync2 (default) | sync2-pro | latentsync | local (free, offline)
 
@@ -58,6 +59,10 @@ VIDEO_BACKENDS = {
     "fal-kling":  ("fal-ai/kling-video/v2.1/standard/image-to-video",  0.110, (5, 10)),
     "fal-wan":    ("fal-ai/wan/v2.2-a14b/image-to-video",              0.050, (5,)),
     "veo":        ("veo-3.1-fast-generate-preview",                    0.150, (4, 6, 8)),
+    # No model at all: animate the key frame locally with a slow push. Free, and
+    # the only option when every video account is out of credit. At six seconds
+    # a well-composed still with a drifting camera reads as a held shot.
+    "kenburns":   ("local-kenburns",                                   0.0,   (6, 8)),
 }
 NEGATIVE = ("on-screen text, subtitles, captions, watermark, logo, brand names, "
             "distorted hands, extra fingers, deformed face, warped features, "
@@ -295,13 +300,36 @@ def video_veo(model: str, prompt: str, frame: Path, seconds: int, dest: Path) ->
     print(f"    ✓ {dest.name} ({dest.stat().st_size // 1024} KB, {waited}s)")
 
 
+def video_kenburns(model: str, prompt: str, frame: Path, seconds: int, dest: Path) -> None:
+    """Animate a still locally: crop to 9:16, then drift the camera across it.
+
+    Six variants, picked deterministically from the shot id, so fourteen shots in
+    a row are not fourteen identical push-ins. Costs nothing and needs no model."""
+    variants = [
+        ("min(1+0.00090*on,1.14)", "iw/2-(iw/zoom/2)",              "ih/2-(ih/zoom/2)"),
+        ("max(1.14-0.00090*on,1)", "iw/2-(iw/zoom/2)",              "ih/2-(ih/zoom/2)"),
+        ("min(1+0.00075*on,1.12)", "iw/2-(iw/zoom/2)-on*0.16",      "ih/2-(ih/zoom/2)"),
+        ("min(1+0.00075*on,1.12)", "iw/2-(iw/zoom/2)+on*0.16",      "ih/2-(ih/zoom/2)"),
+        ("min(1+0.00080*on,1.13)", "iw/2-(iw/zoom/2)",              "ih/2-(ih/zoom/2)-on*0.20"),
+        ("min(1+0.00080*on,1.13)", "iw/2-(iw/zoom/2)",              "ih/2-(ih/zoom/2)+on*0.20"),
+    ]
+    z, x, y = variants[sum(dest.stem.encode()) % len(variants)]
+    run([ffmpeg(), "-y", "-hide_banner", "-loglevel", "error",
+         "-loop", "1", "-framerate", "24", "-t", str(seconds), "-i", str(frame),
+         "-vf", (f"crop='min(iw,ih*9/16)':ih,scale=1536:2730,"
+                 f"zoompan=z='{z}':x='{x}':y='{y}':d=1:s=768x1364:fps=24,setsar=1"),
+         "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+         "-pix_fmt", "yuv420p", str(dest)])
+    print(f"    ✓ {dest.name} ({dest.stat().st_size // 1024} KB, ken burns)")
+
+
 def gen_video(backend: str, prompt: str, frame: Path, seconds: int, dest: Path) -> Path:
     if dest.exists():
         print(f"    · {dest.name} (cached)")
         return dest
     model = VIDEO_BACKENDS[backend][0]
     dest.parent.mkdir(parents=True, exist_ok=True)
-    fn = video_veo if backend == "veo" else video_fal
+    fn = {"veo": video_veo, "kenburns": video_kenburns}.get(backend, video_fal)
     retry(dest.name, lambda: fn(model, prompt, frame, seconds, dest), tries=2, wait=20)
     return dest
 
@@ -646,7 +674,8 @@ def main() -> None:
         frames[s["id"]] = gen_image(
             args.image,
             f"{lead}{s['frame_prompt']} Style: {look}. Vertical 9:16 cinematic film still. "
-            f"No text, captions or watermark anywhere in the image.",
+            f"Absolutely no text of any kind in the image: no subtitles, no captions, no character names, no letters, no numbers, no watermark, "
+            f"no logo. The frame must be pure photography.",
             refs, work / "frames" / f"{s['id']}.png")
     if args.stage == "frames":
         return
