@@ -20,6 +20,10 @@ class SeriesSummary(BaseModel):
     content_rating: str = "U/A 16+"   # IT Rules 2021 self-classification
     cover_url: str = ""               # 9:16 poster (absolute; media origin from env)
     cover_wide_url: str = ""          # 16:9 billboard
+    # On the summary, not just the detail: a home card advertises one series'
+    # free run, and falling back to the global default prints "First 10 free"
+    # over a four-episode season.
+    free_episode_count: int = 0
 
 
 class CastMember(BaseModel):
@@ -32,7 +36,6 @@ class SeriesDetail(SeriesSummary):
     title_native: str = ""            # title in the series' own script
     tropes: list[str] = Field(default_factory=list)
     cast: list[CastMember] = Field(default_factory=list)
-    free_episode_count: int
     episode_coin_price: int
     bundle_discount_pct: int
     episodes: list[Episode]

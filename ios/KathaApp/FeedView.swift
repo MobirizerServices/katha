@@ -284,7 +284,8 @@ private struct HeroCard: View {
                         .multilineTextAlignment(.leading)
                         .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
                     Text(([series.genres.first, model.t("home.episodes", series.episodeCount),
-                           model.freeEpisodesDefault.map { model.t("home.firstFree", $0) }]
+                           series.freeEpisodeCount > 0 && series.freeEpisodeCount < series.episodeCount
+                               ? model.t("home.firstFree", series.freeEpisodeCount) : nil]
                         .compactMap { $0 }.filter { !$0.isEmpty }).joined(separator: " · "))
                         .kathaFont(13, weight: .medium)
                         .foregroundStyle(Katha.Color.text2)

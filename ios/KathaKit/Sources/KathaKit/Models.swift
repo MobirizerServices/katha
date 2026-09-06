@@ -13,6 +13,9 @@ public struct SeriesSummary: Codable, Hashable, Identifiable, Sendable {
     public let contentRating: String   // IT Rules self-classification, e.g. "U/A 16+"
     public let coverUrl: String        // 9:16 poster (absolute URL; empty when unset)
     public let coverWideUrl: String    // 16:9 billboard
+    /// How many of THIS series' episodes are free. A card must not fall back to
+    /// the global default: that prints "First 10 free" over a four-episode season.
+    public let freeEpisodeCount: Int
 
     public var id: String { slug }
 
@@ -23,15 +26,18 @@ public struct SeriesSummary: Codable, Hashable, Identifiable, Sendable {
         case contentRating = "content_rating"
         case coverUrl = "cover_url"
         case coverWideUrl = "cover_wide_url"
+        case freeEpisodeCount = "free_episode_count"
     }
 
     public init(slug: String, title: String, genres: [String], episodeCount: Int,
                 primaryLanguage: String, contentRating: String = "",
-                coverUrl: String = "", coverWideUrl: String = "") {
+                coverUrl: String = "", coverWideUrl: String = "",
+                freeEpisodeCount: Int = 0) {
         self.slug = slug; self.title = title; self.genres = genres
         self.episodeCount = episodeCount; self.primaryLanguage = primaryLanguage
         self.contentRating = contentRating
         self.coverUrl = coverUrl; self.coverWideUrl = coverWideUrl
+        self.freeEpisodeCount = freeEpisodeCount
     }
 
     public init(from decoder: Decoder) throws {
@@ -44,6 +50,7 @@ public struct SeriesSummary: Codable, Hashable, Identifiable, Sendable {
         contentRating = try c.decodeIfPresent(String.self, forKey: .contentRating) ?? ""
         coverUrl = try c.decodeIfPresent(String.self, forKey: .coverUrl) ?? ""
         coverWideUrl = try c.decodeIfPresent(String.self, forKey: .coverWideUrl) ?? ""
+        freeEpisodeCount = try c.decodeIfPresent(Int.self, forKey: .freeEpisodeCount) ?? 0
     }
 }
 

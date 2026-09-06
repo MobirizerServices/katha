@@ -2416,6 +2416,11 @@
             "title": "Cover Wide Url",
             "default": ""
           },
+          "free_episode_count": {
+            "type": "integer",
+            "title": "Free Episode Count",
+            "default": 0
+          },
           "synopsis": {
             "type": "string",
             "title": "Synopsis"
@@ -2438,10 +2443,6 @@
             },
             "type": "array",
             "title": "Cast"
-          },
-          "free_episode_count": {
-            "type": "integer",
-            "title": "Free Episode Count"
           },
           "episode_coin_price": {
             "type": "integer",
@@ -2467,7 +2468,6 @@
           "episode_count",
           "primary_language",
           "synopsis",
-          "free_episode_count",
           "episode_coin_price",
           "bundle_discount_pct",
           "episodes"
@@ -2513,6 +2513,11 @@
             "type": "string",
             "title": "Cover Wide Url",
             "default": ""
+          },
+          "free_episode_count": {
+            "type": "integer",
+            "title": "Free Episode Count",
+            "default": 0
           }
         },
         "type": "object",

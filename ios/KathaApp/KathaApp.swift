@@ -676,6 +676,13 @@ struct MainTabView: View {
                     homePath.append(EpisodeRoute(slug: String(parts[0]), number: n))
                 }
             }
+            // Sibling hook: KATHA_OPEN="slug" lands on the series page instead of
+            // the player, so the episode list can be checked on a device where
+            // nothing can tap.
+            if let slug = ProcessInfo.processInfo.environment["KATHA_OPEN"], !slug.isEmpty {
+                try? await Task.sleep(for: .milliseconds(500))
+                homePath.append(slug)
+            }
             consumePendingRoute()   // notification tapped before the UI existed
         }
         .onChange(of: model.pendingRoute) { _, route in

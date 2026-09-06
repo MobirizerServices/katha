@@ -19,7 +19,7 @@
       "title_native": "काँच का महल",
       "title_meaning": "The Glass Mansion",
       "tagline": "Kabir has no brother.",
-      "synopsis": "Meera, newly married into a Lucknow haveli, finds a stranger standing beside her husband in every wedding photograph. The family insists no such man exists. He is at the door.",
+      "synopsis": "Two years after her elder sister died as a bride in the Rathore haveli, Meera enters that house under a false name as the new bride — to prove it was murder. She has forty days until the Sharad puja settles the estate.",
       "primary_language": "hi",
       "language_name": "Hindi",
       "genres": [
@@ -27,7 +27,8 @@
       ],
       "tropes": [
         "in-laws saga",
-        "hidden identity"
+        "hidden identity",
+        "revenge"
       ],
       "budget_tier": "B",
       "release_mode": "drip",
@@ -67,28 +68,28 @@
       "episodes": [
         {
           "number": 1,
-          "title": "One face too many",
+          "title": "Dobara",
           "is_free": true,
           "coin_price": 0,
           "is_cliff": false
         },
         {
           "number": 2,
-          "title": "The seventh plate",
+          "title": "Nisha",
           "is_free": true,
           "coin_price": 0,
           "is_cliff": false
         },
         {
           "number": 3,
-          "title": "The damp page",
+          "title": "The torn corners",
           "is_free": true,
           "coin_price": 0,
           "is_cliff": false
         },
         {
           "number": 4,
-          "title": "The umbrella",
+          "title": "Kheer",
           "is_free": true,
           "coin_price": 0,
           "is_cliff": false

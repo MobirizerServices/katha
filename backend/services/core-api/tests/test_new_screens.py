@@ -244,7 +244,7 @@ def test_continue_limit_and_full_list_fields():
     assert [i["slug"] for i in full] == ["vetri-vaasal", "ceo-sahab", "kaanch-ka-mahal"]
     kkm = full[-1]
     assert kkm["title"] == kkm["series_title"] == "Kaanch Ka Mahal"
-    assert kkm["episode_title"] == "The damp page" and kkm["percent"] == 8
+    assert kkm["episode_title"] == "The torn corners" and kkm["percent"] == 8
     assert kkm["cover_url"].startswith("http") and "/cover_9x16.jpg" in kkm["cover_url"]
     assert "/cover_16x9.jpg" in kkm["cover_wide_url"]
     assert kkm["updated_at"].startswith("20")

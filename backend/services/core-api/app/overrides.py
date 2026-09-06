@@ -135,11 +135,40 @@ def is_served(slug: str) -> bool:
     return (store.kv(f"status:{slug}") or "live") == "live"
 
 
+def released_count(slug: str, full: int) -> int:
+    """How many episodes of a drip season have actually been released.
+
+    A season is written and priced long before it is shot. Without this the
+    catalogue advertises the whole order — sixty episodes — and a viewer who
+    taps episode five falls into a hole where no media exists. Set
+    ``released:{slug}`` from the back office as each episode ships; unset means
+    the whole run is live, which is the right default for a finished title."""
+    from .store import store
+    raw = store.kv(f"released:{slug}")
+    if raw is None:
+        return full
+    try:
+        return max(0, min(int(raw), full))
+    except (TypeError, ValueError):
+        return full
+
+
 def get_series(slug: str) -> SeriesDetail | None:
     """The one lookup every money path uses: seed or panel-drafted series,
-    with panel pricing applied and versioned cover URLs."""
+    with panel pricing applied, versioned cover URLs, and unreleased episodes
+    trimmed off the end."""
     s = catalog.get_series(slug) or draft_series(slug)
-    return stamp_covers(apply_pricing(s)) if s is not None else None
+    if s is None:
+        return None
+    s = stamp_covers(apply_pricing(s))
+    n = released_count(slug, s.episode_count)
+    if n < s.episode_count:
+        s = s.model_copy(update={
+            "episode_count": n,
+            "episodes": s.episodes[:n],
+            "free_episode_count": min(s.free_episode_count, n),
+        })
+    return s
 
 
 def all_summaries() -> list[SeriesSummary]:
@@ -153,4 +182,14 @@ def all_summaries() -> list[SeriesSummary]:
         if d is not None:
             out.append(SeriesSummary(**{k: getattr(d, k)
                                         for k in SeriesSummary.model_fields}))
-    return [stamp_covers(s) for s in out]
+
+    def trim(s: SeriesSummary) -> SeriesSummary:
+        # The card and the series page must agree, or a title advertises sixty
+        # episodes on the home row and offers four when you open it.
+        n = released_count(s.slug, s.episode_count)
+        if n == s.episode_count:
+            return s
+        return s.model_copy(update={"episode_count": n,
+                                    "free_episode_count": min(s.free_episode_count, n)})
+
+    return [trim(stamp_covers(s)) for s in out]

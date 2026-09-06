@@ -55,7 +55,10 @@ def all_series() -> list[SeriesDetail]:
                 title_native=s.get("title_native") or "",
                 tropes=s.get("tropes", []),
                 cast=[CastMember(**c) for c in s.get("cast", [])],
-                free_episode_count=prof["free_episode_count"],
+                # A series can be shorter than the pricing profile's free run
+                # (a season still in production), and "10 free" on a 4-episode
+                # title is nonsense — never promise more than exists.
+                free_episode_count=min(prof["free_episode_count"], s["episode_count"]),
                 episode_coin_price=prof["episode_coin_price"],
                 bundle_discount_pct=prof["bundle_discount_pct"],
                 episodes=[Episode(**e) for e in s["episodes"]],
