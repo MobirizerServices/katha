@@ -130,7 +130,15 @@ def blend_lips(src: Path, w2l: Path, dest: Path) -> bool:
         # falls from 34% of the source (lips) to 11% (lips+chin) to 2% (full
         # jaw), while the visible mouth motion barely changes. The wider masks
         # simply drag Wav2Lip's 96x96 output across the whole lower face.
-        # Revisit only behind a face-restoration pass on the generated mouth.
+        #
+        # A face-restoration pass was the obvious way to buy that back, and it
+        # was tried. GFPGAN v1.4 over the Wav2Lip output lifts mouth-region
+        # sharpness from 6.7 to 10.0, against 389 in the untouched source: a real
+        # gain on Wav2Lip, still thirty-nine times short of the frame it has to
+        # sit inside, at ~2 s/frame on CPU (35 min per episode). It also smooths
+        # everything else — GFPGAN's prior is young, clean skin, and it took the
+        # age off a 58-year-old character — and returns a glossy mouth that reads
+        # worse against weathered skin than a soft one does. Not pursued.
         hull = cv2.convexHull(pts)
         m = np.zeros((H, W), np.uint8)
         cv2.fillConvexPoly(m, hull, 255)
