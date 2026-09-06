@@ -1,0 +1,167 @@
+{
+  "slug": "kaanch-ka-mahal",
+  "episode": 3,
+  "title": "The torn corners",
+  "language": "hi",
+  "logline": "The family feeds Arun in the courtyard like a guest. He tells Meera to ask them why no photograph of him exists after 2023 — and that night she finds every album page with its corner torn away.",
+  "look": "Indian family drama, Lucknow haveli, warm tungsten and hard window light, carved teak furniture, jaali screens, dust in the light shafts, shallow depth of field, cinematic 35mm anamorphic, muted ochre and deep green palette, film grain, no on-screen text, no logos, no artwork on walls",
+  "characters": {
+    "meera": {
+      "name": "Meera",
+      "ref_prompt": "Photorealistic portrait of a 27-year-old North Indian woman, warm brown skin, large expressive dark eyes, long dark hair partly covered by a soft red-and-gold wedding dupatta, minimal gold jewellery, black-beaded mangalsutra, deep red bridal saree. Composed and watchful, the face of someone concealing something. Natural window light from camera left, warm haveli interior behind her, shallow depth of field. Looking straight at the lens, mouth closed, neutral expression. Head and shoulders, vertical 9:16 framing."
+    },
+    "sushila": {
+      "name": "Sushila",
+      "ref_prompt": "Photorealistic portrait of a 58-year-old North Indian woman, silver-streaked black hair pulled into a tight low bun, plain starched cotton saree in muted olive with a thin border, small gold earrings, thin gold bangles. No smile. Authority without warmth, eyes that give nothing away, deep lines at the mouth. Dim warm tungsten light in an old haveli corridor, shallow depth of field. Looking straight at the lens, mouth closed. Head and shoulders, vertical 9:16 framing."
+    },
+    "kabir": {
+      "name": "Kabir",
+      "ref_prompt": "Photorealistic portrait of a 33-year-old North Indian man, clean-shaven with faint stubble, side-parted black hair, tired guarded eyes, well-cut charcoal kurta. Handsome, decent, exhausted by something he will not name. Warm interior light, shallow depth of field. Looking straight at the lens, mouth closed, neutral expression. Head and shoulders, vertical 9:16 framing."
+    },
+    "arun": {
+      "name": "Arun",
+      "ref_prompt": "Photorealistic portrait of a 34-year-old North Indian man, close-cropped black beard, knowing amused eyes, plain dark kurta, broader and more weathered than his younger brother. Unhurried, faintly entertained, entirely unbothered. Warm daylight, shallow depth of field. Looking straight at the lens, mouth closed. Head and shoulders, vertical 9:16 framing."
+    }
+  },
+  "shots": [
+    {
+      "id": "s01",
+      "beat": 1,
+      "characters": ["arun"],
+      "frame_prompt": "Wide vertical shot at dusk of an open haveli courtyard with a worn stone floor. In the foreground a 34-year-old bearded North Indian man in a plain dark kurta sits alone at a small low table eating from a plain steel plate. Behind him, through a tall lit window, a family is visible seated together around a long table indoors in warm yellow light. He is outside the light; they are inside it. Deep blue dusk above, warm tungsten spill from the window.",
+      "motion": "He eats slowly and without hurry, not looking towards the lit window behind him. Inside, the family's silhouettes shift at their table. Moths turn in the window light. Very slow push-in on him.",
+      "audio": "Evening courtyard tone, crickets starting, the faint clatter of plates and indistinct family conversation muffled behind glass, a steel spoon on a steel plate.",
+      "duration": 6
+    },
+    {
+      "id": "s02",
+      "beat": 1,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera, a 27-year-old woman in a deep red saree and dupatta, standing in shadow beside a carved stone pillar at the edge of the courtyard, half her face lit warm from the window spill and half in darkness, watching something off camera. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. She is not speaking.",
+      "motion": "She watches without moving, then glances back over her shoulder towards the house to check she is unobserved, and looks forward again. Camera static.",
+      "audio": "Evening courtyard tone, crickets, distant plates, her own quiet breathing.",
+      "duration": 6
+    },
+    {
+      "id": "s03",
+      "beat": 2,
+      "characters": ["arun"],
+      "frame_prompt": "Tight vertical close-up of Arun, a 34-year-old North Indian man with a close-cropped black beard in a plain dark kurta, seated at the low table in the dusk courtyard, facing camera, warm tungsten spill on one side of his face and blue dusk on the other. His head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Wry, entirely unsurprised that she has come.",
+      "motion": "He does not look up at first, then raises his eyes to camera and speaks, his mouth moving clearly, with the ghost of a smile. Camera static.",
+      "audio": "Evening courtyard tone, crickets, a steel spoon set down on a plate.",
+      "dialogue": { "speaker": "arun", "hi": "बहू को मेहमान से बात नहीं करनी चाहिए.", "en": "The bahu shouldn't be talking to the guest." },
+      "duration": 6
+    },
+    {
+      "id": "s04",
+      "beat": 2,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera in a deep red saree and dupatta, standing in the dusk courtyard facing camera, lit warm from one side by the window spill, deep blue evening behind her. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Direct, unafraid.",
+      "motion": "She steps closer and speaks, her mouth moving clearly, her eyes steady on camera. A small challenging lift of the chin at the end. Camera static.",
+      "audio": "Evening courtyard tone, crickets, a footstep on worn stone.",
+      "dialogue": { "speaker": "meera", "hi": "मेहमान? तुम तो इस घर के बेटे हो.", "en": "Guest? You're a son of this house." },
+      "duration": 6
+    },
+    {
+      "id": "s05",
+      "beat": 3,
+      "characters": ["arun"],
+      "frame_prompt": "Tight vertical close-up of Arun, 34, close-cropped beard, dark kurta, in the dusk courtyard facing camera, warm light on one side of his face. His head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. The amusement has gone out of him.",
+      "motion": "He looks at camera for a long beat and speaks one short word, his mouth moving clearly. His expression does not change afterwards. Camera holds with the smallest push-in.",
+      "audio": "Crickets, evening tone, complete stillness in the courtyard.",
+      "dialogue": { "speaker": "arun", "hi": "था.", "en": "I was." },
+      "duration": 6
+    },
+    {
+      "id": "s06",
+      "beat": 3,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera in the dusk courtyard facing camera, deep red dupatta framing her face, warm spill on one cheek, blue dusk behind. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Pushing, quietly.",
+      "motion": "She speaks, her mouth moving clearly, holding camera's gaze without blinking. Camera static.",
+      "audio": "Crickets, faint plates indoors, evening tone.",
+      "dialogue": { "speaker": "meera", "hi": "दो साल पहले क्या हुआ था?", "en": "What happened two years ago?" },
+      "duration": 6
+    },
+    {
+      "id": "s07",
+      "beat": 4,
+      "characters": ["arun"],
+      "frame_prompt": "Tight vertical close-up of Arun, 34, close-cropped beard, dark kurta, facing camera in the dusk courtyard, warm tungsten on one side of his face. His head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Giving her the only thing he intends to give her tonight.",
+      "motion": "He leans very slightly forward and speaks the full line, his mouth moving clearly and unhurriedly. On the last word he sits back again. Camera holds.",
+      "audio": "Crickets, evening courtyard tone, nothing indoors any more.",
+      "dialogue": { "speaker": "arun", "hi": "उनसे पूछो कि दो हज़ार तेईस के बाद मेरी एक भी तस्वीर क्यों नहीं है.", "en": "Ask them why there isn't one photograph of me after 2023." },
+      "duration": 6
+    },
+    {
+      "id": "s08",
+      "beat": 4,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera's face in the dusk courtyard, deep red dupatta, warm spill on one side, blue evening behind. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Taking the instruction in and already halfway back to the house with it.",
+      "motion": "Her eyes move off camera as she works it through, then come back and hold. She does not speak. One breath. Camera pushes in slowly.",
+      "audio": "Crickets, evening tone, one quiet breath.",
+      "duration": 6
+    },
+    {
+      "id": "s09",
+      "beat": 5,
+      "characters": [],
+      "frame_prompt": "Vertical medium insert of a heavy maroon velvet wedding album open on a bed of deep red bedding in a dim haveli bedroom at night, lit only by a low brass table lamp at the edge of frame. A woman's hands with mehndi and red-and-gold bangles hold the album open. Warm pooled lamplight, everything beyond it in darkness.",
+      "motion": "Her hands turn a thick page, then another, faster. The lamp flame steadies. Camera pushes slowly down towards the open page.",
+      "audio": "Thick album paper turning, plastic film crackling, a quiet night house, a ceiling fan turning slowly.",
+      "duration": 6
+    },
+    {
+      "id": "s10",
+      "beat": 5,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of one thick album page under warm lamplight: a square colour family photograph of Indian people at a celebration, held under a plastic film — and one corner of the photograph has been cut cleanly away, leaving a neat triangular gap of white backing card where a person used to stand. Visible grain, warm lamp glow, deep shadow around the edges of frame.",
+      "motion": "The camera pushes slowly in on the cut corner until the empty triangle fills much of the frame. Nothing else moves.",
+      "audio": "Near silence, one page settling, a ceiling fan far off, a low tone rising very slightly.",
+      "duration": 6
+    },
+    {
+      "id": "s11",
+      "beat": 6,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of a different album page under warm lamplight, and again one corner of the photograph has been cut cleanly out, leaving the same neat triangular gap. Beneath it the edge of a third photograph is visible with an identical missing corner. Thick card, plastic film, warm lamp glow, grain.",
+      "motion": "A hand turns the page quickly and the next photograph has the same corner missing, and the next. The turning gets faster. Camera holds tight on the pages.",
+      "audio": "Pages turning faster and faster, plastic film crackling, breathing quickening, the low tone climbing.",
+      "duration": 6
+    },
+    {
+      "id": "s12",
+      "beat": 6,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera's face in the dim bedroom at night, lit from below and one side by a low brass lamp, deep shadow behind her, the album open out of focus at the bottom edge of frame. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame.",
+      "motion": "Her eyes move across the page and stop. She speaks under her breath, barely aloud, her mouth moving clearly. She does not look up. Camera pushes in very slowly.",
+      "audio": "Night house silence, a ceiling fan, one page settling.",
+      "dialogue": { "speaker": "meera", "hi": "हर एक तस्वीर में.", "en": "In every single one." },
+      "duration": 6
+    },
+    {
+      "id": "s13",
+      "beat": 7,
+      "characters": ["sushila"],
+      "frame_prompt": "Tight vertical close-up of Sushila, 58, silver-streaked low bun, muted olive cotton saree, standing in a dark bedroom doorway at night, lit dimly and coldly from the corridor behind her so her face is mostly shadow with a hard rim of light along one side. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame.",
+      "motion": "She appears in the doorway without a sound and speaks quietly, her mouth moving clearly. Her eyes drop from camera to something low in the room. Camera static.",
+      "audio": "Complete night silence, a ceiling fan, no footsteps at all before she speaks.",
+      "dialogue": { "speaker": "sushila", "hi": "देर हो गई है, बहू.", "en": "It's late, bahu." },
+      "duration": 6
+    },
+    {
+      "id": "s14",
+      "beat": 7,
+      "characters": ["sushila"],
+      "frame_prompt": "Tight vertical close-up of Sushila's face at night, 58, silver-streaked bun, olive saree, a hard cold rim of corridor light down one side of her face and the rest in deep shadow. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Looking down at something with no expression whatsoever.",
+      "motion": "She looks down towards the open album, then lifts her eyes to camera and speaks flatly. On the final word everything about her stops and the image holds and freezes on her face.",
+      "audio": "Absolute silence, then a single low sub-bass hit on the last word.",
+      "dialogue": { "speaker": "sushila", "hi": "कुछ चीज़ें काटनी ही पड़ती हैं.", "en": "Some things have to be cut out." },
+      "duration": 6
+    }
+  ],
+  "end_card": {
+    "line_hi": "अगली सुबह सुशीला ने उसे रसोई में बुलाया।",
+    "line_en": "The next morning, Sushila called her to the kitchen.",
+    "seconds": 4
+  }
+}
