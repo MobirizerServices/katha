@@ -1,0 +1,167 @@
+{
+  "slug": "kaanch-ka-mahal",
+  "episode": 5,
+  "title": "The locked room",
+  "language": "hi",
+  "logline": "Meera takes the keys and opens her sister's old room, repainted and stripped bare. Under a loose floorboard she finds Nisha's hairpin — and Sushila, in the doorway, says she never found it herself.",
+  "look": "Indian family drama, old Lucknow haveli at night, torchlight and moonlight through shutters, fresh white paint over old wood, dust, bare floorboards, shallow depth of field, cinematic 35mm anamorphic, deep green and cold blue shadows against warm torch beam, film grain, no on-screen text, no logos, no artwork on walls",
+  "characters": {
+    "meera": {
+      "name": "Meera",
+      "ref_prompt": "Photorealistic portrait of a 27-year-old North Indian woman, warm brown skin, large expressive dark eyes, long dark hair partly covered by a soft red-and-gold wedding dupatta, minimal gold jewellery, black-beaded mangalsutra, deep red bridal saree. Composed and watchful, the face of someone concealing something. Natural window light from camera left, warm haveli interior behind her, shallow depth of field. Looking straight at the lens, mouth closed, neutral expression. Head and shoulders, vertical 9:16 framing."
+    },
+    "sushila": {
+      "name": "Sushila",
+      "ref_prompt": "Photorealistic portrait of a 58-year-old North Indian woman, silver-streaked black hair pulled into a tight low bun, plain starched cotton saree in muted olive with a thin border, small gold earrings, thin gold bangles. No smile. Authority without warmth, eyes that give nothing away, deep lines at the mouth. Dim warm tungsten light in an old haveli corridor, shallow depth of field. Looking straight at the lens, mouth closed. Head and shoulders, vertical 9:16 framing."
+    },
+    "kabir": {
+      "name": "Kabir",
+      "ref_prompt": "Photorealistic portrait of a 33-year-old North Indian man, clean-shaven with faint stubble, side-parted black hair, tired guarded eyes, well-cut charcoal kurta. Handsome, decent, exhausted by something he will not name. Warm interior light, shallow depth of field. Looking straight at the lens, mouth closed, neutral expression. Head and shoulders, vertical 9:16 framing."
+    },
+    "arun": {
+      "name": "Arun",
+      "ref_prompt": "Photorealistic portrait of a 34-year-old North Indian man, close-cropped black beard, knowing amused eyes, plain dark kurta, broader and more weathered than his younger brother. Unhurried, faintly entertained, entirely unbothered. Warm daylight, shallow depth of field. Looking straight at the lens, mouth closed. Head and shoulders, vertical 9:16 framing."
+    }
+  },
+  "shots": [
+    {
+      "id": "s01",
+      "beat": 1,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of a heavy iron ring of old worn keys hanging from a bent nail on a dark distempered wall in a narrow haveli passage at night. A young woman's hand with red-and-gold bangles reaches in and closes around the keys, muffling them against her palm to stop them ringing. Cold blue moonlight from one side, deep darkness around. Only the hand, the keys and the wall in frame.",
+      "motion": "The fingers close around the bunch of keys and lift them off the nail with great care, holding them still so they do not chime, then withdraw out of frame. The bent nail is left empty. Slight handheld tension.",
+      "audio": "Iron keys shifting once and being muffled, a very quiet sleeping house, a ceiling fan turning somewhere far off, one distant dog.",
+      "duration": 6
+    },
+    {
+      "id": "s02",
+      "beat": 1,
+      "characters": ["kabir"],
+      "frame_prompt": "Tight vertical close-up of Kabir, a 33-year-old North Indian man with faint stubble in a charcoal kurta, standing in a dark haveli corridor at night, lit dimly and warmly from one low source at camera left, the rest of him in shadow. His head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Tired and already losing this argument.",
+      "motion": "He looks at camera and speaks quietly, his mouth moving clearly. His eyes go to something low in frame, the keys, and come back. Camera static.",
+      "audio": "A silent sleeping house at night, a ceiling fan, two people keeping their voices down.",
+      "dialogue": { "speaker": "kabir", "hi": "उस कमरे की चाबी नहीं है.", "en": "There's no key to that room." },
+      "duration": 6
+    },
+    {
+      "id": "s03",
+      "beat": 2,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera, a 27-year-old woman in a deep red saree with her dupatta loose over her shoulder, standing in the dark corridor facing camera, lit dimly and warmly from one low source, deep darkness behind her. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame.",
+      "motion": "She speaks quietly and evenly, her mouth moving clearly, holding camera's gaze. She does not blink. Camera static.",
+      "audio": "Night house silence, a ceiling fan far off.",
+      "dialogue": { "speaker": "meera", "hi": "हर कमरे की चाबी होती है.", "en": "Every room has a key." },
+      "duration": 6
+    },
+    {
+      "id": "s04",
+      "beat": 2,
+      "characters": ["kabir"],
+      "frame_prompt": "Tight vertical close-up of Kabir in the dark corridor at night, 33, faint stubble, charcoal kurta, dim warm light on one side of his face. His head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Asking rather than ordering, and knowing it will not work.",
+      "motion": "He speaks quietly, his mouth moving clearly, his eyes searching camera's face. On the last word his shoulders drop very slightly. Camera static.",
+      "audio": "Night silence, a ceiling fan, a floorboard settling somewhere in the house.",
+      "dialogue": { "speaker": "kabir", "hi": "मीरा. रहने दो. मेरे लिए.", "en": "Meera. Leave it. For me." },
+      "duration": 6
+    },
+    {
+      "id": "s05",
+      "beat": 3,
+      "characters": [],
+      "frame_prompt": "Close-up insert, vertical, of an old carved wooden door in a haveli corridor at night that has been crudely painted over with flat white distemper, the paint filling the carving and running in dried streaks. A new shiny brass padlock hangs on a new hasp screwed into the old wood, the bright screws obviously recent against the aged frame. Cold moonlight from one side, warm torch beam entering from the other.",
+      "motion": "A torch beam swings across the door and settles on the new padlock, which is the only bright new thing in the frame. Dust drifts in the beam. Camera pushes slowly in on the lock.",
+      "audio": "A quiet night corridor, a torch switch clicking, a ceiling fan turning far away.",
+      "duration": 6
+    },
+    {
+      "id": "s06",
+      "beat": 3,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of a young woman's hands with mehndi and red-and-gold bangles fitting a small worn iron key into a bright new brass padlock in the dark, lit hard from one side by a torch held awkwardly under her wrist. Everything beyond the lock is black. Grain, dust in the beam.",
+      "motion": "The key goes in, resists, then turns with a heavy metallic give and the shackle springs open. Her hands go still for a moment before lifting it away. Slight handheld tremble.",
+      "audio": "A key scraping into a lock, the heavy click of a padlock giving, a sharp indrawn breath, night silence.",
+      "duration": 6
+    },
+    {
+      "id": "s07",
+      "beat": 4,
+      "characters": [],
+      "frame_prompt": "Vertical shot from the dark corridor of the painted-over door swinging slowly inward into a completely black room, a warm torch beam pushing into the darkness ahead of it and finding bare floorboards and the corner of a stripped iron bed frame. Dust hanging thick in the beam. Cold blue night behind camera, absolute black ahead.",
+      "motion": "The door swings inward and the torch beam sweeps slowly across bare floorboards and up onto a stripped bed frame, disturbed dust boiling through the light. The camera moves forward through the doorway.",
+      "audio": "Old hinges giving way with a low groan, a footstep on bare board, absolute silence inside the room, dust.",
+      "duration": 6
+    },
+    {
+      "id": "s08",
+      "beat": 4,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera's face in a pitch-dark room at night, lit only from below and one side by a torch she is holding low, so the light rakes upward across her features and everything behind her is absolute black. Deep red saree, dupatta fallen back off her hair. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame.",
+      "motion": "Her eyes move across the dark room. She speaks one word, barely aloud, her mouth moving clearly. Nothing answers. Camera holds very still.",
+      "audio": "Absolute room silence, dust, one whispered word swallowed by a bare room, her breathing.",
+      "dialogue": { "speaker": "meera", "hi": "दीदी?", "en": "Didi?" },
+      "duration": 6
+    },
+    {
+      "id": "s09",
+      "beat": 5,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera's face in the dark stripped room, torch-lit hard from one side, the bare freshly-whitewashed wall visible behind her shoulder with nothing on it at all. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Understanding what the emptiness means.",
+      "motion": "She turns her head slowly, taking in the whole bare room, and speaks flatly, her mouth moving clearly. Her jaw sets on the last word. Camera static.",
+      "audio": "Bare room with a hard flat echo, a footstep on board, dust.",
+      "dialogue": { "speaker": "meera", "hi": "कुछ भी नहीं छोड़ा.", "en": "They left nothing at all." },
+      "duration": 6
+    },
+    {
+      "id": "s10",
+      "beat": 5,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of a young woman's palm and fingers with red-and-gold bangles pressing down flat on bare dusty floorboards in torchlight, testing them one board at a time. One board sits very slightly proud of the others, its edge darker with old handling. Hard raking torch beam across the grain of the wood, black beyond.",
+      "motion": "Her hand presses down on one board, then the next, then a third — and that one rocks and gives under her palm with a small movement. Her hand stops on it. Camera very tight, slight handheld.",
+      "audio": "Palms on dry old wood, dust, one board knocking softly and rocking in its place, breathing.",
+      "duration": 6
+    },
+    {
+      "id": "s11",
+      "beat": 6,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of a loose floorboard being lifted free of a dark cavity in torchlight, a young woman's fingers with red-and-gold bangles hooked under its edge. Below it a shallow black recess between joists, thick with grey dust and cobweb. Hard torch beam, everything else black.",
+      "motion": "The board lifts away and out of frame, and the torch beam drops into the dark cavity beneath, dust rolling up through the light. Something small catches the beam down in the dust. Camera pushes down into the hole.",
+      "audio": "Dry wood grinding and lifting free, dust falling, a torch beam's silence, one caught breath.",
+      "duration": 6
+    },
+    {
+      "id": "s12",
+      "beat": 6,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera's face lit hard from below by a torch pointed down into a floor cavity, so the light throws her features upward and everything behind her is black. Deep red saree, dust on her hands and forearms. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame.",
+      "motion": "She looks down into the cavity and stops moving entirely. She speaks one word, barely aloud, her mouth moving clearly. Camera pushes in slowly on her eyes.",
+      "audio": "Absolute silence, dust settling, one breath catching.",
+      "dialogue": { "speaker": "meera", "hi": "यहाँ.", "en": "Here." },
+      "duration": 6
+    },
+    {
+      "id": "s13",
+      "beat": 7,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera's face in the dark room, torch-lit from below, holding up close to her own face a small tarnished silver hairpin with a tiny worn enamel flower on it, grey with dust. Her fingers and the hairpin are visible at the lower edge of frame, her face above and behind it. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Two years of certainty arriving at once.",
+      "motion": "She turns the hairpin slowly in the torch beam, and her composure goes. She speaks, her mouth moving clearly, her eyes filling. Camera holds absolutely still.",
+      "audio": "Absolute silence, one unsteady breath, dust.",
+      "dialogue": { "speaker": "meera", "hi": "ये तुम्हारा था.", "en": "This was yours." },
+      "duration": 6
+    },
+    {
+      "id": "s14",
+      "beat": 7,
+      "characters": ["sushila"],
+      "frame_prompt": "Tight vertical close-up of Sushila, 58, silver-streaked low bun, muted olive saree, standing in the black doorway of the stripped room at night, lit from below and to one side by the torch on the floor so the light rakes up across her face from underneath. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Looking at the small object being held up, and not at all at the woman holding it.",
+      "motion": "She stands in the doorway without having made a sound. Her eyes are fixed on the small object. She speaks quietly, her mouth moving clearly, and on the final word she stops entirely and the image holds and freezes on her face.",
+      "audio": "Absolute silence with no footsteps preceding her at all, then a single low sub-bass hit on the last word.",
+      "dialogue": { "speaker": "sushila", "hi": "वो मुझे कभी नहीं मिला.", "en": "I never found that." },
+      "duration": 6
+    }
+  ],
+  "end_card": {
+    "line_hi": "सुशीला भी दो साल से कुछ ढूँढ रही थी।",
+    "line_en": "Sushila had been searching for something too, for two years.",
+    "seconds": 4
+  }
+}
