@@ -92,6 +92,13 @@ LIPSYNC_BACKENDS = {
     "sync2-pro":  ("fal-ai/sync-lipsync/v2", "sec",  0.083, {"model": "lipsync-2-pro"}),
 }
 VOICE_LEAD_S = 0.9          # beat of room tone before a line starts
+# Wav2Lip drives each video frame from a mel window that starts at that frame and
+# runs forward 200ms, so the mouth anticipates the sound it is shaping. Measured
+# across five shots in four episodes the lead is a consistent 2-6 frames, median
+# 3 at 24fps. The mix advances the spoken line by the same amount to put the
+# sound back under the mouth; without it the voice trails the lips by enough to
+# read as badly dubbed.
+LIPSYNC_LEAD_MS = 125
 
 
 def env(name: str) -> str:
@@ -418,6 +425,16 @@ def pad_voice(voice: Path, seconds: int, dest: Path, lead: float = VOICE_LEAD_S)
     return dest
 
 
+def advance_voice(voice: Path, ms: int, dest: Path) -> Path:
+    """The same track with its first `ms` trimmed, so the line lands earlier."""
+    if dest.exists():
+        return dest
+    run([ffmpeg(), "-y", "-hide_banner", "-loglevel", "error", "-i", str(voice),
+         "-af", f"atrim=start={ms / 1000:.3f},asetpts=N/SR/TB",
+         "-c:a", "libmp3lame", "-q:a", "2", str(dest)])
+    return dest
+
+
 def lipsync(clip: Path, voice: Path, dest: Path, backend: str = "sync2") -> Path:
     """Move the character's mouth to the generated line.
 
@@ -711,8 +728,13 @@ def main() -> None:
                 vo = pad_voice(raw, secs(s), work / "voice" / f"{s['id']}_pad.mp3")
                 padded = True
                 if not args.no_lipsync:
-                    clip = lipsync(clip, vo, work / "shots" / f"{s['id']}_ls.mp4",
-                                   args.lipsync)
+                    synced = lipsync(clip, vo, work / "shots" / f"{s['id']}_ls.mp4",
+                                     args.lipsync)
+                    if synced != clip:      # a sync really happened
+                        clip = synced
+                        # put the sound back under the mouth (see LIPSYNC_LEAD_MS)
+                        vo = advance_voice(vo, LIPSYNC_LEAD_MS,
+                                           work / "voice" / f"{s['id']}_mix.mp3")
             clip = lay_audio(clip, amb, vo, work / "cut" / f"{s['id']}_snd.mp4",
                              voice_predelayed=padded)
         final_clips.append(normalise(clip, work / "cut" / f"{s['id']}.mp4"))
