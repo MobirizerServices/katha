@@ -25,6 +25,7 @@ The output is `{slug}_e{NN}.mp4`, exactly what tools/ingest_media.py consumes.
 Backends (--video / --image), chosen by which account is funded:
     video: fal-hailuo (default, cheapest) | fal-kling | fal-wan | veo
     image: openai (default) | fal-flux | gemini
+    lipsync: sync2 (default) | sync2-pro | latentsync | local (free, offline)
 
 Only the project's own scripts and characters are ever sent to a model; no
 third-party footage, likeness or script enters this pipeline (see the content
@@ -45,6 +46,8 @@ import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 ROOT = Path(__file__).resolve().parent.parent
 GEN = ROOT / "media" / "_gen"
@@ -76,6 +79,9 @@ VOICES = {
 # latentsync is the cheap one and the softest; Sync Labs' lipsync-2 is the
 # quality option and barely dearer at these clip lengths.
 LIPSYNC_BACKENDS = {
+    # "local" runs Wav2Lip on this machine and costs nothing — no account, no
+    # API. See tools/lipsync_local.py for the one-time setup.
+    "local":      ("",                       "clip", 0.0,   {}),
     "latentsync": ("fal-ai/latentsync",      "clip", 0.20,  {}),
     "sync2":      ("fal-ai/sync-lipsync/v2", "sec",  0.050, {"model": "lipsync-2"}),
     "sync2-pro":  ("fal-ai/sync-lipsync/v2", "sec",  0.083, {"model": "lipsync-2-pro"}),
@@ -397,6 +403,9 @@ def lipsync(clip: Path, voice: Path, dest: Path, backend: str = "sync2") -> Path
     if dest.exists():
         print(f"    · {dest.name} (cached)")
         return dest
+    if backend == "local":
+        from lipsync_local import sync as _local_sync
+        return dest if _local_sync(clip, voice, dest, ffmpeg()) else clip
     endpoint, _, _, extra = LIPSYNC_BACKENDS[backend]
     hdr = {"Authorization": f"Key {env('FAL_KEY')}"}
 
