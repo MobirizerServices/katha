@@ -1,0 +1,167 @@
+{
+  "slug": "kaanch-ka-mahal",
+  "episode": 4,
+  "title": "Kheer",
+  "language": "hi",
+  "logline": "Sushila makes Meera cook the puja kheer, a recipe only a Rathore bahu is taught. Meera says she does not know it, then makes it perfectly — because her sister taught her.",
+  "look": "Indian family drama, old Lucknow haveli kitchen, worn stone counters, blackened brass and copper vessels, hard morning light through a high barred window, steam and dust in the light, shallow depth of field, cinematic 35mm anamorphic, muted ochre and deep green palette, film grain, no on-screen text, no logos, no artwork on walls",
+  "characters": {
+    "meera": {
+      "name": "Meera",
+      "ref_prompt": "Photorealistic portrait of a 27-year-old North Indian woman, warm brown skin, large expressive dark eyes, long dark hair partly covered by a soft red-and-gold wedding dupatta, minimal gold jewellery, black-beaded mangalsutra, deep red bridal saree. Composed and watchful, the face of someone concealing something. Natural window light from camera left, warm haveli interior behind her, shallow depth of field. Looking straight at the lens, mouth closed, neutral expression. Head and shoulders, vertical 9:16 framing."
+    },
+    "sushila": {
+      "name": "Sushila",
+      "ref_prompt": "Photorealistic portrait of a 58-year-old North Indian woman, silver-streaked black hair pulled into a tight low bun, plain starched cotton saree in muted olive with a thin border, small gold earrings, thin gold bangles. No smile. Authority without warmth, eyes that give nothing away, deep lines at the mouth. Dim warm tungsten light in an old haveli corridor, shallow depth of field. Looking straight at the lens, mouth closed. Head and shoulders, vertical 9:16 framing."
+    },
+    "kabir": {
+      "name": "Kabir",
+      "ref_prompt": "Photorealistic portrait of a 33-year-old North Indian man, clean-shaven with faint stubble, side-parted black hair, tired guarded eyes, well-cut charcoal kurta. Handsome, decent, exhausted by something he will not name. Warm interior light, shallow depth of field. Looking straight at the lens, mouth closed, neutral expression. Head and shoulders, vertical 9:16 framing."
+    },
+    "arun": {
+      "name": "Arun",
+      "ref_prompt": "Photorealistic portrait of a 34-year-old North Indian man, close-cropped black beard, knowing amused eyes, plain dark kurta, broader and more weathered than his younger brother. Unhurried, faintly entertained, entirely unbothered. Warm daylight, shallow depth of field. Looking straight at the lens, mouth closed. Head and shoulders, vertical 9:16 framing."
+    }
+  },
+  "shots": [
+    {
+      "id": "s01",
+      "beat": 1,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of an older woman's hands with thin gold bangles setting objects out one by one on a worn stone kitchen counter: a heavy blackened brass patila, a small brass bowl of saffron threads, a shallow dish of green cardamom pods, a measure of rice. They are placed in a deliberate row, evenly spaced, like instruments laid out for a procedure. Hard morning light from a high barred window, steam-free cold air, deep shadow behind.",
+      "motion": "The hands place each item down separately and precisely, squaring the last one with the others, then withdraw from frame and leave the row sitting there. Camera pushes in very slowly along the row.",
+      "audio": "Brass set down on stone, thin bangles clicking, a large quiet kitchen's echo, a crow outside a high window.",
+      "duration": 6
+    },
+    {
+      "id": "s02",
+      "beat": 1,
+      "characters": ["sushila"],
+      "frame_prompt": "Tight vertical close-up of Sushila, a 58-year-old North Indian woman with a tight silver-streaked low bun and muted olive cotton saree, standing in the old haveli kitchen facing camera directly. Hard morning light from a high barred window rakes across her face from camera left, blackened brass vessels out of focus behind her. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame.",
+      "motion": "She looks directly at camera and speaks evenly, her mouth moving clearly. She does not blink. Camera static.",
+      "audio": "A large stone kitchen's quiet echo, a crow outside, distant household sounds.",
+      "dialogue": { "speaker": "sushila", "hi": "शरद पूजा की खीर इस बार तुम बनाओगी.", "en": "This time you will make the Sharad puja kheer." },
+      "duration": 6
+    },
+    {
+      "id": "s03",
+      "beat": 2,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera, a 27-year-old woman in a deep red saree with the dupatta drawn over her hair, standing in the haveli kitchen facing camera directly. Hard morning light from a high barred window on one side of her face. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Carefully blank.",
+      "motion": "She speaks, her mouth moving clearly, her eyes lowering slightly on the last word in a show of deference. Camera static.",
+      "audio": "Quiet stone kitchen, a crow outside the high window.",
+      "dialogue": { "speaker": "meera", "hi": "मुझे इसकी विधि नहीं आती.", "en": "I don't know how it's made." },
+      "duration": 6
+    },
+    {
+      "id": "s04",
+      "beat": 2,
+      "characters": ["sushila"],
+      "frame_prompt": "Tight vertical close-up of Sushila, 58, silver-streaked bun, olive saree, facing camera directly in the kitchen, hard window light from camera left carving one side of her face, deep shadow on the other. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame.",
+      "motion": "She speaks flatly, her mouth moving clearly, and holds camera's gaze a beat too long afterwards. Camera static.",
+      "audio": "Quiet kitchen echo, a brass lid shifting somewhere.",
+      "dialogue": { "speaker": "sushila", "hi": "राठौर की बहू को आना चाहिए.", "en": "A Rathore bahu should know it." },
+      "duration": 6
+    },
+    {
+      "id": "s05",
+      "beat": 3,
+      "characters": [],
+      "frame_prompt": "Close-up insert, vertical, looking down into a heavy blackened brass patila on a low flame, full of milk just coming to the boil, a wrinkled skin forming across the surface and the first bubbles breaking at the rim. Steam rising through a hard shaft of morning light from a high barred window. Warm brass, white milk, deep shadow around.",
+      "motion": "The milk lifts and the skin wrinkles and slides as the first bubbles break at the edge. Steam curls up through the shaft of light. Camera holds directly overhead, very slow push-in.",
+      "audio": "Milk simmering, a low gas flame, a brass vessel ticking with heat, quiet kitchen.",
+      "duration": 6
+    },
+    {
+      "id": "s06",
+      "beat": 3,
+      "characters": ["sushila"],
+      "frame_prompt": "Tight vertical close-up of Sushila, 58, olive saree, silver-streaked bun, standing back from the stove and facing camera in the kitchen, hard morning light on her face, steam drifting through the frame between camera and her. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Watching, not helping.",
+      "motion": "She speaks two short instructions, her mouth moving clearly, her eyes tracking something low and off camera the whole time. Camera static.",
+      "audio": "Milk simmering off screen, low flame, quiet kitchen echo.",
+      "dialogue": { "speaker": "sushila", "hi": "पहले दूध. फिर चावल. जल्दी मत करना.", "en": "Milk first. Then rice. Don't hurry it." },
+      "duration": 6
+    },
+    {
+      "id": "s07",
+      "beat": 4,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of a young woman's hands with mehndi and red-and-gold bangles crushing green cardamom pods against a worn stone counter with the flat of a small brass bowl, the husks splitting open to show black seeds. Hard morning light from one side, steam drifting, deep shadow behind. Only the hands, the pods and the stone in frame.",
+      "motion": "The bowl presses down and rocks once, the pods split, and her fingers pick the black seeds out of the husks quickly and expertly, without hesitation. Camera holds tight.",
+      "audio": "Cardamom pods cracking against stone, brass on stone, milk simmering somewhere behind, quiet kitchen.",
+      "duration": 6
+    },
+    {
+      "id": "s08",
+      "beat": 4,
+      "characters": ["sushila"],
+      "frame_prompt": "Tight vertical close-up of Sushila's face, 58, silver-streaked bun, olive saree, in the kitchen, hard morning light from camera left, deep shadow on the other side, steam drifting past. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. She is watching something with total attention and no expression at all. She is not speaking.",
+      "motion": "Her eyes track a movement low and off camera, and something changes behind them. The smallest narrowing. She does not speak and does not move otherwise. Camera pushes in very slowly.",
+      "audio": "Milk simmering, low flame, a crow outside, otherwise silence.",
+      "duration": 6
+    },
+    {
+      "id": "s09",
+      "beat": 5,
+      "characters": [],
+      "frame_prompt": "Extreme close-up insert, vertical, of a young woman's fingers holding a small pinch of red saffron threads directly above a brass patila of simmering milk, and tapping the side of her closed fingers twice against the hot rim of the vessel to shake the threads loose. Mehndi on the fingers, red-and-gold bangles at the wrist. Steam rising through hard morning light, warm brass, deep shadow.",
+      "motion": "Her knuckles tap the rim of the brass twice, deliberately, and the saffron threads fall and bloom orange through the white milk. It is a small habitual gesture, done without thinking. Camera holds very tight.",
+      "audio": "Two soft knuckle taps on hot brass, milk simmering, a low flame, steam.",
+      "duration": 6
+    },
+    {
+      "id": "s10",
+      "beat": 5,
+      "characters": ["sushila"],
+      "frame_prompt": "Tight vertical close-up of Sushila, 58, olive saree, silver-streaked bun, facing camera in the kitchen, hard window light on one side of her face. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Something has just gone through her and she is holding very still.",
+      "motion": "She speaks one short sharp word, her mouth moving clearly. Her hand comes up slightly at the edge of frame and stops. Camera static.",
+      "audio": "Milk simmering, then the flame turned down, near silence.",
+      "dialogue": { "speaker": "sushila", "hi": "रुको.", "en": "Stop." },
+      "duration": 6
+    },
+    {
+      "id": "s11",
+      "beat": 6,
+      "characters": ["meera"],
+      "frame_prompt": "Tight vertical close-up of Meera, 27, deep red saree with dupatta over her hair, facing camera in the kitchen, steam drifting between camera and her face, hard morning light from one side. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Caught, and working very hard not to look it.",
+      "motion": "She goes completely still first, then speaks, her mouth moving clearly, her eyes steady on camera. One controlled breath afterwards. Camera static.",
+      "audio": "Steam, a low flame, absolute quiet in the kitchen.",
+      "dialogue": { "speaker": "meera", "hi": "क्या हुआ, माँ जी?", "en": "What is it, Maa ji?" },
+      "duration": 6
+    },
+    {
+      "id": "s12",
+      "beat": 6,
+      "characters": [],
+      "frame_prompt": "Close-up insert, vertical, of finished kheer in a shallow brass serving bowl on a worn stone counter: thick, pale gold, saffron threads swirled through it, crushed cardamom and slivered almonds across the surface, a brass spoon resting in it. Hard morning light from a high barred window across the surface, steam rising faintly, deep shadow around the bowl.",
+      "motion": "Steam rises faintly off the surface and the saffron colour spreads a little further through the pale gold. Nothing else moves. Camera pushes in slowly on the bowl.",
+      "audio": "Near silence, a brass spoon settling against the bowl, faint kitchen room tone.",
+      "duration": 6
+    },
+    {
+      "id": "s13",
+      "beat": 7,
+      "characters": ["sushila"],
+      "frame_prompt": "Tight vertical close-up of Sushila, 58, silver-streaked bun, olive saree, facing camera in the kitchen having just tasted something, a brass spoon lowering at the bottom edge of frame. Hard morning light from camera left. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame. Absolutely unreadable.",
+      "motion": "She lowers the spoon out of frame, swallows, and speaks two short words, her mouth moving clearly. Her expression gives away nothing at all. Camera static.",
+      "audio": "A brass spoon set down on stone, quiet kitchen, a crow outside.",
+      "dialogue": { "speaker": "sushila", "hi": "ठीक बनी है.", "en": "It has come out right." },
+      "duration": 6
+    },
+    {
+      "id": "s14",
+      "beat": 7,
+      "characters": ["sushila"],
+      "frame_prompt": "Tight vertical close-up of Sushila's face, 58, silver-streaked bun, olive saree, half turned away towards the kitchen door with her eyes coming back to camera over her shoulder. Hard morning light catching one side of her face, the rest in deep shadow. Her head and shoulders fill the frame, the face occupying the upper two-thirds of the vertical frame.",
+      "motion": "She begins to turn away, then stops and looks back at camera and speaks, her mouth moving clearly. On the final word she holds absolutely still, looking straight down the lens, and the image freezes on her face.",
+      "audio": "Complete kitchen silence, then a single low sub-bass hit on the last word.",
+      "dialogue": { "speaker": "sushila", "hi": "निशा भी बिल्कुल ऐसे ही बनाती थी. अजीब है.", "en": "Nisha used to make it exactly like this. Strange." },
+      "duration": 6
+    }
+  ],
+  "end_card": {
+    "line_hi": "उस रात मीरा ने निशा का कमरा ढूँढा।",
+    "line_en": "That night, Meera went looking for Nisha's room.",
+    "seconds": 4
+  }
+}
