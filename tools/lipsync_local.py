@@ -124,6 +124,13 @@ def blend_lips(src: Path, w2l: Path, dest: Path) -> bool:
             vw.write(fa)
             n += 1
             continue
+        # Lips only, deliberately. Widening the mask to take the jaw as well —
+        # so the chin moves and it reads more like real speech — was measured on
+        # a close-up and is not worth it: sharpness retained in the mouth region
+        # falls from 34% of the source (lips) to 11% (lips+chin) to 2% (full
+        # jaw), while the visible mouth motion barely changes. The wider masks
+        # simply drag Wav2Lip's 96x96 output across the whole lower face.
+        # Revisit only behind a face-restoration pass on the generated mouth.
         hull = cv2.convexHull(pts)
         m = np.zeros((H, W), np.uint8)
         cv2.fillConvexPoly(m, hull, 255)
