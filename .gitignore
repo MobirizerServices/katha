@@ -76,3 +76,7 @@ ios/KathaApp/Config/Local.xcconfig
 
 # Device screen-review captures (session artifacts, regenerable)
 review/
+
+# Purchased third-party reference code (CodeCanyon licences forbid redistribution).
+# Read it, learn from it, never commit it.
+ref/
